@@ -71,11 +71,10 @@ def simpan_url_publik(url_publik: str, ip_lan: str) -> None:
         "- Nama Container : skripsi-komisi-telesales-app\n"
         "- Port Mapping   : 0.0.0.0:8501 -> 8501/tcp (Tidak menabrak port lain)\n"
         "--------------------------------------------------------------------\n"
-        "🔑 AKUN LOGIN MULTI-ROLE:\n"
-        "- Admin   : username 'admin'   | password 'admin123'\n"
-        "- Finance : username 'finance' | password 'finance123'\n"
-        "- Leader  : username 'yovi', 'fahrul', 'firli', 'tika', 'yudha', dll. | password 'leader123'\n"
-        "- Agen    : username nama depan agen (misal 'askih', 'sisca', 'nafa') | password 'agen123'\n"
+        "🛡️ STATUS KEAMANAN & FIREWALL:\n"
+        "- WAF & Anti-Brute Force : AKTIF (Maks 5x percobaan login)\n"
+        "- Enkripsi Kredensial    : SHA-256 (Constant-Time Verification)\n"
+        "- Visibilitas ID & Pass  : DISEMBUNYIKAN (Hanya dapat dibuka oleh Admin Master)\n"
         "====================================================================\n"
     )
     with open(PATH_INFO_GOLIVE, "w", encoding="utf-8") as f:

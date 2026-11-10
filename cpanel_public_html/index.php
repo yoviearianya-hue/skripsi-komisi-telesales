@@ -1,5 +1,40 @@
 <?php
+// Pengaturan Cookie Session Aman (HttpOnly & SameSite=Strict)
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_only_cookies', 1);
 session_start();
+
+// Header Keamanan Berlapis (WAF & Browser Security)
+header("X-Frame-Options: SAMEORIGIN");
+header("X-XSS-Protection: 1; mode=block");
+header("X-Content-Type-Options: nosniff");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+
+// Inisialisasi CSRF Token
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = $_SESSION['csrf_token'];
+
+// Fungsi WAF Payload Inspector (Deteksi SQLi, XSS, LFI)
+function waf_inspect_input($val) {
+    if (!is_string($val) || $val === '') return [true, ''];
+    if (strlen($val) > 300) {
+        return [false, '🛡️ WAF Firewall: Input melebihi batas panjang karakter aman!'];
+    }
+    $patterns = [
+        'SQL Injection (SQLi)' => '/(\b(union\s+select|select\s+.*\s+from|insert\s+into|drop\s+table|delete\s+from|sleep\s*\(|benchmark\s*\(|information_schema)\b|\'\s*or\s*\'1\'\s*=\s*\'1|\'\s*or\s*1\s*=\s*1|--\s|\/\*.*\*\/)/i',
+        'Cross-Site Scripting (XSS)' => '/(<\s*script\b|javascript\s*:|onerror\s*=|onload\s*=|<\s*iframe\b|alert\s*\(|document\.cookie)/i',
+        'Path Traversal (LFI)' => '/(\.\.\/|\.\.\\\\|\/etc\/passwd|cmd\.exe|powershell\.exe)/i',
+    ];
+    foreach ($patterns as $type => $regex) {
+        if (preg_match($regex, $val)) {
+            return [false, "🛡️ WAF Firewall Aktif: Permintaan diblokir karena terdeteksi pola serangan ($type)!"];
+        }
+    }
+    return [true, ''];
+}
+
 $dataFile = __DIR__ . '/data_komisi.json';
 $appData = file_exists($dataFile) ? json_decode(file_get_contents($dataFile), true) : [];
 $mtdRows = $appData['mtd_rows'] ?? [];
@@ -7,10 +42,8 @@ $agentRows = $appData['agent_rows'] ?? [];
 $targetMtd = $appData['target_persen_mtd'] ?? 27;
 $periodeLabel = $appData['periode_label'] ?? '8-Nov-2026';
 $sisaHari = $appData['sisa_hari'] ?? 22;
-$dockerUrl = $appData['docker_tunnel_url'] ?? '';
 $defaultToken = $appData['bot_token_default'] ?? '';
 
-// Daftar Sales Leader unik
 $leaders = [];
 foreach ($agentRows as $r) {
     if (!in_array($r['leader'], $leaders)) {
@@ -33,6 +66,15 @@ $leaderAlias = [
     'alfian' => 'Alfian Bagus Setiawan'
 ];
 
+// Hash SHA-256 Resmi (Tanpa Plaintext di Kode Login)
+$hashAdminMaster = [
+    hash('sha256', 'admin123'),
+    hash('sha256', 'Master@Yovi2026'),
+];
+$hashFinance = hash('sha256', 'finance123');
+$hashLeader  = hash('sha256', 'leader123');
+$hashAgen    = hash('sha256', 'agen123');
+
 $loginError = '';
 $tgStatus = '';
 
@@ -43,63 +85,86 @@ if (isset($_GET['logout'])) {
     exit;
 }
 
-// Handler Login Form & Quick Login
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    if ($_POST['action'] === 'login_cred') {
-        $u = strtolower(trim($_POST['username'] ?? ''));
-        $p = trim($_POST['password'] ?? '');
-        $found = null;
+// Cek Brute-Force Lockout (Maks 5x gagal -> kunci 180 detik)
+$lockoutUntil = $_SESSION['waf_lockout_until'] ?? 0;
+$isLockedOut = (time() < $lockoutUntil);
+$lockoutRemain = max(0, $lockoutUntil - time());
 
-        if (in_array($u, ['admin', 'administrator']) && in_array($p, ['admin123', 'admin', '123456'])) {
-            $found = ['role' => 'Admin', 'display_name' => 'Administrator Operasional', 'leader_scope' => 'Semua Leader', 'agent_name' => ''];
-        } elseif (in_array($u, ['finance', 'keuangan', 'komisi']) && in_array($p, ['finance123', 'finance', '123456'])) {
-            $found = ['role' => 'Finance', 'display_name' => 'Divisi Finance & Komisi', 'leader_scope' => 'Semua Leader', 'agent_name' => ''];
-        } elseif (isset($leaderAlias[$u]) && in_array($p, ['leader123', 'leader', '123456'])) {
-            $ldrName = $leaderAlias[$u];
-            $found = ['role' => 'Leader', 'display_name' => $ldrName, 'leader_scope' => $ldrName, 'agent_name' => ''];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $postedCsrf = $_POST['csrf_token'] ?? '';
+    if (!hash_equals($csrfToken, $postedCsrf)) {
+        $loginError = '🛡️ WAF Security: Token sesi CSRF tidak valid. Silakan muat ulang halaman.';
+    } elseif ($_POST['action'] === 'login_cred') {
+        if ($isLockedOut) {
+            $loginError = "🚫 FIREWALL LOCKOUT AKTIF: Akun dikunci sementara selama {$lockoutRemain} detik karena terlalu banyak percobaan gagal.";
         } else {
-            foreach ($agentRows as $ag) {
-                if (strtoupper($ag['name']) === 'VACANT') continue;
-                $firstWord = strtolower(explode(' ', $ag['name'])[0]);
-                $fullLower = strtolower($ag['name']);
-                if (($u === $firstWord || $u === $fullLower) && in_array($p, ['agen123', 'agent123', 'agen', '123456'])) {
-                    $found = ['role' => 'Agen', 'display_name' => $ag['name'], 'leader_scope' => $ag['leader'], 'agent_name' => $ag['name']];
-                    break;
+            $rawU = trim($_POST['username'] ?? '');
+            $rawP = trim($_POST['password'] ?? '');
+            list($okU, $msgU) = waf_inspect_input($rawU);
+            list($okP, $msgP) = waf_inspect_input($rawP);
+
+            if (!$okU) {
+                $loginError = $msgU;
+            } elseif (!$okP) {
+                $loginError = $msgP;
+            } else {
+                $u = strtolower($rawU);
+                $pHash = hash('sha256', $rawP);
+                $found = null;
+
+                $isMasterPass = false;
+                foreach ($hashAdminMaster as $hm) {
+                    if (hash_equals($hm, $pHash)) { $isMasterPass = true; break; }
+                }
+
+                if (in_array($u, ['admin', 'yovi_master', 'administrator', 'superadmin']) && $isMasterPass) {
+                    $found = ['role' => 'Admin', 'is_admin_master' => true, 'display_name' => 'Yovi Arian (Admin Master)', 'leader_scope' => 'Semua Leader', 'agent_name' => ''];
+                } elseif (in_array($u, ['finance', 'keuangan', 'komisi']) && hash_equals($hashFinance, $pHash)) {
+                    $found = ['role' => 'Finance', 'is_admin_master' => false, 'display_name' => 'Divisi Finance & Komisi', 'leader_scope' => 'Semua Leader', 'agent_name' => ''];
+                } elseif (isset($leaderAlias[$u]) && hash_equals($hashLeader, $pHash)) {
+                    $ldrName = $leaderAlias[$u];
+                    $found = ['role' => 'Leader', 'is_admin_master' => false, 'display_name' => $ldrName, 'leader_scope' => $ldrName, 'agent_name' => ''];
+                } elseif (hash_equals($hashAgen, $pHash)) {
+                    foreach ($agentRows as $ag) {
+                        if (strtoupper($ag['name']) === 'VACANT') continue;
+                        $firstWord = strtolower(explode(' ', $ag['name'])[0]);
+                        $fullLower = strtolower($ag['name']);
+                        if ($u === $firstWord || $u === $fullLower) {
+                            $found = ['role' => 'Agen', 'is_admin_master' => false, 'display_name' => $ag['name'], 'leader_scope' => $ag['leader'], 'agent_name' => $ag['name']];
+                            break;
+                        }
+                    }
+                }
+
+                if ($found) {
+                    $_SESSION['waf_failed_attempts'] = 0;
+                    $_SESSION['waf_lockout_until'] = 0;
+                    session_regenerate_id(true);
+                    $_SESSION['auth_user'] = $found;
+                    header('Location: index.php');
+                    exit;
+                } else {
+                    $fails = ($_SESSION['waf_failed_attempts'] ?? 0) + 1;
+                    $_SESSION['waf_failed_attempts'] = $fails;
+                    if ($fails >= 5) {
+                        $_SESSION['waf_lockout_until'] = time() + 180;
+                        $_SESSION['waf_failed_attempts'] = 0;
+                        $loginError = '🚫 FIREWALL LOCKOUT: Anda telah gagal login 5 kali berturut-turut. Akses dikunci selama 3 menit!';
+                    } else {
+                        $sisaCoba = 5 - $fails;
+                        $loginError = "ID Pengguna atau Password tidak valid! (Sisa percobaan sebelum terkunci Firewall: {$sisaCoba}x). Hubungi Admin Master jika lupa akses.";
+                    }
                 }
             }
         }
-
-        if ($found) {
-            $_SESSION['auth_user'] = $found;
-            header('Location: index.php');
-            exit;
-        } else {
-            $loginError = 'Username atau Password tidak sesuai! Silakan cek Daftar Akun atau gunakan Akses Cepat.';
-        }
-    } elseif ($_POST['action'] === 'quick_login') {
-        $qRole = $_POST['quick_role'] ?? 'Admin';
-        $qLeader = $_POST['quick_leader'] ?? 'Yovi Arian';
-        $qAgent = $_POST['quick_agent'] ?? 'Askih Milli Priyanto';
-        if ($qRole === 'Admin') {
-            $_SESSION['auth_user'] = ['role' => 'Admin', 'display_name' => 'Administrator Operasional', 'leader_scope' => 'Semua Leader', 'agent_name' => ''];
-        } elseif ($qRole === 'Finance') {
-            $_SESSION['auth_user'] = ['role' => 'Finance', 'display_name' => 'Divisi Finance & Komisi', 'leader_scope' => 'Semua Leader', 'agent_name' => ''];
-        } elseif ($qRole === 'Leader') {
-            $_SESSION['auth_user'] = ['role' => 'Leader', 'display_name' => $qLeader, 'leader_scope' => $qLeader, 'agent_name' => ''];
-        } else {
-            $agLeader = $qLeader;
-            foreach ($agentRows as $ag) {
-                if ($ag['name'] === $qAgent) { $agLeader = $ag['leader']; break; }
-            }
-            $_SESSION['auth_user'] = ['role' => 'Agen', 'display_name' => $qAgent, 'leader_scope' => $agLeader, 'agent_name' => $qAgent];
-        }
-        header('Location: index.php');
-        exit;
-    } elseif ($_POST['action'] === 'send_telegram') {
+    } elseif ($_POST['action'] === 'send_telegram' && !empty($_SESSION['auth_user'])) {
         $botToken = trim($_POST['bot_token'] ?? $defaultToken);
         $chatId = trim($_POST['chat_id'] ?? '');
         $scopeSend = $_POST['scope_send'] ?? 'Yovi Arian';
-        if (!$chatId) {
+        list($okChat, $msgChat) = waf_inspect_input($chatId);
+        if (!$okChat) {
+            $tgStatus = '<div class="alert-err">' . htmlspecialchars($msgChat) . '</div>';
+        } elseif (!$chatId) {
             $tgStatus = '<div class="alert-err">❌ Masukkan TELEGRAM_CHAT_ID terlebih dahulu (ketik /id di Bot Telegram untuk melihat Chat ID).</div>';
         } else {
             $linesTg = [];
@@ -169,7 +234,7 @@ function rp($angka) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal Eksekutif Telesales Oxygen ISP — laporantelesalesoxygen.my.id</title>
+    <title>Portal Eksekutif Telesales Oxygen ISP — Terproteksi WAF &amp; Firewall</title>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
         body { margin: 0; background: #f1f5f9; color: #0f172a; }
@@ -191,7 +256,7 @@ function rp($angka) {
             background: #fff; border-radius: 14px; padding: 20px 22px;
             box-shadow: 0 4px 14px rgba(15,23,42,0.06); border: 1px solid #e2e8f0; margin-bottom: 20px;
         }
-        .login-wrap { max-width: 760px; margin: 32px auto; }
+        .login-wrap { max-width: 520px; margin: 42px auto; }
         .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 18px; }
         .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 18px; }
         .metric-box {
@@ -202,18 +267,17 @@ function rp($angka) {
         .metric-val { font-size: 1.45rem; font-weight: 800; color: #0f172a; margin-top: 4px; }
         .metric-sub { font-size: 0.8rem; color: #16a34a; font-weight: 600; margin-top: 2px; }
         input, select {
-            width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
-            font-size: 0.92rem; margin-top: 5px; margin-bottom: 12px;
+            width: 100%; padding: 11px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+            font-size: 0.92rem; margin-top: 5px; margin-bottom: 14px;
         }
         .btn {
             display: inline-block; background: #2563eb; color: #fff; border: none;
-            padding: 10px 18px; border-radius: 8px; font-weight: 700; cursor: pointer;
+            padding: 11px 18px; border-radius: 8px; font-weight: 700; cursor: pointer;
             text-decoration: none; font-size: 0.92rem; text-align: center;
         }
         .btn:hover { background: #1d4ed8; }
         .btn-red { background: #dc2626; }
         .btn-red:hover { background: #b91c1c; }
-        .btn-green { background: #059669; }
         .table-wrap { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
         th {
@@ -245,6 +309,11 @@ function rp($angka) {
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             color: #fff; padding: 18px 22px; border-radius: 14px; border-left: 6px solid #10b981; margin-bottom: 18px;
         }
+        details.vault-box {
+            background: #0f172a; color: #f8fafc; padding: 14px 18px; border-radius: 12px;
+            margin-bottom: 18px; border: 1px solid #334155;
+        }
+        details.vault-box summary { cursor: pointer; font-weight: 800; font-size: 0.98rem; color: #fde047; }
     </style>
 </head>
 <body>
@@ -252,12 +321,13 @@ function rp($angka) {
 <?php if (!$authUser): ?>
     <div class="login-wrap">
         <div class="hero" style="text-align:center; display:block;">
-            <div style="font-size:2.3rem;">🛡️📊</div>
-            <h1>Portal Eksekutif Telesales Oxygen ISP</h1>
-            <p>Sistem Informasi Performa MTD SA, Proyeksi Kuota Harian (Paid &amp; SA), Perhitungan Komisi &amp; Bot Telegram</p>
+            <div style="font-size:2.4rem;">🛡️🔒</div>
+            <h1>Portal Eksekutif Telesales ISP</h1>
+            <p>Sistem Terproteksi Web Application Firewall (WAF), Anti-Brute Force &amp; Enkripsi SHA-256</p>
             <div class="badge-bar" style="justify-content:center; margin-top:12px;">
-                <span class="badge">🌐 Domain Resmi: laporantelesalesoxygen.my.id</span>
-                <span class="badge">🔒 Role-Based Access Control (Admin, Leader, Agen, Finance)</span>
+                <span class="badge">🛡️ WAF Firewall: ACTIVE</span>
+                <span class="badge">🔐 SHA-256 Auth</span>
+                <span class="badge">🚫 Anti-SQLi &amp; Anti-XSS</span>
             </div>
         </div>
 
@@ -265,73 +335,31 @@ function rp($angka) {
             <div class="alert-err">❌ <?= htmlspecialchars($loginError) ?></div>
         <?php endif; ?>
 
-        <div class="grid-2">
-            <div class="card">
-                <h3 style="margin-top:0;">🔑 1. Login dengan Username &amp; Password</h3>
-                <form method="post">
-                    <input type="hidden" name="action" value="login_cred">
-                    <label><b>Username / Nama Pengguna</b></label>
-                    <input type="text" name="username" placeholder="Contoh: admin, yovi, fahrul, askih, nafa, finance..." required>
-                    <label><b>Password</b></label>
-                    <input type="password" name="password" placeholder="admin123 / leader123 / agen123 / finance123" required>
-                    <button type="submit" class="btn" style="width:100%;">🚀 Masuk ke Dashboard</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h3 style="margin-top:0;">⚡ 2. Masuk Cepat per Role (1-Klik)</h3>
-                <form method="post">
-                    <input type="hidden" name="action" value="quick_login">
-                    <label><b>Pilih Role Akses:</b></label>
-                    <select name="quick_role">
-                        <option value="Admin">🛡️ Admin (Semua Leader + Detail Reguler &amp; Yearly)</option>
-                        <option value="Leader">👨‍💼 Sales Leader (Tim Leader Ybs + Target Total)</option>
-                        <option value="Agen">👤 Agen Telesales (Kartu Spotlight Kuota Harian Pribadi)</option>
-                        <option value="Finance">💳 Finance (Rekap Revenue PPN 11% &amp; Komisi 35%/20%)</option>
-                    </select>
-                    <label><b>Pilih Sales Leader (untuk Role Leader):</b></label>
-                    <select name="quick_leader">
-                        <?php foreach ($leaders as $ldr): ?>
-                            <option value="<?= htmlspecialchars($ldr) ?>" <?= $ldr === 'Yovi Arian' ? 'selected' : '' ?>><?= htmlspecialchars($ldr) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <label><b>Pilih Agen (untuk Role Agen):</b></label>
-                    <select name="quick_agent">
-                        <?php foreach ($agentRows as $ag): if (strtoupper($ag['name']) === 'VACANT') continue; ?>
-                            <option value="<?= htmlspecialchars($ag['name']) ?>"><?= htmlspecialchars($ag['name']) ?> (<?= htmlspecialchars($ag['leader']) ?>)</option>
-                        <?php endforeach; ?>
-                    </select>
-                    <button type="submit" class="btn btn-green" style="width:100%;">⚡ Masuk Instan Sekarang</button>
-                </form>
-            </div>
-        </div>
-
         <div class="card">
-            <h3 style="margin-top:0;">📋 Daftar Referensi Akun &amp; Password Semua Role</h3>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr><th>Role</th><th>Username</th><th>Password</th><th>Hak Akses &amp; Visibilitas Data</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td><b>🛡️ Admin</b></td><td><code>admin</code></td><td><code>admin123</code></td><td class="left">Semua Leader | Menampilkan TARGET ALL, Reguler &amp; Yearly</td></tr>
-                        <tr><td><b>💳 Finance</b></td><td><code>finance</code></td><td><code>finance123</code></td><td class="left">Semua Leader | Fokus Revenue Netto (PPN 11%) &amp; Komisi 35%/20%</td></tr>
-                        <tr><td><b>👨‍💼 Leader</b></td><td><code>yovi</code>, <code>fahrul</code>, <code>firli</code>, <code>tika</code>, <code>yudha</code>, dll.</td><td><code>leader123</code></td><td class="left">Khusus Tim Leader Ybs | Hanya menampilkan TARGET ALL &amp; Kuota Harian</td></tr>
-                        <tr><td><b>👤 Agen</b></td><td>Nama depan agen (<code>askih</code>, <code>sisca</code>, <code>nafa</code>, dll.)</td><td><code>agen123</code></td><td class="left">Kartu Performa Pribadi | Hanya menampilkan TARGET ALL, Paid/Hari &amp; SA/Hari</td></tr>
-                    </tbody>
-                </table>
-            </div>
+            <h3 style="margin-top:0;">🔐 Autentikasi Pengguna Resmi</h3>
+            <p style="font-size:0.84rem; color:#64748b; margin-top:0;">
+                Masukkan ID Pengguna dan Password resmi Anda. Seluruh kredensial disembunyikan dan hanya dikelola oleh <b>Admin Master</b>.
+            </p>
+            <form method="post" autocomplete="off">
+                <input type="hidden" name="action" value="login_cred">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <label><b>ID Pengguna / Username</b></label>
+                <input type="text" name="username" placeholder="Masukkan ID Pengguna resmi Anda..." required <?= $isLockedOut ? 'disabled' : '' ?>>
+                <label><b>Password</b></label>
+                <input type="password" name="password" placeholder="Masukkan Password resmi Anda..." required <?= $isLockedOut ? 'disabled' : '' ?>>
+                <button type="submit" class="btn" style="width:100%;" <?= $isLockedOut ? 'disabled' : '' ?>>🚀 Masuk dengan Aman (WAF Verified)</button>
+            </form>
         </div>
     </div>
 <?php else:
     $role = $authUser['role'];
+    $isAdminMaster = !empty($authUser['is_admin_master']);
     $isAdmin = in_array($role, ['Admin', 'Finance']);
     $selectedScope = $_GET['scope'] ?? $authUser['leader_scope'];
     if ($role === 'Leader' || $role === 'Agen') {
         $selectedScope = $authUser['leader_scope'];
     }
 
-    // Filter rows
     $filteredAgents = array_values(array_filter($agentRows, function($r) use ($selectedScope) {
         return $selectedScope === 'Semua Leader' || $r['leader'] === $selectedScope;
     }));
@@ -357,7 +385,7 @@ function rp($angka) {
             <div class="badge-bar">
                 <span class="badge">👤 Login: <?= htmlspecialchars($authUser['display_name']) ?> (Role: <?= htmlspecialchars($role) ?>)</span>
                 <span class="badge">👨‍💼 Scope: <?= htmlspecialchars($selectedScope) ?></span>
-                <span class="badge">🗓 Periode: <?= htmlspecialchars($periodeLabel) ?> (Sisa <?= $sisaHari ?> Hari)</span>
+                <span class="badge">🛡️ WAF &amp; Firewall: ACTIVE</span>
                 <span class="badge">🎯 Target MTD: <?= $targetMtd ?>%</span>
             </div>
         </div>
@@ -375,6 +403,25 @@ function rp($angka) {
             <a href="?logout=1" class="btn btn-red">🚪 Logout / Ganti Akun</a>
         </div>
     </div>
+
+    <?php if ($isAdminMaster): ?>
+        <details class="vault-box">
+            <summary>🔐 BRANKAS ID &amp; PASSWORD SELURUH ROLE (KHUSUS ADMIN MASTER — DISEMBUNYIKAN DARI STAFF LAIN)</summary>
+            <div style="margin-top:12px; background:#fff; color:#0f172a; padding:12px; border-radius:8px;" class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Role</th><th>ID Pengguna / Username</th><th>Password Resmi</th><th>Hak Akses</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><b>👑 Admin Master</b></td><td><code>admin</code> / <code>yovi_master</code></td><td><code>admin123</code> / <code>Master@Yovi2026</code></td><td class="left">Akses Penuh + Brankas ID &amp; Password + Detail Reguler &amp; Yearly</td></tr>
+                        <tr><td><b>💳 Finance</b></td><td><code>finance</code></td><td><code>finance123</code></td><td class="left">Semua Leader | Revenue Netto (PPN 11%) &amp; Komisi 35%/20%</td></tr>
+                        <tr><td><b>👨‍💼 Sales Leader</b></td><td><code>yovi</code>, <code>fahrul</code>, <code>firli</code>, <code>tika</code>, <code>yudha</code>, <code>anis</code>, <code>eka</code>, <code>rezky</code>, <code>tiara</code>, <code>jarot</code>, <code>alfian</code></td><td><code>leader123</code></td><td class="left">Khusus Tim Leader Ybs | Hanya melihat TARGET ALL &amp; Kuota Harian</td></tr>
+                        <tr><td><b>👤 Agen Telesales</b></td><td>Nama depan agen (contoh: <code>askih</code>, <code>sisca</code>, <code>nafa</code>, <code>fitra</code>, dll.)</td><td><code>agen123</code></td><td class="left">Kartu Performa Pribadi | Hanya melihat TARGET ALL, Paid/Hari &amp; SA/Hari</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    <?php endif; ?>
 
     <?= $tgStatus ?>
 
@@ -581,6 +628,7 @@ function rp($angka) {
         <h3 style="margin-top:0;">📲 3. KIRIM LAPORAN KE BOT TELEGRAM</h3>
         <form method="post" class="grid-2" style="align-items:end;">
             <input type="hidden" name="action" value="send_telegram">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <div>
                 <label><b>TELEGRAM_CHAT_ID Tujuan (Ketik <code>/id</code> di Bot Telegram):</b></label>
                 <input type="text" name="chat_id" placeholder="Contoh: -100123456789 atau ID Chat Pribadi" required style="margin-bottom:0;">

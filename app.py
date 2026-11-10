@@ -11,6 +11,19 @@ import requests
 import streamlit as st
 
 from gambar_laporan import buat_semua_gambar_laporan
+from security_firewall import (
+    HASH_PASS_ADMIN_MASTER,
+    HASH_PASS_AGEN,
+    HASH_PASS_FINANCE,
+    HASH_PASS_LEADER,
+    MAKS_GAGAL_LOGIN,
+    baca_log_keamanan_terbaru,
+    bandingkan_hash_aman,
+    catat_gagal_login,
+    cek_status_lockout,
+    periksa_input_waf,
+    reset_gagal_login,
+)
 
 # Cek ketersediaan library opsional PandasAI untuk Tab Chatbot
 try:
@@ -806,12 +819,9 @@ def verifikasi_login_kredensial(
     password_input: str,
     df_target_ref: pd.DataFrame | None,
 ) -> dict | None:
-    """Memverifikasi pasangan Username & Password untuk seluruh Role:
+    """Memverifikasi pasangan ID & Password dengan Hash SHA-256 (Constant-Time Comparison).
 
-    1. Role Admin   : username 'admin', password 'admin123'
-    2. Role Finance : username 'finance', password 'finance123'
-    3. Role Leader  : username nama depan/lengkap leader (misal 'yovi', 'fahrul', 'firli', 'tika', 'yudha', dll.), password 'leader123'
-    4. Role Agen    : username nama depan/lengkap agen (misal 'askih', 'sisca', 'nafa', 'fitra', dll.), password 'agen123'
+    Seluruh ID & Password disembunyikan dari publik dan hanya dapat dibuka oleh Admin Master.
     """
     u = re.sub(r"\s+", " ", str(username_input)).strip().lower()
     p = str(password_input).strip()
@@ -819,30 +829,27 @@ def verifikasi_login_kredensial(
     if not u or not p:
         return None
 
-    # 1. Cek Role Admin
-    if u in ("admin", "administrator", "superadmin") and p in (
-        "admin123",
-        "admin",
-        "123456",
+    # 1. Cek Role Admin Master (Hanya untuk pemilik sistem / Admin Master)
+    if u in ("admin", "yovi_master", "administrator", "superadmin") and bandingkan_hash_aman(
+        p, HASH_PASS_ADMIN_MASTER
     ):
         return {
             "logged_in": True,
+            "is_admin_master": True,
             "role": "Admin",
-            "username": "admin",
-            "display_name": "Administrator Operasional",
+            "username": u,
+            "display_name": "Yovi Arian (Admin Master)",
             "leader_scope": "Semua Leader",
             "agent_key": "",
         }
 
     # 2. Cek Role Finance
-    if u in ("finance", "keuangan", "komisi") and p in (
-        "finance123",
-        "finance",
-        "admin123",
-        "123456",
+    if u in ("finance", "keuangan", "komisi") and bandingkan_hash_aman(
+        p, HASH_PASS_FINANCE
     ):
         return {
             "logged_in": True,
+            "is_admin_master": False,
             "role": "Finance",
             "username": "finance",
             "display_name": "Divisi Finance & Komisi",
@@ -851,10 +858,11 @@ def verifikasi_login_kredensial(
         }
 
     # 3. Cek Role Sales Leader
-    if u in USERNAME_KE_LEADER and p in ("leader123", "leader", "123456"):
+    if u in USERNAME_KE_LEADER and bandingkan_hash_aman(p, HASH_PASS_LEADER):
         nama_ldr = USERNAME_KE_LEADER[u]
         return {
             "logged_in": True,
+            "is_admin_master": False,
             "role": "Leader",
             "username": u,
             "display_name": nama_ldr,
@@ -879,9 +887,10 @@ def verifikasi_login_kredensial(
                 agent_key.lower(),
                 kata_depan,
                 username_slug,
-            ) and p in ("agen123", "agent123", "agen", "123456"):
+            ) and bandingkan_hash_aman(p, HASH_PASS_AGEN):
                 return {
                     "logged_in": True,
+                    "is_admin_master": False,
                     "role": "Agen",
                     "username": kata_depan,
                     "display_name": nama_tampil,
@@ -893,242 +902,87 @@ def verifikasi_login_kredensial(
 
 
 def tampilkan_halaman_login(df_target_ref: pd.DataFrame | None) -> None:
-    """Menampilkan Halaman Portal Login Multi-Role yang elegan dan interaktif."""
-    url_publik_login = ambil_url_publik_aktif()
-    url_lan_login = ambil_url_lan_aktif(8501)
-    _, col_mid, _ = st.columns([1, 2.2, 1])
+    """Menampilkan Halaman Portal Login Terproteksi WAF & Firewall (Tanpa Mengekspos ID/Password)."""
+    _, col_mid, _ = st.columns([1, 2.0, 1])
     with col_mid:
         st.markdown(
             """
             <div class="login-hero">
-                <div style="font-size: 2.4rem; margin-bottom: 6px;">🛡️📊</div>
+                <div style="font-size: 2.4rem; margin-bottom: 6px;">🛡️🔒</div>
                 <h1>Portal Eksekutif Telesales ISP</h1>
-                <p>Sistem Informasi Performa MTD SA, Proyeksi Kuota Harian (Paid &amp; SA), Perhitungan Komisi &amp; Bot Telegram</p>
+                <p>Sistem Terproteksi Web Application Firewall (WAF), Anti-Brute Force &amp; Enkripsi SHA-256</p>
+                <div style="margin-top: 10px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                    <span class="exec-badge">🛡️ WAF Firewall: ACTIVE</span>
+                    <span class="exec-badge">🔐 SHA-256 Auth</span>
+                    <span class="exec-badge">🚫 Anti-SQLi &amp; Anti-XSS</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        if url_publik_login:
-            st.success(
-                f"🌐 **STATUS GO-LIVE AKTIF (Bisa Diakses Seluruh Staff via HP / Laptop):**  \n"
-                f"🔗 **Link Publik (Internet):** [{url_publik_login}]({url_publik_login})  \n"
-                f"📶 **Link Wi-Fi / LAN Kantor:** `{url_lan_login}`"
+        sedang_lockout, sisa_detik = cek_status_lockout(st.session_state)
+        if sedang_lockout:
+            st.error(
+                f"🚫 **FIREWALL PROTEKSI BRUTE-FORCE AKTIF:** Terlalu banyak percobaan login yang gagal. "
+                f"Akses login dikunci sementara selama **{sisa_detik} detik** demi keamanan sistem."
             )
-        else:
-            st.info(
-                f"📶 **Akses Jaringan Wi-Fi / LAN Kantor:** `{url_lan_login}` *(Jalankan `golive_server.py` untuk mengaktifkan Link Publik Internet)*"
+            return
+
+        with st.form("form_login_utama", clear_on_submit=False):
+            st.markdown("##### 🔐 Autentikasi Pengguna Resmi")
+            st.caption(
+                "Masukkan ID Pengguna dan Password resmi Anda. Daftar ID & Password bersifat rahasia dan hanya dikelola oleh **Admin Master**."
+            )
+            inp_user = st.text_input(
+                "ID Pengguna / Username",
+                placeholder="Masukkan ID Pengguna resmi Anda...",
+            )
+            inp_pass = st.text_input(
+                "Password",
+                type="password",
+                placeholder="Masukkan Password resmi Anda...",
+            )
+            btn_submit_login = st.form_submit_button(
+                "🚀 Masuk dengan Aman (WAF Verified)",
+                type="primary",
+                width="stretch",
             )
 
-
-        tab_kredensial, tab_cepat, tab_daftar_akun = st.tabs(
-            [
-                "🔑 Login Username & Password",
-                "⚡ Akses Cepat per Role (Demo / Sidang)",
-                "📋 Daftar Akun & Password",
-            ]
-        )
-
-        with tab_kredensial:
-            with st.form("form_login_utama", clear_on_submit=False):
-                st.markdown("##### 🔐 Masuk dengan Akun Resmi")
-                inp_user = st.text_input(
-                    "Username / Nama Pengguna",
-                    placeholder="Contoh: admin, yovi, fahrul, firli, askih, nafa, finance...",
-                )
-                inp_pass = st.text_input(
-                    "Password",
-                    type="password",
-                    placeholder="Masukkan password (admin123 / leader123 / agen123 / finance123)",
-                )
-                btn_submit_login = st.form_submit_button(
-                    "🚀 Masuk ke Dashboard",
-                    type="primary",
-                    width="stretch",
-                )
-
-                if btn_submit_login:
+            if btn_submit_login:
+                aman_u, pesan_waf_u = periksa_input_waf(inp_user, "ID Pengguna")
+                aman_p, pesan_waf_p = periksa_input_waf(inp_pass, "Password")
+                if not aman_u:
+                    st.error(pesan_waf_u)
+                elif not aman_p:
+                    st.error(pesan_waf_p)
+                else:
                     hasil_auth = verifikasi_login_kredensial(
                         inp_user, inp_pass, df_target_ref
                     )
                     if hasil_auth is not None:
+                        reset_gagal_login(
+                            st.session_state,
+                            inp_user,
+                            str(hasil_auth.get("role", "")),
+                        )
                         st.session_state["auth_user"] = hasil_auth
                         st.rerun()
                     else:
-                        st.error(
-                            "❌ Username atau Password tidak sesuai! Silakan cek tab **'📋 Daftar Akun & Password'** atau gunakan tab **'⚡ Akses Cepat per Role'**."
+                        jml_gagal, kena_lockout = catat_gagal_login(
+                            st.session_state, inp_user
                         )
+                        if kena_lockout:
+                            st.error(
+                                "🚫 **FIREWALL LOCKOUT:** Anda telah gagal login 5 kali berturut-turut. Sesi dikunci sementara selama 3 menit!"
+                            )
+                        else:
+                            sisa_coba = MAKS_GAGAL_LOGIN - jml_gagal
+                            st.error(
+                                f"❌ ID Pengguna atau Password tidak valid! (Sisa percobaan sebelum terkunci Firewall: **{sisa_coba}x**). "
+                                f"Hubungi **Admin Master** jika lupa kredensial Anda."
+                            )
 
-        with tab_cepat:
-            st.markdown(
-                "##### ⚡ Pilih Role & Identitas Pengguna Secara Langsung"
-            )
-            st.caption(
-                "Memudahkan pengujian seluruh hak akses (*Role-Based Access Control*) secara instan."
-            )
-
-            pilih_role_cepat = st.radio(
-                "Pilih Role Akses:",
-                options=["Admin", "Leader", "Agen", "Finance"],
-                horizontal=True,
-            )
-
-            daftar_ldr_login = sorted(set(TEAM_EXCEL_KE_LEADER.values()))
-            if df_target_ref is not None and not df_target_ref.empty:
-                daftar_ldr_login = sorted(
-                    df_target_ref["Leader_Default"]
-                    .dropna()
-                    .astype(str)
-                    .unique()
-                    .tolist()
-                )
-
-            if pilih_role_cepat == "Admin":
-                st.info(
-                    "🛡️ **Role Admin**: Akses penuh ke seluruh Sales Leader, melihat detail `TARGET ALL`, `Reguler`, dan `Yearly (Target)`, serta broadcast laporan ke Telegram."
-                )
-                if st.button(
-                    "🚀 Masuk sebagai Administrator Operasional",
-                    type="primary",
-                    width="stretch",
-                ):
-                    st.session_state["auth_user"] = {
-                        "logged_in": True,
-                        "role": "Admin",
-                        "username": "admin",
-                        "display_name": "Administrator Operasional",
-                        "leader_scope": "Semua Leader",
-                        "agent_key": "",
-                    }
-                    st.rerun()
-
-            elif pilih_role_cepat == "Finance":
-                st.info(
-                    "💳 **Role Finance**: Akses ke rekapitulasi Revenue Kotor, Revenue Netto (Potong PPN 11%), Tier Komisi (35% vs 20%), dan pencairan komisi seluruh tim."
-                )
-                if st.button(
-                    "🚀 Masuk sebagai Divisi Finance & Komisi",
-                    type="primary",
-                    width="stretch",
-                ):
-                    st.session_state["auth_user"] = {
-                        "logged_in": True,
-                        "role": "Finance",
-                        "username": "finance",
-                        "display_name": "Divisi Finance & Komisi",
-                        "leader_scope": "Semua Leader",
-                        "agent_key": "",
-                    }
-                    st.rerun()
-
-            elif pilih_role_cepat == "Leader":
-                idx_yovi = 0
-                for i, l_nama in enumerate(daftar_ldr_login):
-                    if "yovi" in l_nama.lower():
-                        idx_yovi = i
-                        break
-                ldr_terpilih = st.selectbox(
-                    "Pilih Nama Sales Leader:",
-                    options=daftar_ldr_login,
-                    index=idx_yovi,
-                )
-                st.success(
-                    f"👨‍💼 **Role Sales Leader ({ldr_terpilih})**: Fokus pada tim **{ldr_terpilih}**. Detail `Reguler` & `Yearly` disembunyikan (hanya menampilkan `TARGET ALL`, kuota `Harus Paid / Hari` & `Harus SA / Hari`)."
-                )
-                if st.button(
-                    f"🚀 Masuk sebagai Sales Leader: {ldr_terpilih}",
-                    type="primary",
-                    width="stretch",
-                ):
-                    st.session_state["auth_user"] = {
-                        "logged_in": True,
-                        "role": "Leader",
-                        "username": ldr_terpilih.split()[0].lower(),
-                        "display_name": ldr_terpilih,
-                        "leader_scope": ldr_terpilih,
-                        "agent_key": "",
-                    }
-                    st.rerun()
-
-            elif pilih_role_cepat == "Agen":
-                idx_yovi = 0
-                for i, l_nama in enumerate(daftar_ldr_login):
-                    if "yovi" in l_nama.lower():
-                        idx_yovi = i
-                        break
-                ldr_agen_pilih = st.selectbox(
-                    "Pilih Tim Sales Leader:",
-                    options=daftar_ldr_login,
-                    index=idx_yovi,
-                    key="sel_ldr_agen_login",
-                )
-                if df_target_ref is not None and not df_target_ref.empty:
-                    df_agen_tim = df_target_ref[
-                        (df_target_ref["Leader_Default"] == ldr_agen_pilih)
-                        & (
-                            ~df_target_ref["Agent_Key"]
-                            .astype(str)
-                            .str.startswith("VACANT__")
-                        )
-                    ]
-                    opsi_agen = df_agen_tim["Nama_Tampil"].tolist()
-                else:
-                    opsi_agen = ["Askih Milli Priyanto"]
-
-                nama_agen_pilih = st.selectbox(
-                    "Pilih Nama Agen Telesales:",
-                    options=opsi_agen,
-                )
-                key_agen_pilih = bersihkan_nama_agen(nama_agen_pilih)
-                st.success(
-                    f"👤 **Role Agen ({nama_agen_pilih} — Tim {ldr_agen_pilih})**: Menampilkan Kartu Performa & Kuota Harian Pribadi (`Target Total`, `Harus Paid / Hari`, `Harus SA / Hari`, dan `Estimasi Komisi`)."
-                )
-                if st.button(
-                    f"🚀 Masuk sebagai Agen: {nama_agen_pilih}",
-                    type="primary",
-                    width="stretch",
-                ):
-                    st.session_state["auth_user"] = {
-                        "logged_in": True,
-                        "role": "Agen",
-                        "username": nama_agen_pilih.split()[0].lower(),
-                        "display_name": nama_agen_pilih,
-                        "leader_scope": ldr_agen_pilih,
-                        "agent_key": key_agen_pilih,
-                    }
-                    st.rerun()
-
-        with tab_daftar_akun:
-            st.markdown("##### 📋 Tabel Referensi Kredensial Login Semua Role")
-            df_kredensial_info = pd.DataFrame(
-                [
-                    {
-                        "Role": "🛡️ Admin",
-                        "Username": "admin",
-                        "Password": "admin123",
-                        "Hak Akses & Visibilitas": "Semua Leader | Melihat TARGET ALL, Reguler & Yearly",
-                    },
-                    {
-                        "Role": "💳 Finance",
-                        "Username": "finance",
-                        "Password": "finance123",
-                        "Hak Akses & Visibilitas": "Semua Leader | Fokus Revenue Netto (PPN 11%) & Komisi 35%/20%",
-                    },
-                    {
-                        "Role": "👨‍💼 Leader",
-                        "Username": "yovi / fahrul / firli / tika / yudha / anis / eka / rezky / tiara / jarot / alfian",
-                        "Password": "leader123",
-                        "Hak Akses & Visibilitas": "Khusus Tim Leader Ybs | Hanya melihat TARGET ALL & Kuota Harian",
-                    },
-                    {
-                        "Role": "👤 Agen",
-                        "Username": "askih / sisca / ali / dwi / sandra / anisa / yayang / andri / diana / nafa (atau nama depan agen)",
-                        "Password": "agen123",
-                        "Hak Akses & Visibilitas": "Kartu Performa Pribadi | Hanya melihat TARGET ALL, Paid/Hari & SA/Hari",
-                    },
-                ]
-            )
-            st.dataframe(df_kredensial_info, width="stretch", hide_index=True)
 
 
 # =============================================================================
@@ -1660,22 +1514,26 @@ if (
 # Ambil informasi akun yang sedang login (fallback aman jika diimpor di luar streamlit run)
 akun_aktif = st.session_state.get("auth_user") or {
     "logged_in": True,
+    "is_admin_master": True,
     "role": "Admin",
-    "display_name": "Administrator Operasional",
+    "display_name": "Yovi Arian (Admin Master)",
     "leader_scope": "Semua Leader",
     "agent_key": "",
 }
 role_login_awal = str(akun_aktif.get("role", "Leader"))
+is_admin_master = bool(
+    akun_aktif.get("is_admin_master", role_login_awal == "Admin")
+)
 nama_pengguna_aktif = str(akun_aktif.get("display_name", "Yovi Arian"))
 scope_leader_akun = str(akun_aktif.get("leader_scope", "Yovi Arian"))
 agent_key_akun = str(akun_aktif.get("agent_key", ""))
 
 # =============================================================================
-# 1. SIDEBAR PROFIL PENGGUNA, SWITCHER ROLE & PENGATURAN PARAMETER
+# 1. SIDEBAR PROFIL PENGGUNA, PANEL ADMIN MASTER & PENGATURAN PARAMETER
 # =============================================================================
 
 ikon_role_map = {
-    "Admin": "🛡️ ADMIN OPERASIONAL",
+    "Admin": "👑 ADMIN MASTER",
     "Leader": "👨‍💼 SALES LEADER",
     "Agen": "👤 AGEN TELESALES",
     "Finance": "💳 DIVISI FINANCE",
@@ -1687,7 +1545,7 @@ st.sidebar.markdown(
     <div class="sidebar-profile">
         <div class="sidebar-profile-role">{badge_role_teks}</div>
         <div class="sidebar-profile-name">{escape_html_tg(nama_pengguna_aktif)}</div>
-        <div class="sidebar-profile-scope">Scope: <b>{escape_html_tg(scope_leader_akun)}</b></div>
+        <div class="sidebar-profile-scope">Scope: <b>{escape_html_tg(scope_leader_akun)}</b> | 🛡️ WAF Aktif</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -1697,54 +1555,98 @@ if st.sidebar.button("🚪 Keluar / Ganti Akun (Logout)", width="stretch"):
     st.session_state["auth_user"] = None
     st.rerun()
 
-url_publik_sidebar = ambil_url_publik_aktif()
-url_lan_sidebar = ambil_url_lan_aktif(8501)
-with st.sidebar.expander("🌐 Link Akses Go-Live (Share ke Staff)", expanded=True):
-    if url_publik_sidebar:
-        st.markdown(
-            f"✅ **Go-Live Publik (HP / Luar Kantor):**  \n"
-            f"[{url_publik_sidebar}]({url_publik_sidebar})"
+# HANYA ADMIN MASTER yang dapat melihat Brankas ID & Password, Log Firewall, dan Simulasi Role
+role_akses = role_login_awal
+if is_admin_master:
+    url_publik_sidebar = ambil_url_publik_aktif()
+    url_lan_sidebar = ambil_url_lan_aktif(8501)
+    with st.sidebar.expander(
+        "🌐 Link Akses Go-Live (Khusus Admin Master)", expanded=False
+    ):
+        if url_publik_sidebar:
+            st.markdown(
+                f"✅ **Go-Live Publik (HP / Luar Kantor):**  \n"
+                f"[{url_publik_sidebar}]({url_publik_sidebar})"
+            )
+            st.code(url_publik_sidebar, language="text")
+        st.markdown(f"📶 **Akses Wi-Fi / LAN Kantor:**  \n`{url_lan_sidebar}`")
+
+    with st.sidebar.expander(
+        "🔐 Brankas ID & Password (Khusus Admin Master)", expanded=False
+    ):
+        st.caption(
+            "Daftar ID & Password ini **DISEMBUNYIKAN** dari halaman publik dan hanya dapat dibuka oleh Anda (**Admin Master**)."
         )
-        st.code(url_publik_sidebar, language="text")
-    st.markdown(f"📶 **Akses Wi-Fi / LAN Kantor:**  \n`{url_lan_sidebar}`")
-    st.caption("Bagikan link di atas ke Sales Leader, Agen, atau Finance untuk login dari perangkat masing-masing.")
+        df_vault_master = pd.DataFrame(
+            [
+                {
+                    "Role": "👑 Admin Master",
+                    "ID / Username": "admin / yovi_master",
+                    "Password": "admin123 / Master@Yovi2026",
+                },
+                {
+                    "Role": "💳 Finance",
+                    "ID / Username": "finance",
+                    "Password": "finance123",
+                },
+                {
+                    "Role": "👨‍💼 Sales Leader",
+                    "ID / Username": "yovi, fahrul, firli, tika, yudha, anis, eka, rezky, tiara, jarot, alfian",
+                    "Password": "leader123",
+                },
+                {
+                    "Role": "👤 Agen Telesales",
+                    "ID / Username": "Nama depan agen (askih, sisca, nafa, fitra, dll.)",
+                    "Password": "agen123",
+                },
+            ]
+        )
+        st.dataframe(df_vault_master, width="stretch", hide_index=True)
 
+    with st.sidebar.expander(
+        "🛡️ Monitor WAF & Firewall Log (Khusus Admin Master)", expanded=False
+    ):
+        st.caption("Catatan real-time aktivitas login & blokir serangan WAF:")
+        log_baris = baca_log_keamanan_terbaru(15)
+        st.code("\n".join(log_baris), language="text")
 
-# Switcher Role di Sidebar (mendukung perpindahan cepat saat presentasi & kompatibel pengujian otomatis)
-daftar_opsi_role = ["Admin", "Leader", "Agen", "Finance"]
-idx_role_aktif = (
-    daftar_opsi_role.index(role_login_awal)
-    if role_login_awal in daftar_opsi_role
-    else 1
-)
-
-with st.sidebar.expander("🔄 Mode Presentasi: Ganti Role Cepat", expanded=False):
-    role_akses = st.radio(
-        "Role Akses Aktif:",
-        options=daftar_opsi_role,
-        index=idx_role_aktif,
+    daftar_opsi_role = ["Admin", "Leader", "Agen", "Finance"]
+    idx_role_aktif = (
+        daftar_opsi_role.index(role_login_awal)
+        if role_login_awal in daftar_opsi_role
+        else 0
     )
-    if role_akses != role_login_awal:
-        st.session_state["auth_user"]["role"] = role_akses
-        if role_akses in ("Admin", "Finance"):
-            st.session_state["auth_user"]["display_name"] = (
-                "Administrator Operasional"
-                if role_akses == "Admin"
-                else "Divisi Finance & Komisi"
-            )
-            st.session_state["auth_user"]["leader_scope"] = "Semua Leader"
-        elif role_akses == "Leader" and scope_leader_akun == "Semua Leader":
-            st.session_state["auth_user"]["display_name"] = "Yovi Arian"
-            st.session_state["auth_user"]["leader_scope"] = "Yovi Arian"
-        elif role_akses == "Agen" and not agent_key_akun:
-            st.session_state["auth_user"]["display_name"] = (
-                "Askih Milli Priyanto"
-            )
-            st.session_state["auth_user"]["leader_scope"] = "Yovi Arian"
-            st.session_state["auth_user"]["agent_key"] = (
-                "ASKIH MILLI PRIYANTO"
-            )
-        st.rerun()
+    with st.sidebar.expander(
+        "🔄 Simulasi Role (Khusus Admin Master)", expanded=False
+    ):
+        role_akses = st.radio(
+            "Role Akses Aktif:",
+            options=daftar_opsi_role,
+            index=idx_role_aktif,
+        )
+        if role_akses != role_login_awal:
+            st.session_state["auth_user"]["role"] = role_akses
+            st.session_state["auth_user"]["is_admin_master"] = True
+            if role_akses in ("Admin", "Finance"):
+                st.session_state["auth_user"]["display_name"] = (
+                    "Yovi Arian (Admin Master)"
+                    if role_akses == "Admin"
+                    else "Divisi Finance & Komisi"
+                )
+                st.session_state["auth_user"]["leader_scope"] = "Semua Leader"
+            elif role_akses == "Leader" and scope_leader_akun == "Semua Leader":
+                st.session_state["auth_user"]["display_name"] = "Yovi Arian"
+                st.session_state["auth_user"]["leader_scope"] = "Yovi Arian"
+            elif role_akses == "Agen" and not agent_key_akun:
+                st.session_state["auth_user"]["display_name"] = (
+                    "Askih Milli Priyanto"
+                )
+                st.session_state["auth_user"]["leader_scope"] = "Yovi Arian"
+                st.session_state["auth_user"]["agent_key"] = (
+                    "ASKIH MILLI PRIYANTO"
+                )
+            st.rerun()
+
 
 if role_akses in ("Admin", "Finance"):
     st.sidebar.info(
@@ -3162,15 +3064,21 @@ with tab_ai:
             "Contoh: Siapa agen yang persentasenya masih kurang? atau Detail Askih..."
         )
         if pertanyaan:
-            st.session_state["riwayat_chat"].append(
-                {"role": "user", "content": pertanyaan}
+            aman_chat, pesan_waf_chat = periksa_input_waf(
+                pertanyaan, "Pertanyaan AI"
             )
-            with st.chat_message("user"):
-                st.markdown(pertanyaan)
+            if not aman_chat:
+                st.error(pesan_waf_chat)
+            else:
+                st.session_state["riwayat_chat"].append(
+                    {"role": "user", "content": pertanyaan}
+                )
+                with st.chat_message("user"):
+                    st.markdown(pertanyaan)
 
-            jawaban = sdf.chat(pertanyaan)
-            with st.chat_message("assistant"):
-                st.markdown(jawaban)
-            st.session_state["riwayat_chat"].append(
-                {"role": "assistant", "content": jawaban}
-            )
+                jawaban = sdf.chat(pertanyaan)
+                with st.chat_message("assistant"):
+                    st.markdown(jawaban)
+                st.session_state["riwayat_chat"].append(
+                    {"role": "assistant", "content": jawaban}
+                )

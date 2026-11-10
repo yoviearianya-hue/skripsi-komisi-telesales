@@ -338,14 +338,13 @@ def handle_web_link(message: telebot.types.Message) -> None:
 
     pesan = (
         "🚀 <b>AKSES GO-LIVE DASHBOARD TELESALES ISP</b>\n"
+        "🛡️ <b>Proteksi WAF &amp; Firewall: AKTIF</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{teks_url}\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🔑 <b>Akun Login Multi-Role:</b>\n"
-        "• 🛡️ <b>Admin</b>   : user <code>admin</code> | pass <code>admin123</code>\n"
-        "• 👨‍💼 <b>Leader</b>  : user <code>yovi</code> / <code>fahrul</code> / <code>firli</code> / <code>tika</code> / <code>yudha</code> | pass <code>leader123</code>\n"
-        "• 👤 <b>Agen</b>    : user nama depan (contoh: <code>askih</code> / <code>sisca</code> / <code>nafa</code>) | pass <code>agen123</code>\n"
-        "• 💳 <b>Finance</b> : user <code>finance</code> | pass <code>finance123</code>"
+        "🔒 <b>Keamanan Akses Login:</b>\n"
+        "• Seluruh ID &amp; Password terenkripsi (SHA-256) dan disembunyikan dari publik.\n"
+        "• Silakan hubungi <b>Admin Master (Yovi Arian)</b> untuk mendapatkan hak akses sesuai Role Anda."
     )
     bot.reply_to(message, pesan, parse_mode="HTML")
 

@@ -1,0 +1,36 @@
+# ==============================================================================
+# SERVER FIREWALL & WAF (.htaccess) — laporantelesalesoxygen.my.id
+# ==============================================================================
+
+# 1. Matikan Directory Listing
+Options -Indexes
+ServerSignature Off
+
+# 2. Blokir Akses Publik Langsung ke File Data JSON, SQL, Log, dan Konfigurasi
+<FilesMatch "\.(json|sql|log|ini|env|bak|sh|py|zip)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# 3. HTTP Security Headers (Anti-Clickjacking, Anti-XSS, Anti-MIME Sniffing)
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>
+
+# 4. WAF Rewrite Rules (Blokir SQL Injection, XSS & Path Traversal di Query String)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{QUERY_STRING} (\<|%3C).*script.*(\>|%3E) [NC,OR]
+    RewriteCond %{QUERY_STRING} (union.*select|insert.*into|drop.*table|concat\(|information_schema) [NC,OR]
+    RewriteCond %{QUERY_STRING} (\.\./|\.\.\\|/etc/passwd|boot\.ini) [NC]
+    RewriteRule ^(.*)$ - [F,L]
+</IfModule>
