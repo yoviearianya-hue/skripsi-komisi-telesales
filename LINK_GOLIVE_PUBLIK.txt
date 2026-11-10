@@ -1,16 +1,21 @@
 ====================================================================
-🌐 LINK GO-LIVE DASHBOARD TELESALES ISP (AKSES SEMUA STAFF)
+🌐 LINK GO-LIVE DASHBOARD TELESALES ISP (DOCKER CONTAINER AKTIF)
 ====================================================================
 
 1. LINK PUBLIK INTERNET (Bisa diakses dari HP / Luar Kantor / Mana Saja):
-   👉 https://cloudy-bargain-concrete-lloyd.trycloudflare.com
+   👉 https://stored-volumes-relevance-collectibles.trycloudflare.com
 
 2. LINK JARINGAN KANTOR / LAN (Wi-Fi / Jaringan Lokal yang Sama):
    👉 http://192.168.36.79:8501
 
-3. LINK LOKAL (Komputer Server):
+3. LINK LOKAL (Komputer Server / Port Forwarding Docker):
    👉 http://localhost:8501
 
+--------------------------------------------------------------------
+🐳 INFO CONTAINER DOCKER:
+- Nama Project   : skripsi-komisi-telesales (Terisolasi & Aman)
+- Nama Container : skripsi-komisi-telesales-app
+- Port Mapping   : 0.0.0.0:8501 -> 8501/tcp (Tidak menabrak port lain)
 --------------------------------------------------------------------
 🔑 AKUN LOGIN MULTI-ROLE:
 - Admin   : username 'admin'   | password 'admin123'
