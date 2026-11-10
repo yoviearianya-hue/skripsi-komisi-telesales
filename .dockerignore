@@ -1,0 +1,11 @@
+# Abaikan virtual environment lokal Windows & cache agar image Docker bersih dan ringan
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.vscode/
+.git/
+
+# Abaikan binary Windows cloudflared.exe (di dalam Docker Linux menggunakan binary Linux /usr/local/bin/cloudflared)
+cloudflared.exe

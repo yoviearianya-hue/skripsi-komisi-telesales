@@ -1,0 +1,26 @@
+name: skripsi-komisi-telesales
+
+services:
+  telesales-komisi-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: yoviarian99/skripsi-komisi-telesales:latest
+    container_name: skripsi-komisi-telesales-app
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - TZ=Asia/Jakarta
+      - PYTHONUNBUFFERED=1
+      - HOST_LAN_IP=${HOST_LAN_IP:-192.168.36.79}
+    volumes:
+      # Sinkronisasi seluruh file data (.xlsx, .xls), codingan (.py), dan file link Go-Live aktif
+      - ./:/app
+    networks:
+      - skripsi_komisi_telesales_net
+
+networks:
+  skripsi_komisi_telesales_net:
+    name: skripsi_komisi_telesales_net
+    driver: bridge

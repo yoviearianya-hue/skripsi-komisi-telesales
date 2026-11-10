@@ -1,0 +1,15 @@
+# Virtual Environment & Python Cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Binary lokal berukuran besar (di Docker sudah diunduh otomatis via Dockerfile)
+cloudflared.exe

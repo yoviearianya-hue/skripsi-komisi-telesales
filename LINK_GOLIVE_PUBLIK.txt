@@ -1,0 +1,20 @@
+====================================================================
+🌐 LINK GO-LIVE DASHBOARD TELESALES ISP (AKSES SEMUA STAFF)
+====================================================================
+
+1. LINK PUBLIK INTERNET (Bisa diakses dari HP / Luar Kantor / Mana Saja):
+   👉 https://cloudy-bargain-concrete-lloyd.trycloudflare.com
+
+2. LINK JARINGAN KANTOR / LAN (Wi-Fi / Jaringan Lokal yang Sama):
+   👉 http://192.168.36.79:8501
+
+3. LINK LOKAL (Komputer Server):
+   👉 http://localhost:8501
+
+--------------------------------------------------------------------
+🔑 AKUN LOGIN MULTI-ROLE:
+- Admin   : username 'admin'   | password 'admin123'
+- Finance : username 'finance' | password 'finance123'
+- Leader  : username 'yovi', 'fahrul', 'firli', 'tika', 'yudha', dll. | password 'leader123'
+- Agen    : username nama depan agen (misal 'askih', 'sisca', 'nafa') | password 'agen123'
+====================================================================
