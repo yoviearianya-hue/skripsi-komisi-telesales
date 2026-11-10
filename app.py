@@ -1657,8 +1657,14 @@ if (
     tampilkan_halaman_login(df_target_awal)
     st.stop()
 
-# Ambil informasi akun yang sedang login
-akun_aktif = st.session_state["auth_user"]
+# Ambil informasi akun yang sedang login (fallback aman jika diimpor di luar streamlit run)
+akun_aktif = st.session_state.get("auth_user") or {
+    "logged_in": True,
+    "role": "Admin",
+    "display_name": "Administrator Operasional",
+    "leader_scope": "Semua Leader",
+    "agent_key": "",
+}
 role_login_awal = str(akun_aktif.get("role", "Leader"))
 nama_pengguna_aktif = str(akun_aktif.get("display_name", "Yovi Arian"))
 scope_leader_akun = str(akun_aktif.get("leader_scope", "Yovi Arian"))

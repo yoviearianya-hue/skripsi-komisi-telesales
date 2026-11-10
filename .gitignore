@@ -13,3 +13,4 @@ Thumbs.db
 
 # Binary lokal berukuran besar (di Docker sudah diunduh otomatis via Dockerfile)
 cloudflared.exe
+
