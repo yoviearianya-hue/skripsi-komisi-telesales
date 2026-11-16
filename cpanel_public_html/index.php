@@ -271,6 +271,107 @@ function load_prospect_pool(string $poolActive, string $poolDefault): array {
     return is_array($dec) ? $dec : [];
 }
 
+function send_telegram_server(string $botToken, string $chatId, string $text): array {
+    $urlTg = "https://api.telegram.org/bot{$botToken}/sendMessage";
+    $postBody = http_build_query([
+        'chat_id'                  => $chatId,
+        'text'                     => $text,
+        'parse_mode'               => 'HTML',
+        'disable_web_page_preview' => 'true',
+    ]);
+
+    $lastErr = '';
+    if (function_exists('curl_init')) {
+        foreach ([true, false] as $idxTry => $verifySsl) {
+            $ch = curl_init($urlTg);
+            $opts = [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $postBody,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 6,
+                CURLOPT_TIMEOUT        => 12,
+                CURLOPT_SSL_VERIFYPEER => $verifySsl,
+                CURLOPT_SSL_VERIFYHOST => $verifySsl ? 2 : 0,
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
+            ];
+            if (defined('CURL_IPRESOLVE_V4')) {
+                $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+            }
+            if (defined('CURL_HTTP_VERSION_1_1')) {
+                $opts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_1_1;
+            }
+            curl_setopt_array($ch, $opts);
+            $resp = curl_exec($ch);
+            $errno = curl_errno($ch);
+            $err = curl_error($ch);
+            $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($resp !== false && $httpCode > 0) {
+                $j = json_decode((string)$resp, true);
+                $desc = is_array($j) ? (string)($j['description'] ?? $resp) : (string)$resp;
+                return [
+                    'ok'          => ($httpCode === 200 && is_array($j) && !empty($j['ok'])),
+                    'http_code'   => $httpCode,
+                    'description' => $desc,
+                    'error'       => $desc,
+                    'method'      => $verifySsl ? 'cURL' : 'cURL-NoCA',
+                ];
+            }
+            $lastErr = "cURL #{$errno}: " . ($err ?: 'Koneksi server diblokir/timeout');
+            // Hanya coba ulang tanpa verify SSL jika memang error sertifikat CA lokal
+            if ($idxTry === 0 && !in_array($errno, [35, 51, 58, 60, 77], true)) {
+                break;
+            }
+        }
+    } else {
+        $lastErr = 'Ekstensi cURL PHP tidak aktif';
+    }
+
+    // Fallback ke PHP stream HTTPS jika cURL gagal HTTP 0 dan allow_url_fopen aktif
+    if (ini_get('allow_url_fopen')) {
+        $ctx = stream_context_create([
+            'http' => [
+                'method'           => 'POST',
+                'header'           => "Content-Type: application/x-www-form-urlencoded\r\n",
+                'content'          => $postBody,
+                'timeout'          => 8,
+                'ignore_errors'    => true,
+                'protocol_version' => 1.1,
+            ],
+            'ssl' => [
+                'verify_peer'      => false,
+                'verify_peer_name' => false,
+            ],
+        ]);
+        $streamResp = @file_get_contents($urlTg, false, $ctx);
+        $streamCode = 0;
+        if (!empty($http_response_header) && preg_match('/\s(\d{3})\s/', (string)$http_response_header[0], $hm)) {
+            $streamCode = (int)$hm[1];
+        }
+        if ($streamResp !== false && $streamCode > 0) {
+            $j = json_decode($streamResp, true);
+            $desc = is_array($j) ? (string)($j['description'] ?? $streamResp) : $streamResp;
+            return [
+                'ok'          => ($streamCode === 200 && is_array($j) && !empty($j['ok'])),
+                'http_code'   => $streamCode,
+                'description' => $desc,
+                'error'       => $desc,
+                'method'      => 'PHP-Stream',
+            ];
+        }
+        $lastErr .= ' | Stream gagal terhubung';
+    }
+
+    return [
+        'ok'          => false,
+        'http_code'   => 0,
+        'description' => $lastErr,
+        'error'       => $lastErr,
+        'method'      => 'blocked',
+    ];
+}
+
 function rp($angka): string {
     return 'Rp ' . number_format((float)$angka, 0, ',', '.');
 }
@@ -740,37 +841,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $actionStatus = '<div class="alert-err">❌ ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
     } elseif ($_POST['action'] === 'send_telegram' && !empty($_SESSION['auth_user'])) {
-        $defaultToken = $appData['bot_token_default'] ?? '';
-        $botToken = trim((string)($_POST['bot_token'] ?? $defaultToken));
+        $defaultToken = $appData['bot_token_default'] ?? '9242894728:AAF2oYVZlpfcHEIFcC9PdoeFQA6KuwF-njs';
+        $botToken = trim((string)($_POST['bot_token'] ?? ''));
+        if ($botToken === '') $botToken = $defaultToken;
         $chatId = trim((string)($_POST['chat_id'] ?? ''));
-        $scopeSend = $_POST['scope_send'] ?? 'Yovi Arian';
+        $scopeSend = (string)($_POST['scope_send'] ?? 'Yovi Arian');
+        $sendMode = (string)($_POST['send_mode'] ?? 'auto');
         $agentRowsTg = $appData['agent_rows'] ?? [];
         $dailyRowsTg = $appData['daily_prod_rows'] ?? [];
-        $dailyLblTg  = $appData['daily_prod_date_label'] ?? '';
-        $targetMtdTg = $appData['target_persen_mtd'] ?? 50;
-        $periodeLabelTg = $appData['periode_label'] ?? '';
-        $sisaHariTg = $appData['sisa_hari'] ?? 15;
+        $dailyLblTg  = (string)($appData['daily_prod_date_label'] ?? '');
+        $targetMtdTg = (int)($appData['target_persen_mtd'] ?? 50);
+        $periodeLabelTg = (string)($appData['periode_label'] ?? '');
+        $sisaHariTg = (int)($appData['sisa_hari'] ?? 15);
+
+        $escTg = fn($s) => htmlspecialchars((string)$s, ENT_NOQUOTES, 'UTF-8');
 
         list($okChat, $msgChat) = waf_inspect_input($chatId, $auditLogFile);
+        list($okTok, $msgTok)   = waf_inspect_input($botToken, $auditLogFile);
         if (!$okChat) {
             $tgStatus = '<div class="alert-err">' . htmlspecialchars($msgChat) . '</div>';
-        } elseif (!$chatId) {
-            $tgStatus = '<div class="alert-err">❌ Masukkan TELEGRAM_CHAT_ID terlebih dahulu (ketik /id di Bot Telegram untuk melihat Chat ID).</div>';
+        } elseif (!$okTok) {
+            $tgStatus = '<div class="alert-err">' . htmlspecialchars($msgTok) . '</div>';
+        } elseif ($chatId === '') {
+            $tgStatus = '<div class="alert-err">❌ Masukkan TELEGRAM_CHAT_ID terlebih dahulu (ketik <code>/id</code> di bot <b>@NoticeTelesalesbot</b>).</div>';
         } else {
             $blocks = [];
             $hdrTg = "📊 <b>LAPORAN PERFORMA &amp; TARGET TELESALES ISP</b>\n"
                 . "🌐 Portal Resmi : <b>https://laporantelesalesoxygen.my.id</b>\n"
-                . "👨‍💼 Scope Leader : <b>" . htmlspecialchars($scopeSend) . "</b>\n"
-                . "🗓 Periode : <b>$periodeLabelTg | Target MTD: {$targetMtdTg}%</b> (Sisa $sisaHariTg Hari)\n"
+                . "👨‍💼 Scope Leader : <b>" . $escTg($scopeSend) . "</b>\n"
+                . "🗓 Periode : <b>" . $escTg($periodeLabelTg) . " | Target MTD: {$targetMtdTg}%</b> (Sisa {$sisaHariTg} Hari)\n"
                 . "━━━━━━━━━━━━━━━━━━━━━━\n";
 
-            // Ringkasan Rekap Harian & Agent Belum Produktif
             if (!empty($dailyRowsTg)) {
-                $dpLines = ["📅 <b>REKAP HARIAN ({$dailyLblTg}) &amp; AGENT BLM PRODUKTIF</b>"];
+                $dpLines = ["📅 <b>REKAP HARIAN (" . $escTg($dailyLblTg) . ") &amp; AGENT BLM PRODUKTIF</b>"];
                 foreach ($dailyRowsTg as $dr) {
                     $isGt = !empty($dr['is_grand_total']);
                     if (!$isGt && $scopeSend !== 'Semua Leader' && $dr['leader'] !== $scopeSend) continue;
-                    $dpLines[] = ($isGt ? "🏆 <b>" : "• <b>") . htmlspecialchars($dr['leader']) . "</b>: SO=<b>{$dr['so']}</b> PAID=<b>{$dr['paid']}</b> SA=<b>{$dr['sa']}</b> | Blm Prod: SO=<b>{$dr['blm_so']}</b> PAID=<b>{$dr['blm_paid']}</b> SA=<b>{$dr['blm_sa']}</b>";
+                    $dpLines[] = ($isGt ? "🏆 <b>" : "• <b>") . $escTg($dr['leader']) . "</b>: SO=<b>{$dr['so']}</b> PAID=<b>{$dr['paid']}</b> SA=<b>{$dr['sa']}</b> | Blm Prod: SO=<b>{$dr['blm_so']}</b> PAID=<b>{$dr['blm_paid']}</b> SA=<b>{$dr['blm_sa']}</b>";
                 }
                 $blocks[] = implode("\n", $dpLines) . "\n━━━━━━━━━━━━━━━━━━━━━━\n";
             }
@@ -780,59 +887,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             foreach ($agentRowsTg as $ag) {
                 if ($scopeSend !== 'Semua Leader' && $ag['leader'] !== $scopeSend) continue;
                 if (strtoupper($ag['name']) === 'VACANT') continue;
-                $totT += $ag['target_all'];
-                $totSa += $ag['sa_nov'];
-                $totPaid += $ag['paid_nov'];
-                $totKom += $ag['est_komisi'];
-                $komStr = 'Rp ' . number_format($ag['est_komisi'], 0, ',', '.');
-                $blocks[] = "<b>{$no}. 👤 " . htmlspecialchars($ag['name']) . "</b> ({$ag['level']})\n"
-                    . "├ 📌 Status MTD : <b>{$ag['status_mtd']}</b> ({$ag['persen']}%)\n"
+                $totT += (int)$ag['target_all'];
+                $totSa += (int)$ag['sa_nov'];
+                $totPaid += (int)$ag['paid_nov'];
+                $totKom += (float)$ag['est_komisi'];
+                $komStr = 'Rp ' . number_format((float)$ag['est_komisi'], 0, ',', '.');
+                $blocks[] = "<b>{$no}. 👤 " . $escTg($ag['name']) . "</b> (" . $escTg($ag['level']) . ")\n"
+                    . "├ 📌 Status MTD : <b>" . $escTg($ag['status_mtd']) . "</b> ({$ag['persen']}%)\n"
                     . "├ ✅ Realisasi : <b>{$ag['sa_nov']} SA</b> | <b>{$ag['paid_nov']} Paid</b> | Gap: {$ag['gap_sa']}\n"
                     . "├ ⚡ Wajib Harian : <b>{$ag['harus_paid_hr']} Paid/hr</b> &amp; <b>{$ag['harus_sa_hr']} SA/hr</b>\n"
-                    . "└ 🎯 Target Total : <b>{$ag['target_all']} SA</b> | 💰 <b>$komStr</b>\n";
+                    . "└ 🎯 Target Total : <b>{$ag['target_all']} SA</b> | 💰 <b>{$komStr}</b>\n";
                 $no++;
             }
             $pctTim = $totT > 0 ? round(($totSa / $totT) * 100) : 0;
             $totKomStr = 'Rp ' . number_format($totKom, 0, ',', '.');
             $blocks[] = "━━━━━━━━━━━━━━━━━━━━━━\n🏆 <b>TOTAL TIM: {$totSa} SA / Target {$totT} SA ({$pctTim}%) | {$totKomStr}</b>";
 
-            // Pecah otomatis per <= 3600 karakter agar SEMUA agen terkirim utuh tanpa terpotong
             $messages = [];
             $curMsg = $hdrTg;
             foreach ($blocks as $b) {
                 $add = $b . "\n";
-                if (strlen($curMsg) + strlen($add) > 3600) {
+                if (strlen($curMsg) + strlen($add) > 3500) {
                     $messages[] = trim($curMsg);
-                    $curMsg = "📋 <b>Lanjutan Laporan (" . htmlspecialchars($scopeSend) . ")</b>\n━━━━━━━━━━━━━━━━━━━━━━\n" . $add;
+                    $curMsg = "📋 <b>Lanjutan Laporan (" . $escTg($scopeSend) . ")</b>\n━━━━━━━━━━━━━━━━━━━━━━\n" . $add;
                 } else {
                     $curMsg .= $add;
                 }
             }
             if (trim($curMsg) !== '') $messages[] = trim($curMsg);
 
-            $okAll = true;
+            $needBrowserRelay = ($sendMode === 'browser');
+            $okAll = false;
             $errMsg = '';
-            $urlTg = "https://api.telegram.org/bot{$botToken}/sendMessage";
-            foreach ($messages as $mTxt) {
-                $ch = curl_init($urlTg);
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(['chat_id' => $chatId, 'text' => $mTxt, 'parse_mode' => 'HTML']));
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-                $resp = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-                if ($httpCode !== 200) {
-                    $okAll = false;
-                    $errMsg = "HTTP {$httpCode}: " . (string)$resp;
-                    break;
+            $usedMethod = 'Server';
+
+            if (!$needBrowserRelay) {
+                $okAll = true;
+                foreach ($messages as $idxM => $mTxt) {
+                    $resTg = send_telegram_server($botToken, $chatId, $mTxt);
+                    if (!$resTg['ok']) {
+                        $okAll = false;
+                        $errMsg = "HTTP {$resTg['http_code']}: {$resTg['description']}";
+                        if ($resTg['http_code'] === 0 && $idxM === 0) {
+                            $needBrowserRelay = true;
+                        }
+                        break;
+                    }
+                    $usedMethod = $resTg['method'];
                 }
             }
 
             if ($okAll) {
-                $tgStatus = '<div class="alert-ok">✅ Laporan lengkap berhasil dikirim ke Telegram Chat ID <b>' . htmlspecialchars($chatId) . '</b> (' . count($messages) . ' pesan, HTTP 200 OK)!</div>';
+                $tgStatus = '<div class="alert-ok">✅ Laporan lengkap berhasil dikirim ke Telegram Chat ID <b>' . htmlspecialchars($chatId) . '</b> (' . count($messages) . ' pesan via ' . htmlspecialchars($usedMethod) . ', HTTP 200 OK)!</div>';
+            } elseif ($needBrowserRelay) {
+                $relayJson = json_encode([
+                    'url'      => "https://api.telegram.org/bot{$botToken}/sendMessage",
+                    'chat_id'  => $chatId,
+                    'messages' => $messages,
+                    'server_note' => $errMsg,
+                ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
+                $tgStatus = '<div id="tg-relay-box" class="alert-ok" style="background:#eff6ff; color:#1e3a8a; border-color:#93c5fd;">'
+                    . '⏳ <b>Mengirim langsung via Browser Relay...</b>'
+                    . ($errMsg ? ' <small>(Info hosting: ' . htmlspecialchars($errMsg) . ')</small>' : '')
+                    . '<div id="tg-relay-progress" style="margin-top:6px;">Memproses ' . count($messages) . ' bagian pesan ke Telegram...</div>'
+                    . '</div>'
+                    . '<script>(async function(){'
+                    . 'const cfg=' . $relayJson . ';'
+                    . 'const box=document.getElementById("tg-relay-box");'
+                    . 'const prog=document.getElementById("tg-relay-progress");'
+                    . 'try{'
+                    . '  for(let i=0;i<cfg.messages.length;i++){'
+                    . '    prog.textContent="Mengirim bagian "+(i+1)+"/"+cfg.messages.length+"...";'
+                    . '    const fd=new URLSearchParams({chat_id:cfg.chat_id,text:cfg.messages[i],parse_mode:"HTML",disable_web_page_preview:"true"});'
+                    . '    const r=await fetch(cfg.url,{method:"POST",body:fd});'
+                    . '    const j=await r.json();'
+                    . '    if(!r.ok||!j.ok){throw new Error((j&&j.description)?j.description:("HTTP "+r.status));}'
+                    . '  }'
+                    . '  box.className="alert-ok";box.style.background="";box.style.color="";box.style.borderColor="";'
+                    . '  box.innerHTML="✅ <b>BERHASIL TERKIRIM KE TELEGRAM!</b> Chat ID <b>"+cfg.chat_id+"</b> ("+cfg.messages.length+" pesan terkirim langsung via Browser Relay, 200 OK).";'
+                    . '}catch(err){'
+                    . '  box.className="alert-err";box.style.background="";box.style.color="";box.style.borderColor="";'
+                    . '  box.innerHTML="❌ <b>Gagal mengirim ke Telegram:</b> "+err.message+"<br><small>Pastikan Chat ID benar dan bot <b>@NoticeTelesalesbot</b> sudah diklik <b>/start</b> atau sudah ditambahkan ke grup tujuan.</small>";'
+                    . '}'
+                    . '})();</script>';
             } else {
-                $tgStatus = '<div class="alert-err">❌ Gagal mengirim ke Telegram (' . htmlspecialchars($errMsg) . ')</div>';
+                $tgStatus = '<div class="alert-err">❌ Gagal mengirim ke Telegram (' . htmlspecialchars($errMsg) . '). Pastikan Chat ID benar dan bot sudah di-<code>/start</code> atau masuk ke grup tujuan.</div>';
             }
         }
     }
@@ -1612,18 +1751,28 @@ $authUser = $_SESSION['auth_user'] ?? null;
 
     <!-- DASHBOARD 3: KIRIM LAPORAN KE BOT TELEGRAM -->
     <div class="card">
-        <h3 style="margin-top:0;">📲 3. KIRIM LAPORAN LENGKAP KE BOT TELEGRAM</h3>
-        <form method="post" class="grid-2" style="align-items:end;">
+        <h3 style="margin-top:0;">📲 3. KIRIM LAPORAN LENGKAP KE BOT TELEGRAM (<code>@NoticeTelesalesbot</code>)</h3>
+        <p style="font-size:0.83rem; color:#475569; margin-top:-6px; margin-bottom:14px;">
+            Mendukung <b>Server PHP (IPv4 + Fallback Stream)</b> dan <b>Browser Auto-Relay</b> jika firewall hosting memblokir koneksi keluar. Pastikan bot <b>@NoticeTelesalesbot</b> sudah di-<code>/start</code> (chat pribadi) atau dimasukkan sebagai member ke grup tujuan.
+        </p>
+        <form method="post" class="grid-3" style="align-items:end;">
             <input type="hidden" name="action" value="send_telegram">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+            <input type="hidden" name="scope_send" value="<?= htmlspecialchars($selectedScope) ?>">
             <div>
-                <label><b>TELEGRAM_CHAT_ID Tujuan (Ketik <code>/id</code> di Bot Telegram):</b></label>
-                <input type="text" name="chat_id" placeholder="Contoh: -100123456789 atau ID Chat Pribadi" required style="margin-bottom:0;">
+                <label style="font-size:0.82rem;"><b>TELEGRAM_CHAT_ID Tujuan (ketik <code>/id</code> di bot):</b></label>
+                <input type="text" name="chat_id" value="<?= htmlspecialchars((string)($_POST['chat_id'] ?? '')) ?>" placeholder="Contoh: -100123456789 atau Chat ID Pribadi" required style="margin-bottom:0;">
             </div>
-            <div style="display:flex; gap:10px;">
+            <div>
+                <label style="font-size:0.82rem;"><b>Jalur Pengiriman:</b></label>
+                <select name="send_mode" style="margin-bottom:0;">
+                    <option value="auto" selected>⚡ Otomatis (Server PHP -&gt; Browser Relay jika diblokir)</option>
+                    <option value="browser">🌐 Langsung via Browser Relay (Anti-Blokir Hosting)</option>
+                </select>
+            </div>
+            <div>
                 <input type="hidden" name="bot_token" value="<?= htmlspecialchars($defaultToken) ?>">
-                <input type="hidden" name="scope_send" value="<?= htmlspecialchars($selectedScope) ?>">
-                <button type="submit" class="btn" style="width:100%; padding:12px;">🚀 Kirim Laporan Lengkap (<?= htmlspecialchars($selectedScope) ?>) ke Telegram</button>
+                <button type="submit" class="btn" style="width:100%; padding:11px;">🚀 Kirim Laporan Lengkap (<?= htmlspecialchars($selectedScope) ?>) ke Telegram</button>
             </div>
         </form>
     </div>
