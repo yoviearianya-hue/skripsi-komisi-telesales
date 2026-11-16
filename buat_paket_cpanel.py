@@ -654,6 +654,9 @@ if (isset($_GET['logout'])) {
 }
 
 list($isLockedOut, $lockoutRemain) = rate_limit_status($rateLimitFile);
+if ($isLockedOut && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $loginError = "🚫 FIREWALL LOCKOUT AKTIF: Terlalu banyak percobaan gagal. Form dikunci sementara selama {$lockoutRemain} detik, silakan muat ulang halaman setelah waktu habis.";
+}
 
 // ============================================================================
 // HANDLER POST ACTIONS
