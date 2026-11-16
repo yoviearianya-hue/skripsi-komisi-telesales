@@ -372,6 +372,128 @@ function send_telegram_server(string $botToken, string $chatId, string $text): a
     ];
 }
 
+function send_telegram_server_file(string $botToken, string $chatId, string $filePath, string $fileName, string $caption, string $imgMode = 'photo'): array {
+    if (!function_exists('curl_init') || !class_exists('CURLFile')) {
+        return ['ok' => false, 'http_code' => 0, 'description' => 'cURL/CURLFile tidak aktif di PHP'];
+    }
+    $endpoint = ($imgMode === 'document') ? 'sendDocument' : 'sendPhoto';
+    $field = ($imgMode === 'document') ? 'document' : 'photo';
+    $urlTg = "https://api.telegram.org/bot{$botToken}/{$endpoint}";
+
+    foreach ([true, false] as $idxTry => $verifySsl) {
+        $ch = curl_init($urlTg);
+        $opts = [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => [
+                'chat_id'    => $chatId,
+                'caption'    => $caption,
+                'parse_mode' => 'HTML',
+                $field       => new CURLFile($filePath, 'image/png', $fileName),
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT        => 25,
+            CURLOPT_SSL_VERIFYPEER => $verifySsl,
+            CURLOPT_SSL_VERIFYHOST => $verifySsl ? 2 : 0,
+        ];
+        if (defined('CURL_IPRESOLVE_V4')) $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        if (defined('CURL_HTTP_VERSION_1_1')) $opts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_1_1;
+        curl_setopt_array($ch, $opts);
+        $resp = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $err = curl_error($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($resp !== false && $httpCode > 0) {
+            $j = json_decode((string)$resp, true);
+            $desc = is_array($j) ? (string)($j['description'] ?? $resp) : (string)$resp;
+            return ['ok' => ($httpCode === 200 && is_array($j) && !empty($j['ok'])), 'http_code' => $httpCode, 'description' => $desc];
+        }
+        if ($idxTry === 0 && !in_array($errno, [35, 51, 58, 60, 77], true)) {
+            return ['ok' => false, 'http_code' => 0, 'description' => "cURL #{$errno}: " . ($err ?: 'timeout/blocked')];
+        }
+    }
+    return ['ok' => false, 'http_code' => 0, 'description' => 'Server gagal upload file ke Telegram'];
+}
+
+function build_tg_visual_payload(array $appData, string $scopeSend): array {
+    $agentRowsTg = $appData['agent_rows'] ?? [];
+    $mtdRowsTg   = $appData['mtd_rows'] ?? [];
+    $dailyRowsTg = $appData['daily_prod_rows'] ?? [];
+
+    $mtdFiltered = [];
+    foreach ($mtdRowsTg as $mr) {
+        $isTot = strtoupper((string)$mr['leader']) === 'TOTAL';
+        if ($isTot || $scopeSend === 'Semua Leader' || $mr['leader'] === $scopeSend) {
+            $mtdFiltered[] = [
+                'leader' => (string)$mr['leader'],
+                'sa_oct' => (int)$mr['sa_oct'],
+                'sa_nov' => (int)$mr['sa_nov'],
+                'gap_sa' => (int)$mr['gap_sa'],
+                'is_total' => $isTot,
+            ];
+        }
+    }
+
+    $dailyFiltered = [];
+    foreach ($dailyRowsTg as $dr) {
+        $isGt = !empty($dr['is_grand_total']) || strcasecmp((string)$dr['leader'], 'Grand Total') === 0;
+        if (($isGt && $scopeSend === 'Semua Leader') || (!$isGt && ($scopeSend === 'Semua Leader' || $dr['leader'] === $scopeSend))) {
+            $dailyFiltered[] = [
+                'leader'   => (string)$dr['leader'],
+                'so'       => (int)$dr['so'],
+                'paid'     => (int)$dr['paid'],
+                'sa'       => (int)$dr['sa'],
+                'blm_so'   => (int)$dr['blm_so'],
+                'blm_paid' => (int)$dr['blm_paid'],
+                'blm_sa'   => (int)$dr['blm_sa'],
+                'is_gt'    => $isGt,
+            ];
+        }
+    }
+
+    // Hanya menyertakan TARGET ALL (tanpa Reguler/Yearly terpisah sesuai RBAC Telegram)
+    $agentsSafe = [];
+    foreach ($agentRowsTg as $ag) {
+        if ($scopeSend !== 'Semua Leader' && $ag['leader'] !== $scopeSend) continue;
+        $agentsSafe[] = [
+            'leader'        => (string)$ag['leader'],
+            'name'          => (string)$ag['name'],
+            'level'         => (string)$ag['level'],
+            'target_all'    => (int)$ag['target_all'],
+            'sa_nov'        => (int)$ag['sa_nov'],
+            'paid_nov'      => (int)$ag['paid_nov'],
+            'gap_sa'        => (int)$ag['gap_sa'],
+            'persen'        => (int)$ag['persen'],
+            'runrate_30'    => (int)$ag['runrate_30'],
+            'p_m'           => (int)$ag['p_m'],
+            'p_3m'          => (int)$ag['p_3m'],
+            'p_sem'         => (int)$ag['p_sem'],
+            'p_yr'          => (int)$ag['p_yr'],
+            'harus_paid_hr' => (int)$ag['harus_paid_hr'],
+            'harus_sa_hr'   => (int)$ag['harus_sa_hr'],
+        ];
+    }
+
+    return [
+        'scope'        => $scopeSend,
+        'periode'      => (string)($appData['periode_label'] ?? ''),
+        'target_mtd'   => (int)($appData['target_persen_mtd'] ?? 50),
+        'hari'         => (int)($appData['hari_berjalan'] ?? 15),
+        'total_hari'   => (int)($appData['total_hari'] ?? 30),
+        'sisa_hari'    => (int)($appData['sisa_hari'] ?? 15),
+        'bln_lalu'     => (string)($appData['label_bulan_lalu'] ?? 'OCT'),
+        'bln_ini'      => (string)($appData['label_bulan_ini'] ?? 'NOV'),
+        'tahun'        => (int)($appData['params']['tahun'] ?? 2026),
+        'rasio_paid'   => (float)($appData['params']['rasio_paid'] ?? 1.25),
+        'daily_label'  => (string)($appData['daily_prod_date_label'] ?? ''),
+        'mtd_rows'     => $mtdFiltered,
+        'daily_rows'   => $dailyFiltered,
+        'agent_rows'   => $agentsSafe,
+    ];
+}
+
 function rp($angka): string {
     return 'Rp ' . number_format((float)$angka, 0, ',', '.');
 }
@@ -384,6 +506,52 @@ $appData  = load_json_safe($dataFile, []);
 $loginError   = '';
 $actionStatus = '';
 $tgStatus     = '';
+
+// ============================================================================
+// ENDPOINT UPLOAD GAMBAR PNG RELAY -> SERVER PHP (CADANGAN JIKA BROWSER DIBLOKIR)
+// ============================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'send_telegram_blob') {
+    header('Content-Type: application/json; charset=utf-8');
+    $curRole = $_SESSION['auth_user']['role'] ?? '';
+    if (empty($_SESSION['auth_user']) || !in_array($curRole, ['Admin', 'Finance', 'Leader'], true)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'description' => 'Akses ditolak']);
+        exit;
+    }
+    if (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'description' => 'CSRF token tidak valid']);
+        exit;
+    }
+    $chatId  = trim((string)($_POST['chat_id'] ?? ''));
+    $caption = (string)($_POST['caption'] ?? '');
+    $imgMode = ($_POST['img_mode'] ?? 'photo') === 'document' ? 'document' : 'photo';
+    $botTok  = (string)($_SESSION['tg_last_bot_token'] ?? ($appData['bot_token_default'] ?? '9242894728:AAF2oYVZlpfcHEIFcC9PdoeFQA6KuwF-njs'));
+    list($okChat, $msgChat) = waf_inspect_input($chatId, $auditLogFile);
+    if (!$okChat || $chatId === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'description' => $okChat ? 'Chat ID kosong' : $msgChat]);
+        exit;
+    }
+    if (empty($_FILES['png_file']['tmp_name']) || $_FILES['png_file']['error'] !== UPLOAD_ERR_OK) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'description' => 'File gambar PNG tidak diterima server']);
+        exit;
+    }
+    $headBytes = (string)@file_get_contents($_FILES['png_file']['tmp_name'], false, null, 0, 8);
+    if ($headBytes !== "\x89PNG\r\n\x1a\n") {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'description' => 'File bukan format PNG valid']);
+        exit;
+    }
+    $fname = basename((string)($_FILES['png_file']['name'] ?? 'laporan.png'));
+    $resF = send_telegram_server_file($botTok, $chatId, $_FILES['png_file']['tmp_name'], $fname, $caption, $imgMode);
+    if (!$resF['ok'] && $imgMode === 'photo' && $resF['http_code'] === 400 && stripos((string)$resF['description'], 'chat not found') === false) {
+        $resF = send_telegram_server_file($botTok, $chatId, $_FILES['png_file']['tmp_name'], $fname, $caption, 'document');
+    }
+    echo json_encode($resF);
+    exit;
+}
 
 // ============================================================================
 // ENDPOINT API SYNC LANGSUNG KE SERVER (TANPA DOCKER, AUTH SUPER ADMIN)
@@ -841,137 +1009,137 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $actionStatus = '<div class="alert-err">❌ ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
     } elseif ($_POST['action'] === 'send_telegram' && !empty($_SESSION['auth_user'])) {
-        $defaultToken = $appData['bot_token_default'] ?? '9242894728:AAF2oYVZlpfcHEIFcC9PdoeFQA6KuwF-njs';
-        $botToken = trim((string)($_POST['bot_token'] ?? ''));
-        if ($botToken === '') $botToken = $defaultToken;
-        $chatId = trim((string)($_POST['chat_id'] ?? ''));
-        $scopeSend = (string)($_POST['scope_send'] ?? 'Yovi Arian');
-        $sendMode = (string)($_POST['send_mode'] ?? 'auto');
-        $agentRowsTg = $appData['agent_rows'] ?? [];
-        $dailyRowsTg = $appData['daily_prod_rows'] ?? [];
-        $dailyLblTg  = (string)($appData['daily_prod_date_label'] ?? '');
-        $targetMtdTg = (int)($appData['target_persen_mtd'] ?? 50);
-        $periodeLabelTg = (string)($appData['periode_label'] ?? '');
-        $sisaHariTg = (int)($appData['sisa_hari'] ?? 15);
-
-        $escTg = fn($s) => htmlspecialchars((string)$s, ENT_NOQUOTES, 'UTF-8');
-
-        list($okChat, $msgChat) = waf_inspect_input($chatId, $auditLogFile);
-        list($okTok, $msgTok)   = waf_inspect_input($botToken, $auditLogFile);
-        if (!$okChat) {
-            $tgStatus = '<div class="alert-err">' . htmlspecialchars($msgChat) . '</div>';
-        } elseif (!$okTok) {
-            $tgStatus = '<div class="alert-err">' . htmlspecialchars($msgTok) . '</div>';
-        } elseif ($chatId === '') {
-            $tgStatus = '<div class="alert-err">❌ Masukkan TELEGRAM_CHAT_ID terlebih dahulu (ketik <code>/id</code> di bot <b>@NoticeTelesalesbot</b>).</div>';
+        $curRole = $_SESSION['auth_user']['role'] ?? '';
+        if (!in_array($curRole, ['Admin', 'Finance', 'Leader'], true)) {
+            $tgStatus = '<div class="alert-err">🚫 Akses Ditolak: Pengiriman laporan grup hanya tersedia untuk Admin, Finance, dan Sales Leader.</div>';
         } else {
-            $blocks = [];
-            $hdrTg = "📊 <b>LAPORAN PERFORMA &amp; TARGET TELESALES ISP</b>\n"
-                . "🌐 Portal Resmi : <b>https://laporantelesalesoxygen.my.id</b>\n"
-                . "👨‍💼 Scope Leader : <b>" . $escTg($scopeSend) . "</b>\n"
-                . "🗓 Periode : <b>" . $escTg($periodeLabelTg) . " | Target MTD: {$targetMtdTg}%</b> (Sisa {$sisaHariTg} Hari)\n"
-                . "━━━━━━━━━━━━━━━━━━━━━━\n";
+            $defaultToken = $appData['bot_token_default'] ?? '9242894728:AAF2oYVZlpfcHEIFcC9PdoeFQA6KuwF-njs';
+            $botToken = trim((string)($_POST['bot_token'] ?? ''));
+            if ($botToken === '') $botToken = $defaultToken;
+            $chatId = trim((string)($_POST['chat_id'] ?? ''));
+            $scopeSend = (string)($_POST['scope_send'] ?? 'Yovi Arian');
+            $sendMode = (string)($_POST['send_mode'] ?? 'auto');
+            $imgMode  = (($_POST['img_mode'] ?? 'photo') === 'document') ? 'document' : 'photo';
+            $incImg   = !empty($_POST['include_images']);
+            $incTxt   = !empty($_POST['include_text']);
 
-            if (!empty($dailyRowsTg)) {
-                $dpLines = ["📅 <b>REKAP HARIAN (" . $escTg($dailyLblTg) . ") &amp; AGENT BLM PRODUKTIF</b>"];
-                foreach ($dailyRowsTg as $dr) {
-                    $isGt = !empty($dr['is_grand_total']);
-                    if (!$isGt && $scopeSend !== 'Semua Leader' && $dr['leader'] !== $scopeSend) continue;
-                    $dpLines[] = ($isGt ? "🏆 <b>" : "• <b>") . $escTg($dr['leader']) . "</b>: SO=<b>{$dr['so']}</b> PAID=<b>{$dr['paid']}</b> SA=<b>{$dr['sa']}</b> | Blm Prod: SO=<b>{$dr['blm_so']}</b> PAID=<b>{$dr['blm_paid']}</b> SA=<b>{$dr['blm_sa']}</b>";
-                }
-                $blocks[] = implode("\n", $dpLines) . "\n━━━━━━━━━━━━━━━━━━━━━━\n";
-            }
+            $agentRowsTg = $appData['agent_rows'] ?? [];
+            $dailyRowsTg = $appData['daily_prod_rows'] ?? [];
+            $dailyLblTg  = (string)($appData['daily_prod_date_label'] ?? '');
+            $targetMtdTg = (int)($appData['target_persen_mtd'] ?? 50);
+            $periodeLabelTg = (string)($appData['periode_label'] ?? '');
+            $sisaHariTg = (int)($appData['sisa_hari'] ?? 15);
+            $escTg = fn($s) => htmlspecialchars((string)$s, ENT_NOQUOTES, 'UTF-8');
 
-            $no = 1;
-            $totT = 0; $totSa = 0; $totPaid = 0; $totKom = 0;
-            foreach ($agentRowsTg as $ag) {
-                if ($scopeSend !== 'Semua Leader' && $ag['leader'] !== $scopeSend) continue;
-                if (strtoupper($ag['name']) === 'VACANT') continue;
-                $totT += (int)$ag['target_all'];
-                $totSa += (int)$ag['sa_nov'];
-                $totPaid += (int)$ag['paid_nov'];
-                $totKom += (float)$ag['est_komisi'];
-                $komStr = 'Rp ' . number_format((float)$ag['est_komisi'], 0, ',', '.');
-                $blocks[] = "<b>{$no}. 👤 " . $escTg($ag['name']) . "</b> (" . $escTg($ag['level']) . ")\n"
-                    . "├ 📌 Status MTD : <b>" . $escTg($ag['status_mtd']) . "</b> ({$ag['persen']}%)\n"
-                    . "├ ✅ Realisasi : <b>{$ag['sa_nov']} SA</b> | <b>{$ag['paid_nov']} Paid</b> | Gap: {$ag['gap_sa']}\n"
-                    . "├ ⚡ Wajib Harian : <b>{$ag['harus_paid_hr']} Paid/hr</b> &amp; <b>{$ag['harus_sa_hr']} SA/hr</b>\n"
-                    . "└ 🎯 Target Total : <b>{$ag['target_all']} SA</b> | 💰 <b>{$komStr}</b>\n";
-                $no++;
-            }
-            $pctTim = $totT > 0 ? round(($totSa / $totT) * 100) : 0;
-            $totKomStr = 'Rp ' . number_format($totKom, 0, ',', '.');
-            $blocks[] = "━━━━━━━━━━━━━━━━━━━━━━\n🏆 <b>TOTAL TIM: {$totSa} SA / Target {$totT} SA ({$pctTim}%) | {$totKomStr}</b>";
-
-            $messages = [];
-            $curMsg = $hdrTg;
-            foreach ($blocks as $b) {
-                $add = $b . "\n";
-                if (strlen($curMsg) + strlen($add) > 3500) {
-                    $messages[] = trim($curMsg);
-                    $curMsg = "📋 <b>Lanjutan Laporan (" . $escTg($scopeSend) . ")</b>\n━━━━━━━━━━━━━━━━━━━━━━\n" . $add;
-                } else {
-                    $curMsg .= $add;
-                }
-            }
-            if (trim($curMsg) !== '') $messages[] = trim($curMsg);
-
-            $needBrowserRelay = ($sendMode === 'browser');
-            $okAll = false;
-            $errMsg = '';
-            $usedMethod = 'Server';
-
-            if (!$needBrowserRelay) {
-                $okAll = true;
-                foreach ($messages as $idxM => $mTxt) {
-                    $resTg = send_telegram_server($botToken, $chatId, $mTxt);
-                    if (!$resTg['ok']) {
-                        $okAll = false;
-                        $errMsg = "HTTP {$resTg['http_code']}: {$resTg['description']}";
-                        if ($resTg['http_code'] === 0 && $idxM === 0) {
-                            $needBrowserRelay = true;
-                        }
-                        break;
-                    }
-                    $usedMethod = $resTg['method'];
-                }
-            }
-
-            if ($okAll) {
-                $tgStatus = '<div class="alert-ok">✅ Laporan lengkap berhasil dikirim ke Telegram Chat ID <b>' . htmlspecialchars($chatId) . '</b> (' . count($messages) . ' pesan via ' . htmlspecialchars($usedMethod) . ', HTTP 200 OK)!</div>';
-            } elseif ($needBrowserRelay) {
-                $relayJson = json_encode([
-                    'url'      => "https://api.telegram.org/bot{$botToken}/sendMessage",
-                    'chat_id'  => $chatId,
-                    'messages' => $messages,
-                    'server_note' => $errMsg,
-                ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
-                $tgStatus = '<div id="tg-relay-box" class="alert-ok" style="background:#eff6ff; color:#1e3a8a; border-color:#93c5fd;">'
-                    . '⏳ <b>Mengirim langsung via Browser Relay...</b>'
-                    . ($errMsg ? ' <small>(Info hosting: ' . htmlspecialchars($errMsg) . ')</small>' : '')
-                    . '<div id="tg-relay-progress" style="margin-top:6px;">Memproses ' . count($messages) . ' bagian pesan ke Telegram...</div>'
-                    . '</div>'
-                    . '<script>(async function(){'
-                    . 'const cfg=' . $relayJson . ';'
-                    . 'const box=document.getElementById("tg-relay-box");'
-                    . 'const prog=document.getElementById("tg-relay-progress");'
-                    . 'try{'
-                    . '  for(let i=0;i<cfg.messages.length;i++){'
-                    . '    prog.textContent="Mengirim bagian "+(i+1)+"/"+cfg.messages.length+"...";'
-                    . '    const fd=new URLSearchParams({chat_id:cfg.chat_id,text:cfg.messages[i],parse_mode:"HTML",disable_web_page_preview:"true"});'
-                    . '    const r=await fetch(cfg.url,{method:"POST",body:fd});'
-                    . '    const j=await r.json();'
-                    . '    if(!r.ok||!j.ok){throw new Error((j&&j.description)?j.description:("HTTP "+r.status));}'
-                    . '  }'
-                    . '  box.className="alert-ok";box.style.background="";box.style.color="";box.style.borderColor="";'
-                    . '  box.innerHTML="✅ <b>BERHASIL TERKIRIM KE TELEGRAM!</b> Chat ID <b>"+cfg.chat_id+"</b> ("+cfg.messages.length+" pesan terkirim langsung via Browser Relay, 200 OK).";'
-                    . '}catch(err){'
-                    . '  box.className="alert-err";box.style.background="";box.style.color="";box.style.borderColor="";'
-                    . '  box.innerHTML="❌ <b>Gagal mengirim ke Telegram:</b> "+err.message+"<br><small>Pastikan Chat ID benar dan bot <b>@NoticeTelesalesbot</b> sudah diklik <b>/start</b> atau sudah ditambahkan ke grup tujuan.</small>";'
-                    . '}'
-                    . '})();</script>';
+            list($okChat, $msgChat) = waf_inspect_input($chatId, $auditLogFile);
+            list($okTok, $msgTok)   = waf_inspect_input($botToken, $auditLogFile);
+            if (!$okChat) {
+                $tgStatus = '<div class="alert-err">' . htmlspecialchars($msgChat) . '</div>';
+            } elseif (!$okTok) {
+                $tgStatus = '<div class="alert-err">' . htmlspecialchars($msgTok) . '</div>';
+            } elseif ($chatId === '') {
+                $tgStatus = '<div class="alert-err">❌ Masukkan TELEGRAM_CHAT_ID terlebih dahulu (ketik <code>/id</code> di bot <b>@NoticeTelesalesbot</b>).</div>';
+            } elseif (!$incImg && !$incTxt) {
+                $tgStatus = '<div class="alert-err">⚠️ Pilih minimal satu format laporan (Gambar Presentasi .png atau Pesan Teks Detail).</div>';
             } else {
-                $tgStatus = '<div class="alert-err">❌ Gagal mengirim ke Telegram (' . htmlspecialchars($errMsg) . '). Pastikan Chat ID benar dan bot sudah di-<code>/start</code> atau masuk ke grup tujuan.</div>';
+                $_SESSION['tg_last_bot_token'] = $botToken;
+                $messages = [];
+                if ($incTxt) {
+                    $blocks = [];
+                    $hdrTg = "📊 <b>LAPORAN PERFORMA &amp; TARGET TELESALES ISP</b>\n"
+                        . "🌐 Portal Resmi : <b>https://laporantelesalesoxygen.my.id</b>\n"
+                        . "👨‍💼 Scope Leader : <b>" . $escTg($scopeSend) . "</b>\n"
+                        . "🗓 Periode : <b>" . $escTg($periodeLabelTg) . " | Target MTD: {$targetMtdTg}%</b> (Sisa {$sisaHariTg} Hari)\n"
+                        . "━━━━━━━━━━━━━━━━━━━━━━\n";
+
+                    if (!empty($dailyRowsTg)) {
+                        $dpLines = ["📅 <b>REKAP HARIAN (" . $escTg($dailyLblTg) . ") &amp; AGENT BLM PRODUKTIF</b>"];
+                        foreach ($dailyRowsTg as $dr) {
+                            $isGt = !empty($dr['is_grand_total']);
+                            if (!$isGt && $scopeSend !== 'Semua Leader' && $dr['leader'] !== $scopeSend) continue;
+                            $dpLines[] = ($isGt ? "🏆 <b>" : "• <b>") . $escTg($dr['leader']) . "</b>: SO=<b>{$dr['so']}</b> PAID=<b>{$dr['paid']}</b> SA=<b>{$dr['sa']}</b> | Blm Prod: SO=<b>{$dr['blm_so']}</b> PAID=<b>{$dr['blm_paid']}</b> SA=<b>{$dr['blm_sa']}</b>";
+                        }
+                        $blocks[] = implode("\n", $dpLines) . "\n━━━━━━━━━━━━━━━━━━━━━━\n";
+                    }
+
+                    $no = 1;
+                    $totT = 0; $totSa = 0; $totPaid = 0; $totKom = 0;
+                    foreach ($agentRowsTg as $ag) {
+                        if ($scopeSend !== 'Semua Leader' && $ag['leader'] !== $scopeSend) continue;
+                        if (strtoupper($ag['name']) === 'VACANT') continue;
+                        $totT += (int)$ag['target_all'];
+                        $totSa += (int)$ag['sa_nov'];
+                        $totPaid += (int)$ag['paid_nov'];
+                        $totKom += (float)$ag['est_komisi'];
+                        $komStr = 'Rp ' . number_format((float)$ag['est_komisi'], 0, ',', '.');
+                        $blocks[] = "<b>{$no}. 👤 " . $escTg($ag['name']) . "</b> (" . $escTg($ag['level']) . ")\n"
+                            . "├ 📌 Status MTD : <b>" . $escTg($ag['status_mtd']) . "</b> ({$ag['persen']}%)\n"
+                            . "├ ✅ Realisasi : <b>{$ag['sa_nov']} SA</b> | <b>{$ag['paid_nov']} Paid</b> | Gap: {$ag['gap_sa']}\n"
+                            . "├ ⚡ Wajib Harian : <b>{$ag['harus_paid_hr']} Paid/hr</b> &amp; <b>{$ag['harus_sa_hr']} SA/hr</b>\n"
+                            . "└ 🎯 Target Total : <b>{$ag['target_all']} SA</b> | 💰 <b>{$komStr}</b>\n";
+                        $no++;
+                    }
+                    $pctTim = $totT > 0 ? round(($totSa / $totT) * 100) : 0;
+                    $totKomStr = 'Rp ' . number_format($totKom, 0, ',', '.');
+                    $blocks[] = "━━━━━━━━━━━━━━━━━━━━━━\n🏆 <b>TOTAL TIM: {$totSa} SA / Target {$totT} SA ({$pctTim}%) | {$totKomStr}</b>";
+
+                    $curMsg = $hdrTg;
+                    foreach ($blocks as $b) {
+                        $add = $b . "\n";
+                        if (strlen($curMsg) + strlen($add) > 3500) {
+                            $messages[] = trim($curMsg);
+                            $curMsg = "📋 <b>Lanjutan Laporan (" . $escTg($scopeSend) . ")</b>\n━━━━━━━━━━━━━━━━━━━━━━\n" . $add;
+                        } else {
+                            $curMsg .= $add;
+                        }
+                    }
+                    if (trim($curMsg) !== '') $messages[] = trim($curMsg);
+                }
+
+                // Teks dapat dikirim lewat Server PHP dulu bila bukan gambar & mode auto; jika perlu kirim gambar / server HTTP 0, browser mengirim rapi (Gambar -> Teks)
+                $serverTextSent = false;
+                $serverTextError = '';
+                $needClientRunner = $incImg || ($sendMode === 'browser');
+
+                if ($incTxt && !$needClientRunner) {
+                    $serverTextSent = true;
+                    foreach ($messages as $idxM => $mTxt) {
+                        $resTg = send_telegram_server($botToken, $chatId, $mTxt);
+                        if (!$resTg['ok']) {
+                            $serverTextSent = false;
+                            $serverTextError = "HTTP {$resTg['http_code']}: {$resTg['description']}";
+                            if ($resTg['http_code'] === 0 && $idxM === 0) {
+                                $needClientRunner = true;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                if ($serverTextSent && !$incImg) {
+                    $tgStatus = '<div class="alert-ok">✅ Laporan teks berhasil dikirim ke Telegram Chat ID <b>' . htmlspecialchars($chatId) . '</b> (' . count($messages) . ' pesan, HTTP 200 OK)!</div>';
+                } elseif ($needClientRunner) {
+                    $visualData = $incImg ? build_tg_visual_payload($appData, $scopeSend) : null;
+                    $relayJson = json_encode([
+                        'api_base'    => "https://api.telegram.org/bot{$botToken}",
+                        'chat_id'     => $chatId,
+                        'csrf_token'  => $csrfToken,
+                        'img_mode'    => $imgMode,
+                        'send_images' => $incImg,
+                        'send_text'   => $incTxt && !$serverTextSent,
+                        'messages'    => $incTxt ? $messages : [],
+                        'visual_data' => $visualData,
+                        'server_note' => $serverTextError,
+                    ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
+
+                    $tgStatus = '<div id="tg-relay-box" class="alert-ok" style="background:#eff6ff; color:#1e3a8a; border-color:#93c5fd;">'
+                        . '⏳ <b>Menyiapkan &amp; Mengunggah Gambar Tabel (.png)' . ($incTxt ? ' + Pesan Teks' : '') . ' ke Telegram...</b>'
+                        . '<div id="tg-relay-progress" style="margin-top:6px;">Memproses canvas presentasi resolusi tinggi...</div>'
+                        . '</div>'
+                        . '<script>window.__TG_SEND_CFG=' . $relayJson . ';</script>';
+                } else {
+                    $tgStatus = '<div class="alert-err">❌ Gagal mengirim ke Telegram (' . htmlspecialchars($serverTextError) . '). Pastikan Chat ID benar dan bot sudah di-<code>/start</code> atau masuk ke grup tujuan.</div>';
+                }
             }
         }
     }
@@ -1749,33 +1917,600 @@ $authUser = $_SESSION['auth_user'] ?? null;
     </div>
     <?php endif; ?>
 
-    <!-- DASHBOARD 3: KIRIM LAPORAN KE BOT TELEGRAM -->
+    <?php if (in_array($role, ['Admin', 'Finance', 'Leader'], true)):
+        $previewJsonSpec = json_encode(build_tg_visual_payload($appData, $selectedScope), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
+    ?>
+    <!-- DASHBOARD 3: KIRIM GAMBAR PRESENTASI & TEKS KE BOT TELEGRAM -->
     <div class="card">
-        <h3 style="margin-top:0;">📲 3. KIRIM LAPORAN LENGKAP KE BOT TELEGRAM (<code>@NoticeTelesalesbot</code>)</h3>
+        <h3 style="margin-top:0;">📲 3. KIRIM GAMBAR PRESENTASI &amp; TEKS LENGKAP KE BOT TELEGRAM (<code>@NoticeTelesalesbot</code>)</h3>
         <p style="font-size:0.83rem; color:#475569; margin-top:-6px; margin-bottom:14px;">
-            Mendukung <b>Server PHP (IPv4 + Fallback Stream)</b> dan <b>Browser Auto-Relay</b> jika firewall hosting memblokir koneksi keluar. Pastikan bot <b>@NoticeTelesalesbot</b> sudah di-<code>/start</code> (chat pribadi) atau dimasukkan sebagai member ke grup tujuan.
+            Sekarang mendukung pengiriman <b>🖼️ Gambar Tabel Presentasi (.png)</b> (Tabel MTD SA, Rekap Harian Blm Produktif, &amp; Detail Target Total per Leader — tanpa bocor detail Reguler/Yearly) <b>+ 📝 Pesan Teks Detail</b> langsung dari website!
+            Pastikan bot <b>@NoticeTelesalesbot</b> sudah di-<code>/start</code> atau sudah dimasukkan ke grup Telegram tujuan.
         </p>
-        <form method="post" class="grid-3" style="align-items:end;">
+
+        <form method="post">
             <input type="hidden" name="action" value="send_telegram">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <input type="hidden" name="scope_send" value="<?= htmlspecialchars($selectedScope) ?>">
-            <div>
-                <label style="font-size:0.82rem;"><b>TELEGRAM_CHAT_ID Tujuan (ketik <code>/id</code> di bot):</b></label>
-                <input type="text" name="chat_id" value="<?= htmlspecialchars((string)($_POST['chat_id'] ?? '')) ?>" placeholder="Contoh: -100123456789 atau Chat ID Pribadi" required style="margin-bottom:0;">
+            <input type="hidden" name="bot_token" value="<?= htmlspecialchars($defaultToken) ?>">
+
+            <div class="grid-3" style="align-items:end;">
+                <div>
+                    <label style="font-size:0.82rem;"><b>TELEGRAM_CHAT_ID Tujuan (ketik <code>/id</code> di bot):</b></label>
+                    <input type="text" name="chat_id" value="<?= htmlspecialchars((string)($_POST['chat_id'] ?? '')) ?>" placeholder="Contoh: -100123456789 atau Chat ID Pribadi" required>
+                </div>
+                <div>
+                    <label style="font-size:0.82rem;"><b>Format Pengiriman Gambar PNG:</b></label>
+                    <select name="img_mode">
+                        <option value="photo" <?= (($_POST['img_mode'] ?? 'photo') === 'photo') ? 'selected' : '' ?>>🖼️ Foto (langsung tampil rapi di chat Telegram)</option>
+                        <option value="document" <?= (($_POST['img_mode'] ?? '') === 'document') ? 'selected' : '' ?>>📎 File / Dokumen PNG (resolusi asli tajam di-zoom)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.82rem;"><b>Jalur Pengiriman:</b></label>
+                    <select name="send_mode">
+                        <option value="auto" selected>⚡ Otomatis (Upload Gambar + Teks Anti-Blokir)</option>
+                        <option value="browser">🌐 Langsung via Browser Relay</option>
+                    </select>
+                </div>
             </div>
-            <div>
-                <label style="font-size:0.82rem;"><b>Jalur Pengiriman:</b></label>
-                <select name="send_mode" style="margin-bottom:0;">
-                    <option value="auto" selected>⚡ Otomatis (Server PHP -&gt; Browser Relay jika diblokir)</option>
-                    <option value="browser">🌐 Langsung via Browser Relay (Anti-Blokir Hosting)</option>
-                </select>
+
+            <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center; margin:4px 0 14px 0;">
+                <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem; font-weight:700;">
+                    <input type="checkbox" name="include_images" value="1" <?= ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['action'] ?? '') !== 'send_telegram' || !empty($_POST['include_images'])) ? 'checked' : '' ?> style="width:auto; margin:0;">
+                    🖼️ Sertakan Gambar Presentasi Tabel (.png)
+                </label>
+                <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem; font-weight:700;">
+                    <input type="checkbox" name="include_text" value="1" <?= ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['action'] ?? '') !== 'send_telegram' || !empty($_POST['include_text'])) ? 'checked' : '' ?> style="width:auto; margin:0;">
+                    📝 Sertakan Pesan Teks Detail
+                </label>
             </div>
-            <div>
-                <input type="hidden" name="bot_token" value="<?= htmlspecialchars($defaultToken) ?>">
-                <button type="submit" class="btn" style="width:100%; padding:11px;">🚀 Kirim Laporan Lengkap (<?= htmlspecialchars($selectedScope) ?>) ke Telegram</button>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button type="button" onclick="window.tgPreviewGallery()" class="btn btn-amber">👁️ Pratinjau &amp; Download Gambar Tabel (.png)</button>
+                <button type="submit" class="btn" style="flex:1; min-width:260px;">🚀 Kirim Gambar + Teks (<?= htmlspecialchars($selectedScope) ?>) ke Telegram</button>
             </div>
         </form>
+
+        <div id="tg-preview-gallery" style="display:none; margin-top:18px; padding-top:14px; border-top:1px solid #cbd5e1;"></div>
     </div>
+
+    <script>
+    (function(){
+        const PREVIEW_DATA = <?= $previewJsonSpec ?>;
+        const F_FACE = "'Segoe UI', Roboto, Arial, sans-serif";
+
+        function fmtInt(n) {
+            const v = Math.round(Number(n) || 0);
+            const sign = v < 0 ? '-' : '';
+            return sign + Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+        function roundExcel(v) {
+            const x = Number(v) || 0;
+            return x >= 0 ? Math.floor(x + 0.5) : Math.ceil(x - 0.5);
+        }
+
+        function measureMulti(ctx, text, font) {
+            ctx.font = font;
+            const lines = String(text).split('\n');
+            let m = 0;
+            for (const ln of lines) m = Math.max(m, ctx.measureText(ln).width);
+            return m;
+        }
+
+        function drawTextCell(ctx, box, text, font, color, align) {
+            const [x0, y0, x1, y1] = box;
+            const lines = String(text).split('\n');
+            const sizeMatch = /\b(\d+)px\b/.exec(font);
+            const px = sizeMatch ? Number(sizeMatch[1]) : 16;
+            const lineH = px * 1.2;
+            let y = (y0 + y1) / 2 - (lineH * lines.length) / 2 + lineH / 2;
+            ctx.font = font;
+            ctx.fillStyle = color;
+            ctx.textBaseline = 'middle';
+            for (const ln of lines) {
+                if (align === 'l') {
+                    ctx.textAlign = 'left';
+                    ctx.fillText(ln, x0 + 12, y);
+                } else if (align === 'r') {
+                    ctx.textAlign = 'right';
+                    ctx.fillText(ln, x1 - 12, y);
+                } else {
+                    ctx.textAlign = 'center';
+                    ctx.fillText(ln, (x0 + x1) / 2, y);
+                }
+                y += lineH;
+            }
+        }
+
+        function renderTablePng(spec) {
+            const margin = 28;
+            const padCell = 14;
+            const rowH = 38;
+            const fTitle = '800 26px ' + F_FACE;
+            const fSub   = '400 16px ' + F_FACE;
+            const fHead  = '700 15px ' + F_FACE;
+            const fGroup = '700 15px ' + F_FACE;
+            const fCell  = '400 16px ' + F_FACE;
+            const fBold  = '700 16px ' + F_FACE;
+            const fNote  = '400 14px ' + F_FACE;
+            const fBan   = '800 16px ' + F_FACE;
+
+            const tmpCanvas = document.createElement('canvas');
+            const mCtx = tmpCanvas.getContext('2d');
+            const nCol = spec.columns.length;
+            const align = spec.align || Array(nCol).fill('c');
+            const groups = spec.groupHeaders || [];
+            const notes = spec.notes || [];
+
+            let colW = [];
+            for (let c = 0; c < nCol; c++) {
+                let w = measureMulti(mCtx, spec.columns[c], fHead);
+                for (const r of spec.rows) {
+                    w = Math.max(w, measureMulti(mCtx, r[c], fBold));
+                }
+                colW.push(w + 2 * padCell);
+            }
+            for (const g of groups) {
+                const need = measureMulti(mCtx, g.label, fGroup) + 2 * padCell;
+                let have = 0;
+                for (let c = g.start; c <= g.end; c++) have += colW[c];
+                if (need > have) {
+                    const add = (need - have) / (g.end - g.start + 1);
+                    for (let c = g.start; c <= g.end; c++) colW[c] += add;
+                }
+            }
+
+            let banW = 0, banLW = 0, banH = 0;
+            if (spec.banner) {
+                banLW = measureMulti(mCtx, spec.banner.left, fBan) + 36;
+                const banRW = measureMulti(mCtx, spec.banner.right, fBan) + 36;
+                banW = Math.max(banLW + banRW, measureMulti(mCtx, spec.banner.top, fBan) + 36);
+                banH = 68;
+            }
+
+            const titleW = Math.max(measureMulti(mCtx, spec.title, fTitle), measureMulti(mCtx, spec.subtitle, fSub));
+            let noteW = 0;
+            for (const nt of notes) noteW = Math.max(noteW, measureMulti(mCtx, nt, fNote));
+            const tableW = colW.reduce((a, b) => a + b, 0);
+            const contentW = Math.max(tableW, titleW + (spec.banner ? banW + 40 : 0), noteW);
+            if (contentW > tableW) {
+                const ratio = contentW / tableW;
+                colW = colW.map(w => w * ratio);
+            }
+            colW = colW.map(w => Math.ceil(w));
+            const totalW = colW.reduce((a, b) => a + b, 0);
+
+            const maxHeadLines = Math.max(...spec.columns.map(k => String(k).split('\n').length));
+            const headH = Math.ceil(maxHeadLines * 18 + 20);
+            const groupH = groups.length ? 34 : 0;
+            const titleBlkH = Math.max(66, banH) + 20;
+            const noteH = notes.length ? (notes.length * 22 + 16) : 0;
+
+            const imgW = totalW + 2 * margin;
+            const imgH = margin + 8 + titleBlkH + groupH + headH + spec.rows.length * rowH + noteH + margin;
+
+            const canvas = document.createElement('canvas');
+            const scale = (imgW * 1.5 + imgH * 1.5 <= 9000) ? 1.5 : 1.0;
+            canvas.width = Math.round(imgW * scale);
+            canvas.height = Math.round(imgH * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scale, scale);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, imgW, imgH);
+            ctx.fillStyle = '#1f3864';
+            ctx.fillRect(0, 0, imgW, 8);
+
+            const y0 = margin + 8;
+            ctx.fillStyle = '#0f172a';
+            ctx.font = fTitle;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(spec.title, margin, y0);
+            ctx.fillStyle = '#475569';
+            ctx.font = fSub;
+            ctx.fillText(spec.subtitle, margin, y0 + 36);
+
+            if (spec.banner) {
+                const bx1 = margin + totalW;
+                const bx0 = bx1 - banW;
+                const bxm = bx0 + banLW;
+                ctx.fillStyle = '#6b1d36';
+                ctx.fillRect(bx0, y0, banW, 32);
+                ctx.strokeStyle = '#4a1525';
+                ctx.strokeRect(bx0, y0, banW, 32);
+                drawTextCell(ctx, [bx0, y0, bx1, y0 + 32], spec.banner.top, fBan, '#ffffff', 'c');
+
+                ctx.fillStyle = '#58152b';
+                ctx.fillRect(bx0, y0 + 32, banLW, 36);
+                ctx.fillRect(bxm, y0 + 32, bx1 - bxm, 36);
+                ctx.strokeStyle = '#993355';
+                ctx.strokeRect(bx0, y0 + 32, banLW, 36);
+                ctx.strokeRect(bxm, y0 + 32, bx1 - bxm, 36);
+                drawTextCell(ctx, [bx0, y0 + 32, bxm, y0 + 68], spec.banner.left, fBan, '#ffffff', 'c');
+                drawTextCell(ctx, [bxm, y0 + 32, bx1, y0 + 68], spec.banner.right, fBan, '#fde047', 'c');
+            }
+
+            const yTab = y0 + titleBlkH;
+            const xs = [margin];
+            for (const w of colW) xs.push(xs[xs.length - 1] + w);
+
+            const groupedCols = new Set();
+            const colHeadBg = {};
+            for (const g of groups) {
+                const bgG = g.bg || '#1f3864';
+                for (let c = g.start; c <= g.end; c++) {
+                    groupedCols.add(c);
+                    colHeadBg[c] = bgG;
+                }
+                ctx.fillStyle = bgG;
+                ctx.fillRect(xs[g.start], yTab, xs[g.end + 1] - xs[g.start], groupH);
+                ctx.strokeStyle = '#5b6f99';
+                ctx.strokeRect(xs[g.start], yTab, xs[g.end + 1] - xs[g.start], groupH);
+                drawTextCell(ctx, [xs[g.start], yTab, xs[g.end + 1], yTab + groupH], g.label, fGroup, '#ffffff', 'c');
+            }
+
+            for (let c = 0; c < nCol; c++) {
+                const bgH = colHeadBg[c] || spec.headBg || '#1f3864';
+                const topY = groupedCols.has(c) ? (yTab + groupH) : yTab;
+                const hH = groupedCols.has(c) ? headH : (groupH + headH);
+                ctx.fillStyle = bgH;
+                ctx.fillRect(xs[c], topY, xs[c + 1] - xs[c], hH);
+                ctx.strokeStyle = '#5b6f99';
+                ctx.strokeRect(xs[c], topY, xs[c + 1] - xs[c], hH);
+                drawTextCell(ctx, [xs[c], topY, xs[c + 1], topY + hH], spec.columns[c], fHead, '#ffffff', 'c');
+            }
+
+            let y = yTab + groupH + headH;
+            for (let i = 0; i < spec.rows.length; i++) {
+                const row = spec.rows[i];
+                const rb = (spec.rowStyles && spec.rowStyles[i]) || {};
+                const baseBg = rb.bg || (i % 2 ? '#f5f7fb' : '#ffffff');
+                for (let c = 0; c < nCol; c++) {
+                    const cs = (spec.cellStyle ? spec.cellStyle(i, c, row[c]) : null) || {};
+                    const bg = cs.bg || baseBg;
+                    const fg = cs.fg || rb.fg || '#0f172a';
+                    const isBold = (cs.bold !== undefined) ? cs.bold : !!rb.bold;
+                    const al = cs.align || align[c];
+                    ctx.fillStyle = bg;
+                    ctx.fillRect(xs[c], y, xs[c + 1] - xs[c], rowH);
+                    ctx.strokeStyle = '#a7b1c2';
+                    ctx.strokeRect(xs[c], y, xs[c + 1] - xs[c], rowH);
+                    drawTextCell(ctx, [xs[c], y, xs[c + 1], y + rowH], row[c], isBold ? fBold : fCell, fg, al);
+                }
+                y += rowH;
+            }
+            ctx.strokeStyle = '#1f3864';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(margin, yTab, totalW, y - yTab);
+            ctx.lineWidth = 1;
+
+            let ny = y + 18;
+            ctx.fillStyle = '#475569';
+            ctx.font = fNote;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            for (const nt of notes) {
+                ctx.fillText(nt, margin, ny);
+                ny += 22;
+            }
+
+            return new Promise(resolve => {
+                canvas.toBlob(blob => {
+                    resolve({ blob: blob, dataUrl: canvas.toDataURL('image/png') });
+                }, 'image/png');
+            });
+        }
+
+        async function buildAllReportPngs(data) {
+            const out = [];
+
+            // 1. MTD SA
+            if (data.mtd_rows && data.mtd_rows.length) {
+                let totOct = 0, totNov = 0;
+                const rows = [];
+                const rowStyles = [];
+                let idxTot = -1;
+                for (const mr of data.mtd_rows) {
+                    if (mr.is_total) {
+                        totOct = mr.sa_oct;
+                        totNov = mr.sa_nov;
+                        idxTot = rows.length;
+                        rowStyles.push({ bg: '#c9daf8', bold: true });
+                    } else {
+                        rowStyles.push(null);
+                    }
+                    rows.push([mr.leader, fmtInt(mr.sa_oct), fmtInt(mr.sa_nov), fmtInt(mr.gap_sa)]);
+                }
+                const acv = totOct > 0 ? roundExcel(((totNov - totOct) / totOct) * 100) : 0;
+                const idxNote = rows.length;
+                rows.push(['Note Acv SA', '', acv < 0 ? '↓' : '↑', acv + '%']);
+                rowStyles.push({ bg: '#dbe5f1', bold: true });
+
+                const imgMtd = await renderTablePng({
+                    title: 'MTD SA — RINGKASAN PENCAPAIAN LEADER',
+                    subtitle: `Perbandingan tanggal 1-${data.hari} ${data.bln_lalu} vs ${data.bln_ini} ${data.tahun} (${data.scope})`,
+                    columns: ['SALES LEADER', `SA ${data.bln_lalu}\n1-${data.hari}`, `SA ${data.bln_ini}\n1-${data.hari}`, 'GAP SA'],
+                    rows: rows,
+                    align: ['l', 'c', 'c', 'c'],
+                    rowStyles: rowStyles,
+                    cellStyle: (i, c, txt) => {
+                        if (c === 0 && (i === idxTot || i === idxNote)) return { align: 'c' };
+                        if (c === 3) {
+                            const v = parseInt(String(txt).replace(/\./g, '').replace('%', ''), 10);
+                            if (!isNaN(v) && v < 0) return { bg: '#f4cccc', fg: '#990000', bold: true };
+                            if (!isNaN(v) && v > 0) return { fg: '#15803d', bold: true };
+                        }
+                        return null;
+                    },
+                    notes: [`GAP SA = SA ${data.bln_ini} - SA ${data.bln_lalu}. Note Acv SA = kenaikan/penurunan terhadap bulan lalu.`],
+                });
+                out.push({
+                    fileName: `01_MTD_SA_1-${data.hari}_${data.bln_ini}_${data.tahun}.png`,
+                    caption: `📈 <b>MTD SA 1-${data.hari} ${data.bln_lalu} vs ${data.bln_ini} ${data.tahun}</b>`,
+                    blob: imgMtd.blob,
+                    dataUrl: imgMtd.dataUrl,
+                });
+            }
+
+            // 1B. REKAP HARIAN & AGENT BELUM PRODUKTIF
+            if (data.daily_rows && data.daily_rows.length) {
+                const dRows = [];
+                const dStyles = [];
+                let idxGt = -1;
+                for (const dr of data.daily_rows) {
+                    if (dr.is_gt) {
+                        idxGt = dRows.length;
+                        dStyles.push({ bg: '#ffffff', bold: true });
+                    } else {
+                        dStyles.push(null);
+                    }
+                    dRows.push([dr.leader, fmtInt(dr.so), fmtInt(dr.paid), fmtInt(dr.sa), fmtInt(dr.blm_so), fmtInt(dr.blm_paid), fmtInt(dr.blm_sa)]);
+                }
+                const imgDp = await renderTablePng({
+                    title: `REKAP HARIAN (${data.daily_label}) & AGENT BELUM PRODUKTIF`,
+                    subtitle: `SO / PAID / SA tanggal ${data.daily_label} vs Jumlah Agent Aktif yang Belum Produktif`,
+                    columns: ['Sales Leader', 'SO', 'PAID', 'SA', 'SO', 'PAID', 'SA'],
+                    groupHeaders: [
+                        { label: data.daily_label, start: 1, end: 3, bg: '#002060' },
+                        { label: 'Jumlah Agent Blm Produktif', start: 4, end: 6, bg: '#dc0000' },
+                    ],
+                    headBg: '#002060',
+                    rows: dRows,
+                    align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'],
+                    rowStyles: dStyles,
+                    cellStyle: (i, c) => (i === idxGt && c >= 4) ? { bg: '#fce4d6', fg: '#9a3412', bold: true } : null,
+                    notes: [`Kolom Merah: Banyaknya agen aktif non-Vacant dengan hasil 0 tepat pada tanggal ${data.daily_label}.`],
+                });
+                out.push({
+                    fileName: `01B_Rekap_Harian_Blm_Produktif_${data.daily_label}.png`,
+                    caption: `📊 <b>Rekap Harian (${data.daily_label}) &amp; Jumlah Agent Belum Produktif</b>`,
+                    blob: imgDp.blob,
+                    dataUrl: imgDp.dataUrl,
+                });
+            }
+
+            // 2. DETAIL AGENT PER LEADER (TANPA Reguler/Yearly terpisah!)
+            if (data.agent_rows && data.agent_rows.length) {
+                const byLdr = new Map();
+                for (const ag of data.agent_rows) {
+                    if (!byLdr.has(ag.leader)) byLdr.set(ag.leader, []);
+                    byLdr.get(ag.leader).push(ag);
+                }
+                let seq = 2;
+                for (const [ldrName, grp] of byLdr.entries()) {
+                    const rows = [];
+                    const styles = [];
+                    const vacantSet = new Set();
+                    const kurangSet = new Set();
+                    let nKurang = 0;
+                    let sT = 0, sSa = 0, sPaid = 0, sM = 0, s3m = 0, sSem = 0, sYr = 0, sPHr = 0, sSHr = 0;
+
+                    grp.forEach((r, idx) => {
+                        const isVac = String(r.name).toUpperCase() === 'VACANT';
+                        let stTxt = 'AMAN';
+                        if (isVac) {
+                            stTxt = 'VACANT';
+                            vacantSet.add(rows.length);
+                        } else if (r.persen < data.target_mtd) {
+                            stTxt = `KURANG -${data.target_mtd - r.persen}%`;
+                            nKurang++;
+                            kurangSet.add(rows.length);
+                        }
+                        sT += r.target_all; sSa += r.sa_nov; sPaid += r.paid_nov;
+                        sM += r.p_m; s3m += r.p_3m; sSem += r.p_sem; sYr += r.p_yr;
+                        sPHr += r.harus_paid_hr; sSHr += r.harus_sa_hr;
+                        rows.push([
+                            String(idx + 1), r.name, r.level, fmtInt(r.target_all),
+                            fmtInt(r.sa_nov), fmtInt(r.paid_nov), fmtInt(r.gap_sa), r.persen + '%',
+                            fmtInt(r.runrate_30), fmtInt(r.p_m), fmtInt(r.p_3m), fmtInt(r.p_sem), fmtInt(r.p_yr),
+                            stTxt, fmtInt(r.harus_paid_hr), fmtInt(r.harus_sa_hr),
+                        ]);
+                        styles.push(null);
+                    });
+
+                    const idxTotL = rows.length;
+                    const pctL = sT > 0 ? roundExcel((sSa / sT) * 100) : 0;
+                    const rrL = roundExcel((sSa * data.total_hari) / Math.max(1, data.hari));
+                    rows.push([
+                        '', `TOTAL ${ldrName}`, '', fmtInt(sT), fmtInt(sSa), fmtInt(sPaid), fmtInt(sSa - sT),
+                        pctL + '%', fmtInt(rrL), fmtInt(sM), fmtInt(s3m), fmtInt(sSem), fmtInt(sYr),
+                        `${nKurang} agen kurang`, fmtInt(sPHr), fmtInt(sSHr),
+                    ]);
+                    styles.push({ bg: '#b4a7d6', bold: true });
+
+                    const imgLdr = await renderTablePng({
+                        title: `DETAIL AGENT — TIM ${ldrName.toUpperCase()}`,
+                        subtitle: `Realisasi MTD 1-${data.hari} ${data.bln_ini} ${data.tahun}  •  Sisa ${data.sisa_hari} hari  •  Target MTD ${data.target_mtd}%`,
+                        columns: ['NO', 'SALES NAME', 'LEVEL', 'TARGET\nTOTAL', `SA\n${data.bln_ini}`, `PAID\n${data.bln_ini}`, 'GAP\nSA', 'PERSEN-\nTASE', `RUNRATE\n${data.total_hari}H`, 'M', '3M', 'SEM', 'Y', `STATUS vs\nTARGET ${data.target_mtd}%`, 'PAID\n/ HARI', 'SA\n/ HARI'],
+                        groupHeaders: [
+                            { label: 'BREAKDOWN PAKET', start: 9, end: 12, bg: '#1f3864' },
+                            { label: 'KUOTA WAJIB / HARI', start: 14, end: 15, bg: '#1f3864' },
+                        ],
+                        banner: { top: 'TARGET', left: data.periode, right: data.target_mtd + '%' },
+                        rows: rows,
+                        align: ['c', 'l', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'],
+                        rowStyles: styles,
+                        cellStyle: (i, c, txt) => {
+                            const isTot = i === idxTotL;
+                            if (c === 1 && vacantSet.has(i)) return { bg: '#ffff00', bold: true };
+                            if (c === 4 && !isTot) return { bg: '#c9daf8', bold: true };
+                            if (c === 6 && !isTot && Number(String(txt).replace(/\./g, '')) < 0) return { fg: '#990000' };
+                            if (c === 7) {
+                                const v = parseInt(String(txt), 10);
+                                return (!isNaN(v) && v < data.target_mtd)
+                                    ? { bg: '#f4cccc', fg: '#990000', bold: true }
+                                    : { bg: '#d9ead3', fg: '#134f5c', bold: true };
+                            }
+                            if (c === 13 && !isTot) {
+                                if (String(txt).startsWith('KURANG')) return { bg: '#f4cccc', fg: '#990000', bold: true };
+                                if (txt === 'AMAN') return { bg: '#d9ead3', fg: '#134f5c', bold: true };
+                            }
+                            if ((c === 14 || c === 15) && kurangSet.has(i)) return { bg: '#fff2cc', fg: '#7f4f00', bold: true };
+                            if (c === 14 || c === 15) return { bold: true };
+                            return null;
+                        },
+                        notes: [`PERSENTASE = SA ÷ Target Total. Kuning = kuota harian Paid/SA bagi agen di bawah ${data.target_mtd}%.`],
+                    });
+                    const safeL = ldrName.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+                    const escCapL = ldrName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    out.push({
+                        fileName: `${String(seq).padStart(2, '0')}_Detail_Agent_${safeL}.png`,
+                        caption: `📋 <b>Detail Agent — Tim ${escCapL}</b> | ${data.periode} | Target MTD ${data.target_mtd}%`,
+                        blob: imgLdr.blob,
+                        dataUrl: imgLdr.dataUrl,
+                    });
+                    seq++;
+                }
+            }
+            return out;
+        }
+
+        window.tgPreviewGallery = async function() {
+            const gal = document.getElementById('tg-preview-gallery');
+            if (!gal) return;
+            gal.style.display = 'block';
+            gal.innerHTML = '<div style="padding:10px; color:#1e3a8a; font-weight:700;">⏳ Merender gambar tabel presentasi (.png)...</div>';
+            try {
+                const imgs = await buildAllReportPngs(PREVIEW_DATA);
+                gal.innerHTML = '<h4 style="margin:0 0 10px 0;">🖼️ Pratinjau Gambar Tabel Telegram (' + imgs.length + ' Gambar)</h4>';
+                for (const im of imgs) {
+                    const wrap = document.createElement('div');
+                    wrap.style.cssText = 'background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:12px; margin-bottom:12px;';
+                    const bar = document.createElement('div');
+                    bar.style.cssText = 'display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;';
+                    const ttl = document.createElement('b');
+                    ttl.textContent = im.fileName;
+                    const dl = document.createElement('a');
+                    dl.href = im.dataUrl;
+                    dl.download = im.fileName;
+                    dl.className = 'btn btn-green';
+                    dl.style.cssText = 'padding:6px 12px; font-size:0.8rem;';
+                    dl.textContent = '📥 Download .png';
+                    bar.appendChild(ttl);
+                    bar.appendChild(dl);
+                    const imgEl = document.createElement('img');
+                    imgEl.src = im.dataUrl;
+                    imgEl.style.cssText = 'max-width:100%; height:auto; border:1px solid #cbd5e1; border-radius:6px;';
+                    wrap.appendChild(bar);
+                    wrap.appendChild(imgEl);
+                    gal.appendChild(wrap);
+                }
+            } catch (err) {
+                gal.innerHTML = '<div class="alert-err">❌ Gagal membuat pratinjau gambar: ' + err.message + '</div>';
+            }
+        };
+
+        async function uploadSinglePng(cfg, im) {
+            const tryEndpoint = async (mode) => {
+                const fd = new FormData();
+                fd.append('chat_id', cfg.chat_id);
+                fd.append('caption', im.caption);
+                fd.append('parse_mode', 'HTML');
+                fd.append(mode === 'document' ? 'document' : 'photo', im.blob, im.fileName);
+                const ep = mode === 'document' ? '/sendDocument' : '/sendPhoto';
+                const r = await fetch(cfg.api_base + ep, { method: 'POST', body: fd });
+                const j = await r.json();
+                return { ok: !!(r.ok && j && j.ok), status: r.status, desc: (j && j.description) ? j.description : ('HTTP ' + r.status) };
+            };
+
+            try {
+                let res = await tryEndpoint(cfg.img_mode);
+                const dLow = (res.desc || '').toLowerCase();
+                if (!res.ok && cfg.img_mode === 'photo' && res.status === 400 && !dLow.includes('chat not found') && !dLow.includes('forbidden')) {
+                    // Fallback otomatis ke sendDocument jika dimensi/ukuran ditolak sendPhoto Telegram
+                    res = await tryEndpoint('document');
+                }
+                if (res.ok) return res;
+                throw new Error(res.desc);
+            } catch (browserErr) {
+                // Backup terakhir lewat endpoint PHP server jika browser klien memblokir Telegram
+                const fdSrv = new FormData();
+                fdSrv.append('action', 'send_telegram_blob');
+                fdSrv.append('csrf_token', cfg.csrf_token);
+                fdSrv.append('chat_id', cfg.chat_id);
+                fdSrv.append('caption', im.caption);
+                fdSrv.append('img_mode', cfg.img_mode);
+                fdSrv.append('png_file', im.blob, im.fileName);
+                const rs = await fetch('index.php', { method: 'POST', body: fdSrv });
+                const js = await rs.json().catch(() => null);
+                if (js && js.ok) return { ok: true };
+                throw new Error(browserErr.message || (js && js.description) || 'Gagal mengunggah gambar ke Telegram');
+            }
+        }
+
+        if (window.__TG_SEND_CFG) {
+            (async function(){
+                const cfg = window.__TG_SEND_CFG;
+                const box = document.getElementById('tg-relay-box');
+                const prog = document.getElementById('tg-relay-progress');
+                let sentImgs = 0, sentMsgs = 0;
+                try {
+                    if (cfg.send_images && cfg.visual_data) {
+                        const imgs = await buildAllReportPngs(cfg.visual_data);
+                        for (let i = 0; i < imgs.length; i++) {
+                            if (prog) prog.textContent = '🖼️ Mengunggah gambar ' + (i + 1) + '/' + imgs.length + ': ' + imgs[i].fileName + '...';
+                            await uploadSinglePng(cfg, imgs[i]);
+                            sentImgs++;
+                            await new Promise(r => setTimeout(r, 350));
+                        }
+                    }
+                    if (cfg.send_text && cfg.messages && cfg.messages.length) {
+                        for (let j = 0; j < cfg.messages.length; j++) {
+                            if (prog) prog.textContent = '📝 Mengirim teks bagian ' + (j + 1) + '/' + cfg.messages.length + '...';
+                            const fdTxt = new URLSearchParams({
+                                chat_id: cfg.chat_id,
+                                text: cfg.messages[j],
+                                parse_mode: 'HTML',
+                                disable_web_page_preview: 'true'
+                            });
+                            const rt = await fetch(cfg.api_base + '/sendMessage', { method: 'POST', body: fdTxt });
+                            const jt = await rt.json();
+                            if (!rt.ok || !jt.ok) {
+                                throw new Error((jt && jt.description) ? jt.description : ('HTTP ' + rt.status));
+                            }
+                            sentMsgs++;
+                            await new Promise(r => setTimeout(r, 250));
+                        }
+                    }
+                    if (box) {
+                        box.className = 'alert-ok';
+                        box.style.background = ''; box.style.color = ''; box.style.borderColor = '';
+                        box.innerHTML = '✅ <b>BERHASIL TERKIRIM KE TELEGRAM!</b> Chat ID <b>' + cfg.chat_id + '</b> (' + sentImgs + ' Gambar Tabel PNG' + (cfg.send_text ? (' + ' + sentMsgs + ' Pesan Teks') : '') + ').';
+                    }
+                } catch (err) {
+                    if (box) {
+                        box.className = 'alert-err';
+                        box.style.background = ''; box.style.color = ''; box.style.borderColor = '';
+                        box.innerHTML = '❌ <b>Gagal mengirim ke Telegram:</b> ' + err.message + '<br><small>Pastikan Chat ID benar dan bot <b>@NoticeTelesalesbot</b> sudah diklik <b>/start</b> atau ditambahkan ke grup tujuan.</small>';
+                    }
+                }
+            })();
+        }
+    })();
+    </script>
+    <?php endif; ?>
 <?php endif; ?>
 </div>
 </body>
