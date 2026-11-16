@@ -12,17 +12,18 @@ import streamlit as st
 
 from gambar_laporan import buat_semua_gambar_laporan
 from security_firewall import (
-    HASH_PASS_ADMIN_MASTER,
-    HASH_PASS_AGEN,
-    HASH_PASS_FINANCE,
-    HASH_PASS_LEADER,
     MAKS_GAGAL_LOGIN,
     baca_log_keamanan_terbaru,
-    bandingkan_hash_aman,
     catat_gagal_login,
     cek_status_lockout,
+    decrypt_vault,
+    muat_config_roles,
+    muat_config_superadmin,
     periksa_input_waf,
     reset_gagal_login,
+    username_super_admin,
+    verifikasi_peran_non_admin,
+    verifikasi_super_admin,
 )
 
 # Cek ketersediaan library opsional PandasAI untuk Tab Chatbot
@@ -809,6 +810,158 @@ def get_mtd_so_data(
     return df_mtd_so
 
 
+def dedup_prospect_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Menghapus baris duplikat persis & memperbarui status baris dengan Prospect+Customer yang sama."""
+    if df is None or df.empty:
+        return df
+    df_c = df.copy()
+    if "Prospect No" in df_c.columns:
+        pno = df_c["Prospect No"].fillna("").astype(str).str.strip()
+        cno = (
+            df_c["Customer No"].fillna("").astype(str).str.strip()
+            if "Customer No" in df_c.columns
+            else pd.Series("", index=df_c.index)
+        )
+        cname = (
+            df_c["Customer Name"].fillna("").astype(str).str.strip().str.upper()
+            if "Customer Name" in df_c.columns
+            else pd.Series("", index=df_c.index)
+        )
+        has_pk = (pno != "") & ((cno != "") | (cname != ""))
+        df_c["_dedup_key"] = np.where(
+            has_pk,
+            "PK:" + pno + "|" + cno + "|" + cname,
+            pd.Series(df_c.index.astype(str), index=df_c.index),
+        )
+        df_c = df_c.drop_duplicates(subset=["_dedup_key"], keep="last").drop(columns=["_dedup_key"])
+    return df_c.drop_duplicates().reset_index(drop=True)
+
+
+def hitung_rekap_harian_blm_produktif_py(
+    df_prospect: pd.DataFrame,
+    df_target: pd.DataFrame | None,
+    tgl_cek: datetime.date,
+    leader_filter: str = "Semua Leader",
+) -> tuple[list[dict], str]:
+    """Menghitung Rekap Harian (SO, PAID, SA) & Jumlah Agent Blm Produktif per Leader."""
+    nama_bln = NAMA_BULAN_TAMPIL.get(tgl_cek.month, "Nov")
+    date_label = f"{tgl_cek.day}-{nama_bln}-{str(tgl_cek.year)[-2:]}"
+
+    df_p = df_prospect.copy() if df_prospect is not None else pd.DataFrame()
+    if df_p.empty:
+        return [], date_label
+
+    for kol in ("Created Date", "Payment Date", "Active Date"):
+        if kol in df_p.columns:
+            df_p[kol] = pd.to_datetime(df_p[kol], errors="coerce")
+
+    df_p["_ag_key"] = (
+        df_p["Salesname"].apply(bersihkan_nama_agen)
+        if "Salesname" in df_p.columns
+        else ""
+    )
+    df_p["_ldr"] = (
+        df_p["Sales Leader"].fillna("").astype(str).str.strip()
+        if "Sales Leader" in df_p.columns
+        else ""
+    )
+
+    so_mask = (
+        df_p["Created Date"].dt.date == tgl_cek
+        if "Created Date" in df_p.columns
+        else pd.Series(False, index=df_p.index)
+    )
+    paid_status = (
+        df_p["Status Payment"].fillna("").astype(str).str.strip().str.upper() == "PAID"
+        if "Status Payment" in df_p.columns
+        else pd.Series(True, index=df_p.index)
+    )
+    paid_mask = (
+        paid_status & (df_p["Payment Date"].dt.date == tgl_cek)
+        if "Payment Date" in df_p.columns
+        else pd.Series(False, index=df_p.index)
+    )
+    sa_mask = (
+        df_p["Active Date"].dt.date == tgl_cek
+        if "Active Date" in df_p.columns
+        else pd.Series(False, index=df_p.index)
+    )
+
+    df_so = df_p[so_mask]
+    df_paid = df_p[paid_mask]
+    df_sa = df_p[sa_mask]
+
+    so_ldr = df_so[df_so["_ldr"] != ""].groupby("_ldr").size().to_dict()
+    paid_ldr = df_paid[df_paid["_ldr"] != ""].groupby("_ldr").size().to_dict()
+    sa_ldr = df_sa[df_sa["_ldr"] != ""].groupby("_ldr").size().to_dict()
+
+    so_ag = set(df_so["_ag_key"].tolist())
+    paid_ag = set(df_paid["_ag_key"].tolist())
+    sa_ag = set(df_sa["_ag_key"].tolist())
+
+    agen_per_ldr: dict[str, list[tuple[str, str]]] = {}
+    if df_target is not None and not df_target.empty:
+        non_vac = df_target[
+            ~df_target["Agent_Key"].astype(str).str.startswith("VACANT__")
+        ]
+        for _, r in non_vac.iterrows():
+            ldr = str(r["Leader_Default"]).strip()
+            ak = str(r["Agent_Key"]).strip()
+            nm = str(r["Nama_Tampil"]).strip()
+            if ldr and ak:
+                agen_per_ldr.setdefault(ldr, []).append((ak, nm))
+
+    semua_ldr = set(agen_per_ldr.keys())
+    for mp in (so_ldr, paid_ldr, sa_ldr):
+        semua_ldr.update(k for k, v in mp.items() if v > 0)
+
+    if leader_filter != "Semua Leader":
+        semua_ldr = {l for l in semua_ldr if l == leader_filter}
+
+    rows: list[dict] = []
+    for ldr in semua_ldr:
+        ag_list = agen_per_ldr.get(ldr, [])
+        blm_so_nm = [nm for ak, nm in ag_list if ak not in so_ag]
+        blm_paid_nm = [nm for ak, nm in ag_list if ak not in paid_ag]
+        blm_sa_nm = [nm for ak, nm in ag_list if ak not in sa_ag]
+        rows.append(
+            {
+                "leader": ldr,
+                "so": int(so_ldr.get(ldr, 0)),
+                "paid": int(paid_ldr.get(ldr, 0)),
+                "sa": int(sa_ldr.get(ldr, 0)),
+                "blm_so": len(blm_so_nm),
+                "blm_paid": len(blm_paid_nm),
+                "blm_sa": len(blm_sa_nm),
+                "total_agents": len(ag_list),
+                "agents_blm_so": blm_so_nm,
+                "agents_blm_paid": blm_paid_nm,
+                "agents_blm_sa": blm_sa_nm,
+                "is_grand_total": False,
+            }
+        )
+
+    rows.sort(key=lambda x: (-x["so"], -x["paid"], -x["sa"], x["leader"]))
+    if rows:
+        rows.append(
+            {
+                "leader": "Grand Total",
+                "so": sum(r["so"] for r in rows),
+                "paid": sum(r["paid"] for r in rows),
+                "sa": sum(r["sa"] for r in rows),
+                "blm_so": sum(r["blm_so"] for r in rows),
+                "blm_paid": sum(r["blm_paid"] for r in rows),
+                "blm_sa": sum(r["blm_sa"] for r in rows),
+                "total_agents": sum(r["total_agents"] for r in rows),
+                "agents_blm_so": [],
+                "agents_blm_paid": [],
+                "agents_blm_sa": [],
+                "is_grand_total": True,
+            }
+        )
+    return rows, date_label
+
+
 # =============================================================================
 # SISTEM AUTENTIKASI LOGIN MULTI-ROLE (ADMIN, LEADER, AGEN, FINANCE)
 # =============================================================================
@@ -819,84 +972,41 @@ def verifikasi_login_kredensial(
     password_input: str,
     df_target_ref: pd.DataFrame | None,
 ) -> dict | None:
-    """Memverifikasi pasangan ID & Password dengan Hash SHA-256 (Constant-Time Comparison).
+    """Memverifikasi ID & Password dari `superadmin_config.json` dan `roles_config.json`.
 
-    Seluruh ID & Password disembunyikan dari publik dan hanya dapat dibuka oleh Admin Master.
+    Seluruh ID & Password lama diblokir permanen dan Brankas hanya dapat dibuka Super Admin.
     """
+    _ = df_target_ref
     u = re.sub(r"\s+", " ", str(username_input)).strip().lower()
     p = str(password_input).strip()
 
     if not u or not p:
         return None
 
-    # 1. Cek Role Admin Master (Hanya untuk pemilik sistem / Admin Master)
-    if u in ("admin", "yovi_master", "administrator", "superadmin") and bandingkan_hash_aman(
-        p, HASH_PASS_ADMIN_MASTER
-    ):
+    # 1. Cek Role Super Admin (Admin Master) — PBKDF2
+    if verifikasi_super_admin(u, p):
+        roles_cfg = muat_config_roles()
+        unlocked = None
+        if roles_cfg and roles_cfg.get("vault_enc") and roles_cfg.get("vault_salt"):
+            unlocked = decrypt_vault(roles_cfg["vault_enc"], p, roles_cfg["vault_salt"])
+        st.session_state["unlocked_vault"] = unlocked
+        st.session_state["_sa_vault_secret"] = p
         return {
             "logged_in": True,
             "is_admin_master": True,
             "role": "Admin",
             "username": u,
-            "display_name": "Yovi Arian (Admin Master)",
+            "display_name": "Yovi Arian (Super Admin)",
             "leader_scope": "Semua Leader",
             "agent_key": "",
         }
 
-    # 2. Cek Role Finance
-    if u in ("finance", "keuangan", "komisi") and bandingkan_hash_aman(
-        p, HASH_PASS_FINANCE
-    ):
-        return {
-            "logged_in": True,
-            "is_admin_master": False,
-            "role": "Finance",
-            "username": "finance",
-            "display_name": "Divisi Finance & Komisi",
-            "leader_scope": "Semua Leader",
-            "agent_key": "",
-        }
-
-    # 3. Cek Role Sales Leader
-    if u in USERNAME_KE_LEADER and bandingkan_hash_aman(p, HASH_PASS_LEADER):
-        nama_ldr = USERNAME_KE_LEADER[u]
-        return {
-            "logged_in": True,
-            "is_admin_master": False,
-            "role": "Leader",
-            "username": u,
-            "display_name": nama_ldr,
-            "leader_scope": nama_ldr,
-            "agent_key": "",
-        }
-
-    # 4. Cek Role Agen Telesales (pencarian dari df_target_ref)
-    if df_target_ref is not None and not df_target_ref.empty:
-        df_non_vacant = df_target_ref[
-            ~df_target_ref["Agent_Key"].astype(str).str.startswith("VACANT__")
-        ]
-        for _, r in df_non_vacant.iterrows():
-            nama_tampil = str(r["Nama_Tampil"]).strip()
-            agent_key = str(r["Agent_Key"]).strip()
-            ldr_def = str(r["Leader_Default"]).strip()
-            kata_depan = nama_tampil.split()[0].lower() if nama_tampil else ""
-            username_slug = re.sub(r"[^a-z0-9]", "", nama_tampil.lower())
-
-            if u in (
-                nama_tampil.lower(),
-                agent_key.lower(),
-                kata_depan,
-                username_slug,
-            ) and bandingkan_hash_aman(p, HASH_PASS_AGEN):
-                return {
-                    "logged_in": True,
-                    "is_admin_master": False,
-                    "role": "Agen",
-                    "username": kata_depan,
-                    "display_name": nama_tampil,
-                    "leader_scope": ldr_def,
-                    "agent_key": agent_key,
-                }
+    # 2. Cek Finance, Sales Leader, dan Agen dari `roles_config.json` (hash terverifikasi)
+    hasil_peran = verifikasi_peran_non_admin(u, p)
+    if hasil_peran is not None:
+        st.session_state["unlocked_vault"] = None
+        st.session_state["_sa_vault_secret"] = None
+        return hasil_peran
 
     return None
 
@@ -1516,7 +1626,7 @@ akun_aktif = st.session_state.get("auth_user") or {
     "logged_in": True,
     "is_admin_master": True,
     "role": "Admin",
-    "display_name": "Yovi Arian (Admin Master)",
+    "display_name": "Yovi Arian (Super Admin)",
     "leader_scope": "Semua Leader",
     "agent_key": "",
 }
@@ -1553,6 +1663,8 @@ st.sidebar.markdown(
 
 if st.sidebar.button("🚪 Keluar / Ganti Akun (Logout)", width="stretch"):
     st.session_state["auth_user"] = None
+    st.session_state["unlocked_vault"] = None
+    st.session_state["_sa_vault_secret"] = None
     st.rerun()
 
 # HANYA ADMIN MASTER yang dapat melihat Brankas ID & Password, Log Firewall, dan Simulasi Role
@@ -1563,45 +1675,54 @@ if is_admin_master:
     with st.sidebar.expander(
         "🌐 Link Akses Go-Live (Khusus Admin Master)", expanded=False
     ):
+        st.markdown("✅ **Domain Live Resmi (cPanel Non-Docker):**  \nhttps://laporantelesalesoxygen.my.id/index.php")
         if url_publik_sidebar:
             st.markdown(
-                f"✅ **Go-Live Publik (HP / Luar Kantor):**  \n"
+                f"✅ **Tunnel Publik Cadangan:**  \n"
                 f"[{url_publik_sidebar}]({url_publik_sidebar})"
             )
-            st.code(url_publik_sidebar, language="text")
         st.markdown(f"📶 **Akses Wi-Fi / LAN Kantor:**  \n`{url_lan_sidebar}`")
 
     with st.sidebar.expander(
         "🔐 Brankas ID & Password (Khusus Admin Master)", expanded=False
     ):
         st.caption(
-            "Daftar ID & Password ini **DISEMBUNYIKAN** dari halaman publik dan hanya dapat dibuka oleh Anda (**Admin Master**)."
+            "Daftar ID & Password BARU seluruh Role tersimpan terenkripsi dan **DISEMBUNYIKAN** dari publik."
         )
-        df_vault_master = pd.DataFrame(
-            [
-                {
-                    "Role": "👑 Admin Master",
-                    "ID / Username": "admin / yovi_master",
-                    "Password": "admin123 / Master@Yovi2026",
-                },
-                {
-                    "Role": "💳 Finance",
-                    "ID / Username": "finance",
-                    "Password": "finance123",
-                },
-                {
-                    "Role": "👨‍💼 Sales Leader",
-                    "ID / Username": "yovi, fahrul, firli, tika, yudha, anis, eka, rezky, tiara, jarot, alfian",
-                    "Password": "leader123",
-                },
-                {
-                    "Role": "👤 Agen Telesales",
-                    "ID / Username": "Nama depan agen (askih, sisca, nafa, fitra, dll.)",
-                    "Password": "agen123",
-                },
-            ]
-        )
-        st.dataframe(df_vault_master, width="stretch", hide_index=True)
+        v_dec = st.session_state.get("unlocked_vault")
+        if isinstance(v_dec, dict):
+            fin_meta = v_dec.get("finance", {})
+            ldr_meta = v_dec.get("leaders", {})
+            agt_meta = v_dec.get("agen", {})
+            ldr_ids_str = ", ".join(sorted(ldr_meta.get("ids", {}).keys()))
+            agt_sample_str = ", ".join(agt_meta.get("sample_ids", [])[:5])
+            df_vault_master = pd.DataFrame(
+                [
+                    {
+                        "Role": "👑 Super Admin",
+                        "ID / Username": username_super_admin() or v_dec.get("super_admin_id", "-"),
+                        "Password": "🔒 Master Key Aktif (PBKDF2)",
+                    },
+                    {
+                        "Role": "💳 Finance",
+                        "ID / Username": fin_meta.get("id", "-"),
+                        "Password": fin_meta.get("pass", "🔒 Terenkripsi"),
+                    },
+                    {
+                        "Role": "👨‍💼 Sales Leader",
+                        "ID / Username": ldr_ids_str or "-",
+                        "Password": ldr_meta.get("pass_default", "🔒 Terenkripsi"),
+                    },
+                    {
+                        "Role": f"👤 Agen ({agt_meta.get('total', 0)} Akun)",
+                        "ID / Username": f"Format unik agt_<nama> (mis: {agt_sample_str}...)",
+                        "Password": agt_meta.get("pass_default", "🔒 Terenkripsi"),
+                    },
+                ]
+            )
+            st.dataframe(df_vault_master, width="stretch", hide_index=True)
+        else:
+            st.info("Login ulang dengan ID & Password Super Admin untuk mendekripsi Brankas Vault.")
 
     with st.sidebar.expander(
         "🛡️ Monitor WAF & Firewall Log (Khusus Admin Master)", expanded=False
@@ -1629,7 +1750,7 @@ if is_admin_master:
             st.session_state["auth_user"]["is_admin_master"] = True
             if role_akses in ("Admin", "Finance"):
                 st.session_state["auth_user"]["display_name"] = (
-                    "Yovi Arian (Admin Master)"
+                    "Yovi Arian (Super Admin)"
                     if role_akses == "Admin"
                     else "Divisi Finance & Komisi"
                 )
@@ -1646,6 +1767,34 @@ if is_admin_master:
                     "ASKIH MILLI PRIYANTO"
                 )
             st.rerun()
+
+    with st.sidebar.expander(
+        "🔄 Sync ke Server Live (laporantelesalesoxygen.my.id)", expanded=False
+    ):
+        st.caption("Dorong pembaruan Excel & parameter langsung ke server PHP tanpa Docker:")
+        if st.button("🚀 Sync Data Lokal -> Server Live", width="stretch"):
+            sa_sec = str(st.session_state.get("_sa_vault_secret") or "")
+            sa_uid = str(akun_aktif.get("username") or username_super_admin())
+            if not sa_sec:
+                st.warning("Login ulang sebagai Super Admin untuk mengaktifkan Auto-Sync.")
+            else:
+                try:
+                    from sync_ke_server import sync_files_ke_server
+
+                    nov_path = os.path.join(FOLDER_PROYEK, "list_prospect November.xls")
+                    res_sync = sync_files_ke_server(
+                        url_server="https://laporantelesalesoxygen.my.id/index.php",
+                        api_user=sa_uid,
+                        api_pass=sa_sec,
+                        target_path=DEFAULT_TARGET_PATH if os.path.isfile(DEFAULT_TARGET_PATH) else None,
+                        prospect_paths=[nov_path] if os.path.isfile(nov_path) else [],
+                    )
+                    if res_sync.get("ok"):
+                        st.success(f"✅ Server Live diupdate! Periode: {res_sync.get('periode')} | Total Baris: {res_sync.get('total_prospect')}")
+                    else:
+                        st.error(f"❌ Gagal sync: {res_sync.get('error')}")
+                except Exception as exc_sync:
+                    st.error(f"❌ Gagal menghubungi server live: {exc_sync}")
 
 
 if role_akses in ("Admin", "Finance"):
@@ -1695,10 +1844,10 @@ total_hari_bulan_ini = st.sidebar.number_input(
 )
 
 hari_berjalan_saat_ini = st.sidebar.number_input(
-    "Hari Berjalan Saat Ini (misal 8)",
+    "Hari Berjalan Saat Ini (misal 15)",
     min_value=1,
     max_value=31,
-    value=8,
+    value=15,
     step=1,
 )
 
@@ -1719,16 +1868,23 @@ nama_sheet_target = st.sidebar.text_input(
 st.sidebar.divider()
 st.sidebar.subheader("📂 Upload File Sumber")
 
-uploaded_target = st.sidebar.file_uploader(
-    "Upload File Target (.xlsx)",
-    type=["xlsx"],
-)
+if role_akses in ("Admin", "Leader"):
+    uploaded_target = st.sidebar.file_uploader(
+        "Upload File Target (.xlsx)",
+        type=["xlsx"],
+    )
 
-uploaded_prospects = st.sidebar.file_uploader(
-    "Upload File Prospect (.xls HTML)",
-    type=["xls", "html", "xlsx"],
-    accept_multiple_files=True,
-)
+    uploaded_prospects = st.sidebar.file_uploader(
+        "Upload File Prospect (.xls HTML)",
+        type=["xls", "html", "xlsx"],
+        accept_multiple_files=True,
+    )
+else:
+    uploaded_target = None
+    uploaded_prospects = []
+    st.sidebar.info(
+        "🔒 Upload file hanya tersedia untuk role **Admin** dan **Sales Leader**."
+    )
 
 st.sidebar.divider()
 st.sidebar.subheader("🤖 Notifikasi Bot Telegram")
@@ -1829,10 +1985,8 @@ else:
                 pass
 
 if list_df_prospect:
-    df_prospect_all = (
+    df_prospect_all = dedup_prospect_df(
         pd.concat(list_df_prospect, ignore_index=True)
-        .drop_duplicates()
-        .reset_index(drop=True)
     )
     df_prospect_all["Active Date"] = pd.to_datetime(
         df_prospect_all["Active Date"], errors="coerce"
@@ -2110,6 +2264,116 @@ with tab_utama:
             width="stretch",
             hide_index=True,
         )
+
+        # =====================================================================
+        # 3B. DASHBOARD 1B: REKAP HARIAN SO/PAID/SA & AGENT BLM PRODUKTIF
+        # =====================================================================
+
+        st.markdown(
+            f"""
+            <div class="section-card-header">
+                <div>
+                    <div class="section-card-title">📊 DASHBOARD 1B: REKAP HARIAN SO / PAID / SA &amp; JUMLAH AGENT BELUM PRODUKTIF</div>
+                    <div class="section-card-sub">Rekap Performa Tanggal Tertentu &amp; Monitoring Agent Aktif yang Belum Cetak SO / PAID / SA</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        col_dt1, col_dt2 = st.columns([1.2, 2.8])
+        with col_dt1:
+            tgl_cek_harian = st.date_input(
+                "Pilih Tanggal Cek Produktivitas Harian:",
+                value=tgl_acuan_laporan,
+                key="tgl_cek_harian_blm_prod",
+            )
+        if not isinstance(tgl_cek_harian, datetime.date):
+            tgl_cek_harian = tgl_acuan_laporan
+
+        daily_prod_rows, daily_prod_date_label = hitung_rekap_harian_blm_produktif_py(
+            df_prospect_all,
+            df_target,
+            tgl_cek_harian,
+            leader_login if role_akses != "Agen" else "Semua Leader",
+        )
+        df_daily_prod_export = pd.DataFrame(
+            [
+                {
+                    "Sales Leader": r["leader"],
+                    f"{daily_prod_date_label} SO": r["so"],
+                    f"{daily_prod_date_label} PAID": r["paid"],
+                    f"{daily_prod_date_label} SA": r["sa"],
+                    "Blm Produktif SO": r["blm_so"],
+                    "Blm Produktif PAID": r["blm_paid"],
+                    "Blm Produktif SA": r["blm_sa"],
+                }
+                for r in daily_prod_rows
+            ]
+        )
+
+        if daily_prod_rows and role_akses != "Agen":
+            tr_html_dp = []
+            for r in daily_prod_rows:
+                is_gt = bool(r.get("is_grand_total"))
+                if is_gt:
+                    tr_html_dp.append(
+                        f"<tr style='font-weight:800; background:#ffffff; border-top:2px solid #0f172a;'>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:left;'>{escape_html_tg(r['leader'])}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['so']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['paid']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['sa']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center; background:#fce4d6;'>{r['blm_so']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center; background:#fce4d6;'>{r['blm_paid']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center; background:#fce4d6;'>{r['blm_sa']}</td>"
+                        f"</tr>"
+                    )
+                else:
+                    tr_html_dp.append(
+                        f"<tr>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:left;'>{escape_html_tg(r['leader'])}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['so']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['paid']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['sa']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['blm_so']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['blm_paid']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['blm_sa']}</td>"
+                        f"</tr>"
+                    )
+
+            tabel_dp_html = (
+                "<div style='overflow-x:auto; margin-bottom:14px;'>"
+                "<table style='width:100%; max-width:860px; border-collapse:collapse; font-size:0.88rem; background:#fff; color:#0f172a;'>"
+                "<thead>"
+                "<tr>"
+                "<th rowspan='2' style='background:#002060; color:#fff; padding:8px 12px; border:1px solid #475569; text-align:center;'>Sales Leader</th>"
+                f"<th colspan='3' style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>{escape_html_tg(daily_prod_date_label)}</th>"
+                "<th colspan='3' style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>Jumlah Agent Blm Produktif</th>"
+                "</tr>"
+                "<tr>"
+                "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>SO</th>"
+                "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>PAID</th>"
+                "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>SA</th>"
+                "<th style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>SO</th>"
+                "<th style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>PAID</th>"
+                "<th style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>SA</th>"
+                "</tr>"
+                "</thead>"
+                f"<tbody>{''.join(tr_html_dp)}</tbody>"
+                "</table></div>"
+            )
+            st.markdown(tabel_dp_html, unsafe_allow_html=True)
+
+            with st.expander(f"🔎 Lihat Rincian Nama Agen Belum Produktif ({daily_prod_date_label})"):
+                for r in daily_prod_rows:
+                    if r.get("is_grand_total"):
+                        continue
+                    st.markdown(
+                        f"**{escape_html_tg(r['leader'])}** ({r['total_agents']} agen aktif) — "
+                        f"0 SO ({r['blm_so']}): `{', '.join(r['agents_blm_so']) or 'Semua Produktif'}` | "
+                        f"0 PAID ({r['blm_paid']}): `{', '.join(r['agents_blm_paid']) or 'Semua Produktif'}` | "
+                        f"0 SA ({r['blm_sa']}): `{', '.join(r['agents_blm_sa']) or 'Semua Produktif'}`"
+                    )
 
         # =====================================================================
         # 4. DASHBOARD 2: DETAIL AGENT & BREAKDOWN KOMISI (Sesuai Gambar 1)
@@ -2736,6 +3000,10 @@ with tab_utama:
                 df_mtd_final.to_excel(
                     writer, index=False, sheet_name="Summary_MTD_SA"
                 )
+                if not df_daily_prod_export.empty:
+                    df_daily_prod_export.to_excel(
+                        writer, index=False, sheet_name="Rekap_Harian_Blm_Produktif"
+                    )
                 df_detail_final.to_excel(
                     writer, index=False, sheet_name="Detail_Target_Agent"
                 )
@@ -2823,6 +3091,8 @@ with tab_utama:
                     sisa_hari=sisa_hari_int,
                     target_persen_mtd=target_persen_mtd,
                     rasio_paid=rasio_paid_float,
+                    daily_prod_rows=daily_prod_rows if role_akses != "Agen" else None,
+                    daily_prod_date_label=daily_prod_date_label,
                 )
             except Exception as err_gambar:
                 st.warning(
@@ -2971,17 +3241,22 @@ with tab_harian:
         )
 
         s_create = (
-            df_harian_scope["Created Date"].dt.date
+            pd.to_datetime(df_harian_scope["Created Date"], errors="coerce").dt.date
             if "Created Date" in df_harian_scope.columns
             else pd.Series(dtype="object")
         )
+        paid_mask_tab2 = (
+            df_harian_scope["Status Payment"].astype(str).str.strip().str.upper() == "PAID"
+            if "Status Payment" in df_harian_scope.columns
+            else pd.Series(True, index=df_harian_scope.index)
+        )
         s_paid = (
-            df_harian_scope["Payment Date"].dt.date
+            pd.to_datetime(df_harian_scope["Payment Date"], errors="coerce").dt.date.where(paid_mask_tab2)
             if "Payment Date" in df_harian_scope.columns
             else pd.Series(dtype="object")
         )
         s_active = (
-            df_harian_scope["Active Date"].dt.date
+            pd.to_datetime(df_harian_scope["Active Date"], errors="coerce").dt.date
             if "Active Date" in df_harian_scope.columns
             else pd.Series(dtype="object")
         )

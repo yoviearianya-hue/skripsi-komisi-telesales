@@ -185,7 +185,11 @@ def render_tabel_png(
             w = max(w, _lebar_teks(r[c], f_sel_tebal))
         lebar_kol.append(w + 2 * PAD_SEL)
 
-    for label, a, b in grup_header:
+    for grp in grup_header:
+        if len(grp) >= 4:
+            label, a, b, bg_grp = grp[0], grp[1], grp[2], grp[3]
+        else:
+            label, a, b, bg_grp = grp[0], grp[1], grp[2], WARNA_NAVY
         perlu = _lebar_teks(label, f_grup) + 2 * PAD_SEL
         ada = sum(lebar_kol[a : b + 1])
         if perlu > ada:
@@ -269,18 +273,26 @@ def render_tabel_png(
         xs.append(xs[-1] + w)
 
     kolom_bergrup: set[int] = set()
-    for label, a, b in grup_header:
+    kolom_bg_head: dict[int, str] = {}
+    for grp in grup_header:
+        if len(grp) >= 4:
+            label, a, b, bg_grp = grp[0], grp[1], grp[2], grp[3]
+        else:
+            label, a, b, bg_grp = grp[0], grp[1], grp[2], WARNA_NAVY
         kolom_bergrup.update(range(a, b + 1))
+        for c_idx in range(a, b + 1):
+            kolom_bg_head[c_idx] = bg_grp
         kotak = (xs[a], y_tab, xs[b + 1], y_tab + tinggi_grup)
-        d.rectangle(kotak, fill=WARNA_NAVY, outline=WARNA_GARIS_HEAD)
+        d.rectangle(kotak, fill=bg_grp, outline=WARNA_GARIS_HEAD)
         _tulis(d, kotak, label, f_grup, "white")
 
     for c in range(n_kol):
+        bg_h = kolom_bg_head.get(c, WARNA_NAVY)
         if c in kolom_bergrup:
             kotak = (xs[c], y_tab + tinggi_grup, xs[c + 1], y_tab + tinggi_grup + tinggi_head)
         else:
             kotak = (xs[c], y_tab, xs[c + 1], y_tab + tinggi_grup + tinggi_head)
-        d.rectangle(kotak, fill=WARNA_NAVY, outline=WARNA_GARIS_HEAD)
+        d.rectangle(kotak, fill=bg_h, outline=WARNA_GARIS_HEAD)
         _tulis(d, kotak, kolom[c], f_head, "white")
 
     # 6. Isi tabel
@@ -540,6 +552,71 @@ def buat_gambar_detail_leader(
 
 
 # =============================================================================
+# GAMBAR 1B: REKAP HARIAN SO / PAID / SA & JUMLAH AGENT BLM PRODUKTIF
+# =============================================================================
+
+
+def buat_gambar_harian_blm_produktif(
+    rows_harian: list[dict],
+    date_label: str,
+) -> bytes:
+    """Membuat gambar tabel Performa Harian (SO, PAID, SA) & Jumlah Agent Blm Produktif."""
+    kolom = [
+        "Sales Leader",
+        "SO",
+        "PAID",
+        "SA",
+        "SO",
+        "PAID",
+        "SA",
+    ]
+    grup_header = [
+        (date_label, 1, 3, WARNA_NAVY),
+        ("Jumlah Agent Blm Produktif", 4, 6, "#d90000"),
+    ]
+    baris: list[list[str]] = []
+    gaya: list[dict | None] = []
+    idx_grand = -1
+    for i, r in enumerate(rows_harian):
+        is_gt = bool(r.get("is_grand_total")) or str(r.get("leader", "")).lower() == "grand total"
+        if is_gt:
+            idx_grand = i
+        baris.append(
+            [
+                str(r.get("leader", "")),
+                _fmt_angka(r.get("so", 0)),
+                _fmt_angka(r.get("paid", 0)),
+                _fmt_angka(r.get("sa", 0)),
+                _fmt_angka(r.get("blm_so", 0)),
+                _fmt_angka(r.get("blm_paid", 0)),
+                _fmt_angka(r.get("blm_sa", 0)),
+            ]
+        )
+        gaya.append({"bg": "white", "bold": True} if is_gt else None)
+
+    def gaya_sel(i: int, c: int, _teks: str) -> dict | None:
+        if i == idx_grand and c in (4, 5, 6):
+            return {"bg": "#fce4d6", "bold": True}
+        return None
+
+    waktu = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
+    return render_tabel_png(
+        judul=f"REKAP HARIAN ({date_label}) & AGENT BELUM PRODUKTIF",
+        sub_judul="Realisasi SO, PAID, SA Harian vs Jumlah Agent Aktif yang Belum Produktif (0 SO / 0 PAID / 0 SA)",
+        kolom=kolom,
+        baris=baris,
+        rata=["l", "c", "c", "c", "c", "c", "c"],
+        gaya_baris=gaya,
+        gaya_sel=gaya_sel,
+        grup_header=grup_header,
+        catatan=[
+            f"Kolom {date_label}: Total SO (Created Date), PAID (Payment Date PAID), SA (Active Date) tepat pada tanggal {date_label}.",
+            f"Kolom Merah (Jumlah Agent Blm Produktif): Banyaknya agen aktif non-Vacant dengan nilai 0 pada {date_label}. Dibuat otomatis: {waktu}",
+        ],
+    )
+
+
+# =============================================================================
 # FUNGSI UTAMA: SUSUN SEMUA GAMBAR LAPORAN UNTUK TELEGRAM
 # =============================================================================
 
@@ -559,6 +636,8 @@ def buat_semua_gambar_laporan(
     sisa_hari: int,
     target_persen_mtd: int,
     rasio_paid: float,
+    daily_prod_rows: list[dict] | None = None,
+    daily_prod_date_label: str = "",
 ) -> list[tuple[str, bytes, str]]:
     """Menghasilkan daftar (nama_file, png_bytes, caption_html) untuk dikirim ke Telegram."""
     hasil: list[tuple[str, bytes, str]] = []
@@ -574,6 +653,17 @@ def buat_semua_gambar_laporan(
             f"📈 <b>MTD SA 1-{hari_berjalan} {kode_bln_lalu} vs {kode_bln_ini} {tahun}</b>",
         )
     )
+
+    if daily_prod_rows:
+        lbl_dl = daily_prod_date_label or f"{hari_berjalan}-{nama_bln_tampil}-{str(tahun)[-2:]}"
+        png_dp = buat_gambar_harian_blm_produktif(daily_prod_rows, lbl_dl)
+        hasil.append(
+            (
+                f"01B_Harian_Blm_Produktif_{lbl_dl}.png",
+                png_dp,
+                f"📊 <b>Rekap Harian ({_escape_html(lbl_dl)}) &amp; Jumlah Agent Belum Produktif</b>",
+            )
+        )
 
     df_valid = df_agent[
         ~df_agent["SALES NAME"].astype(str).str.strip().str.upper().isin(["", "NAN", "NONE", "TOTAL", "-"])

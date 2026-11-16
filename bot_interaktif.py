@@ -65,7 +65,7 @@ def ambil_url_lan_aktif(port: int = 8501) -> str:
 RASIO_PAID_PER_SA = 1.25
 RASIO_SO_PER_PAID = 1.25
 TOTAL_HARI_BULAN = 30
-HARI_BERJALAN_DEFAULT = 8
+HARI_BERJALAN_DEFAULT = 15
 
 # Data Target Total (Target Reguler + Target Yearly = Target Total)
 # Detail Reguler & Yearly disembunyikan dari agen (hanya untuk Admin)

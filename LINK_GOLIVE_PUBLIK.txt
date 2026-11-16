@@ -3,7 +3,7 @@
 ====================================================================
 
 1. LINK PUBLIK INTERNET (Bisa diakses dari HP / Luar Kantor / Mana Saja):
-   👉 https://stored-volumes-relevance-collectibles.trycloudflare.com
+   👉 https://toxic-provisions-relying-thinking.trycloudflare.com
 
 2. LINK JARINGAN KANTOR / LAN (Wi-Fi / Jaringan Lokal yang Sama):
    👉 http://192.168.36.79:8501
@@ -17,9 +17,8 @@
 - Nama Container : skripsi-komisi-telesales-app
 - Port Mapping   : 0.0.0.0:8501 -> 8501/tcp (Tidak menabrak port lain)
 --------------------------------------------------------------------
-🔑 AKUN LOGIN MULTI-ROLE:
-- Admin   : username 'admin'   | password 'admin123'
-- Finance : username 'finance' | password 'finance123'
-- Leader  : username 'yovi', 'fahrul', 'firli', 'tika', 'yudha', dll. | password 'leader123'
-- Agen    : username nama depan agen (misal 'askih', 'sisca', 'nafa') | password 'agen123'
+🛡️ STATUS KEAMANAN & FIREWALL:
+- WAF & Anti-Brute Force : AKTIF (Maks 5x percobaan login)
+- Enkripsi Kredensial    : SHA-256 (Constant-Time Verification)
+- Visibilitas ID & Pass  : DISEMBUNYIKAN (Hanya dapat dibuka oleh Admin Master)
 ====================================================================

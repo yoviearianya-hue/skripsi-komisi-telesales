@@ -1,8 +1,12 @@
 """Generator File SQL Database (MySQL / MariaDB - cPanel phpMyAdmin Compatible)
 
 Menghasilkan:
-1. database_komisi_telesales.sql : File SQL lengkap (siap di-Import di phpMyAdmin cPanel kasuari.kencang.com).
-2. query_phpmyadmin_cepat.sql    : Query SQL ringkas yang bisa langsung di-Copy-Paste ke tab SQL phpMyAdmin.
+1. database_komisi_telesales.sql : File SQL lengkap (siap di-Import di phpMyAdmin cPanel).
+2. query_phpmyadmin_cepat.sql    : Query SQL ringkas untuk Copy-Paste ke tab SQL phpMyAdmin.
+
+Catatan Keamanan:
+- Tidak menyimpan password plaintext di file SQL maupun GitHub; seluruh akun di `users_multi_role`
+  menggunakan ID Role terbaru (`sa_yovi_2026`, `fin_oxygen26`, `ldr_*`, `agt_*`) & hash terenkripsi.
 """
 
 import logging
@@ -15,6 +19,7 @@ warnings.filterwarnings("ignore")
 logging.disable(logging.WARNING)
 
 import app as modul_app
+import security_firewall as sf
 
 FOLDER_PROYEK = os.path.dirname(os.path.abspath(__file__))
 PATH_SQL_FULL = os.path.join(FOLDER_PROYEK, "database_komisi_telesales.sql")
@@ -51,41 +56,38 @@ def generate_sql_files() -> None:
     df_mtd_final = modul_app.df_mtd_final.copy()
     df_agent = modul_app.df_agent.copy()
     df_mtd_ini = modul_app.df_mtd_ini.copy()
+    daily_prod_rows = list(getattr(modul_app, "daily_prod_rows", []))
+    daily_prod_label = str(getattr(modul_app, "daily_prod_date_label", "15-Nov-26"))
     kol_oct = modul_app.kol_sa_oct
     kol_nov = modul_app.kol_sa_nov
     kol_gap = modul_app.kol_gap_sa
+    hari_berjalan = int(modul_app.hari_berjalan_int)
+    kode_bln = str(modul_app.kode_bln_ini)
+    tahun_int = int(modul_app.tahun_int)
 
-    # 1. Susun Data Users Multi-Role
+    # 1. Susun Data Users Multi-Role (HANYA Hash PBKDF2/SHA-256 — TANPA Plaintext!)
+    cfg_sa = sf.muat_config_superadmin() or {"username": "sa_yovi_2026", "hash": "PBKDF2_PROTECTED"}
+    cfg_roles = sf.muat_config_roles() or {}
     rows_users = [
-        ("admin", "admin123", "Admin", "Administrator Operasional", "Semua Leader"),
-        ("finance", "finance123", "Finance", "Divisi Finance & Komisi", "Semua Leader"),
+        (cfg_sa["username"], f"pbkdf2_sha256${cfg_sa.get('iterations', 200000)}${cfg_sa.get('hash', '')[:32]}...", "Admin", "Yovi Arian (Super Admin)", "Semua Leader"),
     ]
-    ldr_added = set()
-    for u_ldr, nama_ldr in sorted(modul_app.USERNAME_KE_LEADER.items()):
-        if nama_ldr not in ldr_added:
-            rows_users.append((u_ldr, "leader123", "Leader", nama_ldr, nama_ldr))
-            ldr_added.add(nama_ldr)
+    fin = cfg_roles.get("finance", {})
+    if fin:
+        rows_users.append((fin.get("username", "fin_oxygen26"), str(fin.get("hash", "")), "Finance", "Divisi Finance & Komisi", "Semua Leader"))
 
-    user_added = {r[0] for r in rows_users}
-    for _, r in df_agent.iterrows():
-        nama_ag = str(r["SALES NAME"]).strip()
-        if nama_ag.upper() == "VACANT":
-            continue
-        u_ag = nama_ag.split()[0].lower()
-        if u_ag in user_added:
-            u_ag = "".join(ch for ch in nama_ag.lower() if ch.isalnum())[:20]
-        user_added.add(u_ag)
-        rows_users.append((u_ag, "agen123", "Agen", nama_ag, str(r["SALES LEADER"]).strip()))
+    for u_ldr, meta_l in sorted(cfg_roles.get("leaders", {}).items()):
+        rows_users.append((u_ldr, str(meta_l.get("hash", "")), "Leader", str(meta_l.get("leader", "")), str(meta_l.get("leader", ""))))
+
+    for u_ag, meta_a in sorted(cfg_roles.get("agen_accounts", {}).items()):
+        rows_users.append((u_ag, str(meta_a.get("hash", "")), "Agen", str(meta_a.get("name", "")), str(meta_a.get("leader", ""))))
+
+    periode_mtd_str = f"1-{hari_berjalan} {kode_bln.title()} {tahun_int}"
 
     lines = [
         "-- ============================================================================",
         "-- DATABASE SQL DUMP: SISTEM KOMISI & MONITORING PERFORMA TELESALES ISP",
-        "-- Kompatibel 100% dengan MySQL / MariaDB (cPanel phpMyAdmin kasuari.kencang.com)",
-        "-- ============================================================================",
-        "-- CARA PAKAI DI PHPMYADMIN (kasuari.kencang.com):",
-        "-- 1. Klik nama Database Anda di panel sebelah kiri phpMyAdmin.",
-        "-- 2. Buka tab 'SQL' (atau tab 'Import' / 'Impor').",
-        "-- 3. Paste isi file ini (atau upload file database_komisi_telesales.sql) lalu klik 'Kirim' / 'Go'.",
+        "-- Kompatibel 100% dengan MySQL / MariaDB (cPanel phpMyAdmin)",
+        "-- Kredensial hanya disimpan dalam bentuk hash kriptografis (Zero Plaintext).",
         "-- ============================================================================",
         "",
         "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";",
@@ -94,13 +96,13 @@ def generate_sql_files() -> None:
         "SET NAMES utf8mb4;",
         "",
         "-- ----------------------------------------------------------------------------",
-        "-- 1. TABEL: users_multi_role (Akun Login Admin, Leader, Agen, Finance)",
+        "-- 1. TABEL: users_multi_role (Akun Baru Super Admin, Finance, Leader, Agen)",
         "-- ----------------------------------------------------------------------------",
         "DROP TABLE IF EXISTS `users_multi_role`;",
         "CREATE TABLE `users_multi_role` (",
         "  `id` int(11) NOT NULL AUTO_INCREMENT,",
         "  `username` varchar(60) NOT NULL,",
-        "  `password_plain` varchar(60) NOT NULL,",
+        "  `password_hash` varchar(128) NOT NULL,",
         "  `role` enum('Admin','Leader','Agen','Finance') NOT NULL,",
         "  `display_name` varchar(120) NOT NULL,",
         "  `leader_scope` varchar(120) NOT NULL,",
@@ -109,25 +111,25 @@ def generate_sql_files() -> None:
         "  UNIQUE KEY `uk_username` (`username`)",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
         "",
-        "INSERT INTO `users_multi_role` (`username`, `password_plain`, `role`, `display_name`, `leader_scope`) VALUES",
+        "INSERT INTO `users_multi_role` (`username`, `password_hash`, `role`, `display_name`, `leader_scope`) VALUES",
     ]
 
     val_users = [
-        f"({sql_str(u)}, {sql_str(p)}, {sql_str(rl)}, {sql_str(dn)}, {sql_str(sc)})"
-        for u, p, rl, dn, sc in rows_users
+        f"({sql_str(u)}, {sql_str(h)}, {sql_str(rl)}, {sql_str(dn)}, {sql_str(sc)})"
+        for u, h, rl, dn, sc in rows_users
     ]
     lines.append(",\n".join(val_users) + ";\n")
 
     lines.extend(
         [
             "-- ----------------------------------------------------------------------------",
-            "-- 2. TABEL: rekap_mtd_sa_leader (Perbandingan SA OCT 1-8 vs SA NOV 1-8 & GAP SA)",
+            "-- 2. TABEL: rekap_mtd_sa_leader (Perbandingan SA Bulan Lalu vs Bulan Ini)",
             "-- ----------------------------------------------------------------------------",
             "DROP TABLE IF EXISTS `rekap_mtd_sa_leader`;",
             "CREATE TABLE `rekap_mtd_sa_leader` (",
             "  `id` int(11) NOT NULL AUTO_INCREMENT,",
             "  `sales_leader` varchar(120) NOT NULL,",
-            "  `periode_mtd` varchar(30) NOT NULL DEFAULT '1-8 Nov 2026',",
+            "  `periode_mtd` varchar(30) NOT NULL,",
             "  `sa_oct_mtd` int(11) NOT NULL DEFAULT 0,",
             "  `sa_nov_mtd` int(11) NOT NULL DEFAULT 0,",
             "  `gap_sa` int(11) NOT NULL DEFAULT 0,",
@@ -139,10 +141,39 @@ def generate_sql_files() -> None:
     )
 
     val_mtd = [
-        f"({sql_str(r['SALES LEADER'])}, '1-8 Nov 2026', {sql_num(r[kol_oct])}, {sql_num(r[kol_nov])}, {sql_num(r[kol_gap])})"
+        f"({sql_str(r['SALES LEADER'])}, {sql_str(periode_mtd_str)}, {sql_num(r[kol_oct])}, {sql_num(r[kol_nov])}, {sql_num(r[kol_gap])})"
         for _, r in df_mtd_final.iterrows()
     ]
     lines.append(",\n".join(val_mtd) + ";\n")
+
+    if daily_prod_rows:
+        lines.extend(
+            [
+                "-- ----------------------------------------------------------------------------",
+                "-- 2B. TABEL: rekap_harian_blm_produktif (SO/PAID/SA Harian & Agent Blm Produktif)",
+                "-- ----------------------------------------------------------------------------",
+                "DROP TABLE IF EXISTS `rekap_harian_blm_produktif`;",
+                "CREATE TABLE `rekap_harian_blm_produktif` (",
+                "  `id` int(11) NOT NULL AUTO_INCREMENT,",
+                "  `tanggal_label` varchar(30) NOT NULL,",
+                "  `sales_leader` varchar(120) NOT NULL,",
+                "  `harian_so` int(11) NOT NULL DEFAULT 0,",
+                "  `harian_paid` int(11) NOT NULL DEFAULT 0,",
+                "  `harian_sa` int(11) NOT NULL DEFAULT 0,",
+                "  `blm_produktif_so` int(11) NOT NULL DEFAULT 0,",
+                "  `blm_produktif_paid` int(11) NOT NULL DEFAULT 0,",
+                "  `blm_produktif_sa` int(11) NOT NULL DEFAULT 0,",
+                "  PRIMARY KEY (`id`)",
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+                "",
+                "INSERT INTO `rekap_harian_blm_produktif` (`tanggal_label`, `sales_leader`, `harian_so`, `harian_paid`, `harian_sa`, `blm_produktif_so`, `blm_produktif_paid`, `blm_produktif_sa`) VALUES",
+            ]
+        )
+        val_dp = [
+            f"({sql_str(daily_prod_label)}, {sql_str(r['leader'])}, {sql_num(r['so'])}, {sql_num(r['paid'])}, {sql_num(r['sa'])}, {sql_num(r['blm_so'])}, {sql_num(r['blm_paid'])}, {sql_num(r['blm_sa'])})"
+            for r in daily_prod_rows
+        ]
+        lines.append(",\n".join(val_dp) + ";\n")
 
     lines.extend(
         [
@@ -308,7 +339,7 @@ def generate_sql_files() -> None:
 
     print(
         f"SUCCESS_SQL:\n"
-        f"- {PATH_SQL_FULL} ({os.path.getsize(PATH_SQL_FULL):,} bytes | {len(rows_users)} users, {len(df_mtd_final)} baris MTD, {len(df_agent)} baris Detail Agent, {len(df_mtd_ini)} transaksi SA Nov)\n"
+        f"- {PATH_SQL_FULL} ({os.path.getsize(PATH_SQL_FULL):,} bytes | {len(rows_users)} users, {len(df_mtd_final)} baris MTD, {len(daily_prod_rows)} baris Harian, {len(df_agent)} baris Detail Agent, {len(df_mtd_ini)} transaksi SA)\n"
         f"- {PATH_SQL_CEPAT} ({os.path.getsize(PATH_SQL_CEPAT):,} bytes)"
     )
 

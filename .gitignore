@@ -14,3 +14,15 @@ Thumbs.db
 # Binary lokal berukuran besar (di Docker sudah diunduh otomatis via Dockerfile)
 cloudflared.exe
 
+# File rahasia / konfigurasi kredensial lokal & audit log (jangan push ke GitHub)
+superadmin_config.json
+roles_config.json
+roles_vault_local.json
+security_audit.log
+cpanel_public_html/uploads/roles_store.json
+cpanel_public_html/uploads/superadmin_store.json
+cpanel_public_html/uploads/.waf_ratelimit.json
+cpanel_public_html/uploads/security_audit.log
+cpanel_public_html/uploads/tmp_prospect_*
+
+
