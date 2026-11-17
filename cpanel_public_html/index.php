@@ -34,6 +34,10 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 $csrfToken = $_SESSION['csrf_token'];
+// Bebaskan exclusive session file lock segera agar reload / multi-tab tidak pernah "loading terus"
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['logout'])) {
+    @session_write_close();
+}
 
 $uploadsDir = __DIR__ . '/uploads';
 if (!is_dir($uploadsDir)) {
@@ -288,8 +292,8 @@ function send_telegram_server(string $botToken, string $chatId, string $text): a
                 CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => $postBody,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_CONNECTTIMEOUT => 6,
-                CURLOPT_TIMEOUT        => 12,
+                CURLOPT_CONNECTTIMEOUT => 3,
+                CURLOPT_TIMEOUT        => 7,
                 CURLOPT_SSL_VERIFYPEER => $verifySsl,
                 CURLOPT_SSL_VERIFYHOST => $verifySsl ? 2 : 0,
                 CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
@@ -335,7 +339,7 @@ function send_telegram_server(string $botToken, string $chatId, string $text): a
                 'method'           => 'POST',
                 'header'           => "Content-Type: application/x-www-form-urlencoded\r\n",
                 'content'          => $postBody,
-                'timeout'          => 8,
+                'timeout'          => 5,
                 'ignore_errors'    => true,
                 'protocol_version' => 1.1,
             ],
@@ -391,8 +395,8 @@ function send_telegram_server_file(string $botToken, string $chatId, string $fil
                 $field       => new CURLFile($filePath, 'image/png', $fileName),
             ],
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => 8,
-            CURLOPT_TIMEOUT        => 25,
+            CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_TIMEOUT        => 12,
             CURLOPT_SSL_VERIFYPEER => $verifySsl,
             CURLOPT_SSL_VERIFYHOST => $verifySsl ? 2 : 0,
         ];
@@ -417,7 +421,7 @@ function send_telegram_server_file(string $botToken, string $chatId, string $fil
     return ['ok' => false, 'http_code' => 0, 'description' => 'Server gagal upload file ke Telegram'];
 }
 
-function build_tg_visual_payload(array $appData, string $scopeSend): array {
+function build_tg_visual_payload(array $appData, string $scopeSend, bool $includeWo = true): array {
     $agentRowsTg = $appData['agent_rows'] ?? [];
     $mtdRowsTg   = $appData['mtd_rows'] ?? [];
     $dailyRowsTg = $appData['daily_prod_rows'] ?? [];
@@ -476,6 +480,32 @@ function build_tg_visual_payload(array $appData, string $scopeSend): array {
         ];
     }
 
+    $woSafe = null;
+    if ($includeWo && !empty($appData['wo_summary']['leader_summary'])) {
+        $wsSrc = $appData['wo_summary'];
+        $woLdrRows = [];
+        foreach ($wsSrc['leader_summary'] as $wr) {
+            $isGtW = !empty($wr['is_grand_total']) || strcasecmp((string)($wr['leader'] ?? ''), 'Grand Total') === 0;
+            if ($isGtW && $scopeSend !== 'Semua Leader') continue;
+            if (!$isGtW && $scopeSend !== 'Semua Leader' && ($wr['leader'] ?? '') !== $scopeSend) continue;
+            $woLdrRows[] = [
+                'leader'                => (string)($wr['leader'] ?? ''),
+                'today_on_installation' => (int)($wr['today_on_installation'] ?? 0),
+                'today_refund'          => (int)($wr['today_refund'] ?? 0),
+                'today_waiting_wo'      => (int)($wr['today_waiting_wo'] ?? 0),
+                'today_total'           => (int)($wr['today_total'] ?? 0),
+                'waiting_wo'            => (int)($wr['waiting_wo'] ?? 0),
+                'wo_besok'              => (int)($wr['wo_besok'] ?? 0),
+                'is_gt'                 => $isGtW,
+            ];
+        }
+        $woSafe = [
+            'today_label'    => (string)($wsSrc['today_label'] ?? ''),
+            'besok_label'    => (string)($wsSrc['besok_label'] ?? ''),
+            'leader_summary' => $woLdrRows,
+        ];
+    }
+
     return [
         'scope'        => $scopeSend,
         'periode'      => (string)($appData['periode_label'] ?? ''),
@@ -490,6 +520,7 @@ function build_tg_visual_payload(array $appData, string $scopeSend): array {
         'daily_label'  => (string)($appData['daily_prod_date_label'] ?? ''),
         'mtd_rows'     => $mtdFiltered,
         'daily_rows'   => $dailyFiltered,
+        'wo_summary'   => $woSafe,
         'agent_rows'   => $agentsSafe,
     ];
 }
@@ -545,6 +576,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'send_
         exit;
     }
     $fname = basename((string)($_FILES['png_file']['name'] ?? 'laporan.png'));
+    @session_write_close();
     $resF = send_telegram_server_file($botTok, $chatId, $_FILES['png_file']['tmp_name'], $fname, $caption, $imgMode);
     if (!$resF['ok'] && $imgMode === 'photo' && $resF['http_code'] === 400 && stripos((string)$resF['description'], 'chat not found') === false) {
         $resF = send_telegram_server_file($botTok, $chatId, $_FILES['png_file']['tmp_name'], $fname, $caption, 'document');
@@ -581,6 +613,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'api_s
         $tHari   = max(1, min(31, (int)($_POST['total_hari'] ?? ($appData['params']['total_hari'] ?? 30))));
         $hJalan  = max(1, min($tHari, (int)($_POST['hari_berjalan'] ?? ($appData['params']['hari_berjalan'] ?? 15))));
         $hHarian = max(1, min(31, (int)($_POST['hari_harian'] ?? $hJalan)));
+        $hWo     = max(1, min(31, (int)($_POST['hari_wo'] ?? $hHarian)));
         $rasio   = max(0.5, min(5.0, (float)($_POST['rasio_paid'] ?? ($appData['params']['rasio_paid'] ?? 1.25))));
         $modeP   = ($_POST['mode_prospect'] ?? 'merge') === 'replace' ? 'replace' : 'merge';
 
@@ -636,6 +669,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'api_s
             'total_hari'         => $tHari,
             'hari_berjalan'      => $hJalan,
             'hari_harian'        => $hHarian,
+            'hari_wo'            => $hWo,
             'rasio_paid'         => $rasio,
             'simpan_pool_path'   => $poolActiveFile,
         ]);
@@ -645,7 +679,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'api_s
         $hasil['docker_tunnel_url'] = $appData['docker_tunnel_url'] ?? '';
         $hasil['sumber']['updated_at'] = date('Y-m-d H:i:s');
         $hasil['sumber']['updated_by'] = $apiU . ' (Auto-Sync Server)';
-        file_put_contents($dataFile, json_encode($hasil, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+        file_put_contents($dataFile, json_encode($hasil, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
         waf_log_event($auditLogFile, 'SERVER-SYNC', $apiU, 'Update via Auto-Sync (' . ($hasil['sumber']['total_baris_prospect'] ?? 0) . ' baris)');
 
         echo json_encode([
@@ -668,6 +702,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'api_s
 if (isset($_GET['download']) && !empty($_SESSION['auth_user'])) {
     $dlType = $_GET['download'];
     $authU = $_SESSION['auth_user'];
+    @session_write_close();
     $dlScope = $_GET['scope'] ?? $authU['leader_scope'];
     if (in_array($authU['role'], ['Leader', 'Agen'], true)) {
         $dlScope = $authU['leader_scope'];
@@ -704,6 +739,16 @@ if (isset($_GET['download']) && !empty($_SESSION['auth_user'])) {
             if (!empty($dr['is_grand_total']) && $dlScope !== 'Semua Leader') continue;
             if (empty($dr['is_grand_total']) && $dlScope !== 'Semua Leader' && $dr['leader'] !== $dlScope) continue;
             echo '<tr><td>' . htmlspecialchars($dr['leader']) . "</td><td>{$dr['so']}</td><td>{$dr['paid']}</td><td>{$dr['sa']}</td><td>{$dr['blm_so']}</td><td>{$dr['blm_paid']}</td><td>{$dr['blm_sa']}</td></tr>";
+        }
+        $dlWoSum = $appData['wo_summary'] ?? [];
+        if (!empty($dlWoSum['leader_summary'])) {
+            echo '</table><br><h3>1C. MONITORING WORK ORDER (WO TODAY ' . htmlspecialchars((string)($dlWoSum['today_label'] ?? '')) . ' | WAITING WO | WO BESOK ' . htmlspecialchars((string)($dlWoSum['besok_label'] ?? '')) . ')</h3>';
+            echo '<table border="1"><tr><th>Sales Leader</th><th>WO Today On Install</th><th>WO Today Refund</th><th>WO Today Waiting WO</th><th>Total WO Today</th><th>Waiting WO (Bulan Ini)</th><th>WO Besok</th></tr>';
+            foreach ($dlWoSum['leader_summary'] as $wr) {
+                if (!empty($wr['is_grand_total']) && $dlScope !== 'Semua Leader') continue;
+                if (empty($wr['is_grand_total']) && $dlScope !== 'Semua Leader' && $wr['leader'] !== $dlScope) continue;
+                echo '<tr><td>' . htmlspecialchars((string)$wr['leader']) . "</td><td>{$wr['today_on_installation']}</td><td>{$wr['today_refund']}</td><td>{$wr['today_waiting_wo']}</td><td>{$wr['today_total']}</td><td>{$wr['waiting_wo']}</td><td>{$wr['wo_besok']}</td></tr>";
+            }
         }
         echo '</table><br><h3>2. DETAIL TARGET & KOMISI AGENT</h3><table border="1"><tr><th>SALES LEADER</th><th>SALES NAME</th><th>MASA KERJA</th><th>LEVEL</th><th>TARGET ALL</th>';
         if ($dlAdmin) echo '<th>Reguler</th><th>Yearly</th>';
@@ -790,6 +835,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     } elseif ($_POST['action'] === 'switch_daily_date' && !empty($_SESSION['auth_user'])) {
         // Ubah Tanggal Cek Rekap Harian & Agent Blm Produktif secara instan di server tanpa Docker / tanpa re-upload
+        @session_write_close();
         try {
             $hariCekIn = max(1, min(31, (int)($_POST['hari_harian_cek'] ?? 15)));
             if (!file_exists($targetActiveFile) && file_exists($targetDefaultFile)) {
@@ -806,13 +852,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $appData['daily_prod_rows'] = $dp['rows'];
             $appData['params']['hari_harian'] = $dp['day'];
             $appData['tanggal_tersedia'] = daftar_hari_tersedia_bulan($poolNow, (int)$pCur['bulan_ini'], (int)$pCur['tahun'], $dp['day']);
-            file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+            file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
             $actionStatus = '<div class="alert-ok">📅 Tanggal Tabel Harian &amp; Agent Blm Produktif diubah ke <b>' . htmlspecialchars($dp['date_label']) . '</b> langsung di server!</div>';
         } catch (Throwable $e) {
             $actionStatus = '<div class="alert-err">❌ Gagal mengganti tanggal harian: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
+    } elseif ($_POST['action'] === 'switch_wo_date' && !empty($_SESSION['auth_user'])) {
+        // Ubah Tanggal Monitoring WO Today (WO Besok otomatis H+1) langsung di server
+        @session_write_close();
+        try {
+            $hariWoCek = max(1, min(31, (int)($_POST['hari_wo_cek'] ?? ($appData['wo_summary']['day'] ?? ($appData['daily_prod_day'] ?? 15)))));
+            $poolNow = load_prospect_pool($poolActiveFile, $poolDefaultFile);
+            $pCur = $appData['params'] ?? ['bulan_ini' => 11, 'tahun' => 2026];
+            $woRes = hitung_wo_laporan($poolNow, (int)($pCur['bulan_ini'] ?? 11), (int)($pCur['tahun'] ?? 2026), $hariWoCek);
+            $appData['wo_summary'] = $woRes;
+            $appData['params']['hari_wo'] = $woRes['day'];
+            file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
+            $actionStatus = '<div class="alert-ok">🛠️ Monitoring Work Order diperbarui: <b>WO Today ' . htmlspecialchars($woRes['today_label']) . '</b> | <b>Waiting WO: ' . (int)$woRes['waiting_wo_total'] . '</b> | <b>WO Besok (' . htmlspecialchars($woRes['besok_label']) . '): ' . (int)$woRes['wo_besok_total'] . '</b>!</div>';
+        } catch (Throwable $e) {
+            $actionStatus = '<div class="alert-err">❌ Gagal memperbarui tanggal WO: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        }
     } elseif ($_POST['action'] === 'upload_excel_data' && !empty($_SESSION['auth_user'])) {
         $curRole = $_SESSION['auth_user']['role'] ?? '';
+        $curDisp = (string)($_SESSION['auth_user']['display_name'] ?? $curRole);
+        $curUname = (string)($_SESSION['auth_user']['username'] ?? $curRole);
+        @session_write_close();
         if (!in_array($curRole, ['Admin', 'Leader'], true)) {
             $actionStatus = '<div class="alert-err">🚫 Akses Ditolak: Hanya Super Admin dan Sales Leader yang diizinkan mengupdate data di server!</div>';
         } else {
@@ -824,6 +888,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $totalHariIn  = max(1, min(31, (int)($_POST['total_hari'] ?? 30)));
                 $hariJalanIn  = max(1, min($totalHariIn, (int)($_POST['hari_berjalan'] ?? 15)));
                 $hariHarianIn = max(1, min(31, (int)($_POST['hari_harian'] ?? $hariJalanIn)));
+                $hariWoIn     = max(1, min(31, (int)($_POST['hari_wo'] ?? $hariHarianIn)));
                 $rasioPaidIn  = max(0.5, min(5.0, (float)($_POST['rasio_paid'] ?? 1.25)));
                 $modeProspect = ($_POST['mode_prospect'] ?? 'merge') === 'replace' ? 'replace' : 'merge';
 
@@ -889,6 +954,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     'total_hari'         => $totalHariIn,
                     'hari_berjalan'      => $hariJalanIn,
                     'hari_harian'        => $hariHarianIn,
+                    'hari_wo'            => $hariWoIn,
                     'rasio_paid'         => $rasioPaidIn,
                     'simpan_pool_path'   => $poolActiveFile,
                 ]);
@@ -897,11 +963,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $hasilBaru['bot_token_default'] = $appData['bot_token_default'] ?? '9242894728:AAF2oYVZlpfcHEIFcC9PdoeFQA6KuwF-njs';
                 $hasilBaru['docker_tunnel_url'] = $appData['docker_tunnel_url'] ?? '';
                 $hasilBaru['sumber']['updated_at'] = date('Y-m-d H:i:s');
-                $hasilBaru['sumber']['updated_by'] = $_SESSION['auth_user']['display_name'] . ' (' . $curRole . ')';
+                $hasilBaru['sumber']['updated_by'] = $curDisp . ' (' . $curRole . ')';
 
-                file_put_contents($dataFile, json_encode($hasilBaru, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+                file_put_contents($dataFile, json_encode($hasilBaru, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
                 $appData = $hasilBaru;
-                waf_log_event($auditLogFile, 'DATA-UPDATE', $_SESSION['auth_user']['username'] ?? $curRole, 'Update server selesai: ' . ($hasilBaru['periode_label'] ?? ''));
+                waf_log_event($auditLogFile, 'DATA-UPDATE', $curUname, 'Update server selesai: ' . ($hasilBaru['periode_label'] ?? ''));
 
                 $jmlAgen = count($hasilBaru['agent_rows'] ?? []);
                 $jmlBarisP = number_format((int)($hasilBaru['sumber']['total_baris_prospect'] ?? 0), 0, ',', '.');
@@ -913,13 +979,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     . '📊 Sheet Target: <b>' . htmlspecialchars($sheetInput) . '</b> (' . $jmlAgen . ' Agen) | '
                     . '📂 Total Prospect Unik: <b>' . $jmlBarisP . ' baris</b> (' . htmlspecialchars($infoUploadStr) . ') | '
                     . '🗓 Periode MTD: <b>' . htmlspecialchars($hasilBaru['periode_label']) . ' (' . $hasilBaru['target_persen_mtd'] . '%)</b> | '
-                    . '📅 Cek Harian: <b>' . htmlspecialchars($hasilBaru['daily_prod_date_label'] ?? '') . '</b></div>';
+                    . '📅 Cek Harian: <b>' . htmlspecialchars($hasilBaru['daily_prod_date_label'] ?? '') . '</b> | '
+                    . '🛠️ WO Today: <b>' . (int)($hasilBaru['wo_summary']['wo_today_totals']['total'] ?? 0) . '</b> / Waiting: <b>' . (int)($hasilBaru['wo_summary']['waiting_wo_total'] ?? 0) . '</b> / Besok: <b>' . (int)($hasilBaru['wo_summary']['wo_besok_total'] ?? 0) . '</b></div>';
             } catch (Throwable $e) {
                 $actionStatus = '<div class="alert-err">❌ <b>Gagal Memproses Data Excel:</b> ' . htmlspecialchars($e->getMessage()) . '</div>';
             }
         }
     } elseif ($_POST['action'] === 'reset_default_data' && !empty($_SESSION['auth_user'])) {
         $curRole = $_SESSION['auth_user']['role'] ?? '';
+        $curUname = (string)($_SESSION['auth_user']['username'] ?? $curRole);
+        @session_write_close();
         if (!in_array($curRole, ['Admin', 'Leader'], true)) {
             $actionStatus = '<div class="alert-err">🚫 Akses Ditolak!</div>';
         } else {
@@ -927,7 +996,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if (file_exists($targetDefaultFile)) @copy($targetDefaultFile, $targetActiveFile);
             if (file_exists($poolDefaultFile)) @copy($poolDefaultFile, $poolActiveFile);
             $appData = load_json_safe($dataFile, []);
-            waf_log_event($auditLogFile, 'DATA-RESET', $_SESSION['auth_user']['username'] ?? $curRole, 'Reset ke dataset default server');
+            waf_log_event($auditLogFile, 'DATA-RESET', $curUname, 'Reset ke dataset default server');
             $actionStatus = '<div class="alert-ok">♻️ <b>Data Dashboard Server dikembalikan ke Dataset Default!</b></div>';
         }
     } elseif ($_POST['action'] === 'update_all_credentials' && !empty($_SESSION['auth_user']['is_admin_master'])) {
@@ -1022,6 +1091,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $imgMode  = (($_POST['img_mode'] ?? 'photo') === 'document') ? 'document' : 'photo';
             $incImg   = !empty($_POST['include_images']);
             $incTxt   = !empty($_POST['include_text']);
+            $incWo    = !empty($_POST['include_wo']);
 
             $agentRowsTg = $appData['agent_rows'] ?? [];
             $dailyRowsTg = $appData['daily_prod_rows'] ?? [];
@@ -1043,6 +1113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $tgStatus = '<div class="alert-err">⚠️ Pilih minimal satu format laporan (Gambar Presentasi .png atau Pesan Teks Detail).</div>';
             } else {
                 $_SESSION['tg_last_bot_token'] = $botToken;
+                @session_write_close();
                 $messages = [];
                 if ($incTxt) {
                     $blocks = [];
@@ -1060,6 +1131,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             $dpLines[] = ($isGt ? "🏆 <b>" : "• <b>") . $escTg($dr['leader']) . "</b>: SO=<b>{$dr['so']}</b> PAID=<b>{$dr['paid']}</b> SA=<b>{$dr['sa']}</b> | Blm Prod: SO=<b>{$dr['blm_so']}</b> PAID=<b>{$dr['blm_paid']}</b> SA=<b>{$dr['blm_sa']}</b>";
                         }
                         $blocks[] = implode("\n", $dpLines) . "\n━━━━━━━━━━━━━━━━━━━━━━\n";
+                    }
+
+                    $woSumTg = $appData['wo_summary'] ?? [];
+                    if ($incWo && !empty($woSumTg['leader_summary'])) {
+                        $woLines = ["🛠️ <b>MONITORING WORK ORDER (Today " . $escTg((string)($woSumTg['today_label'] ?? '')) . " | Besok " . $escTg((string)($woSumTg['besok_label'] ?? '')) . ")</b>"];
+                        foreach ($woSumTg['leader_summary'] as $wr) {
+                            $isGtW = !empty($wr['is_grand_total']);
+                            if ($isGtW && $scopeSend !== 'Semua Leader') continue;
+                            if (!$isGtW && $scopeSend !== 'Semua Leader' && ($wr['leader'] ?? '') !== $scopeSend) continue;
+                            $woLines[] = ($isGtW ? "🏆 <b>" : "• <b>") . $escTg((string)($wr['leader'] ?? '')) . "</b>: WO Today=<b>{$wr['today_total']}</b> (On Inst={$wr['today_on_installation']}, Refund={$wr['today_refund']}, Wait={$wr['today_waiting_wo']}) | Waiting WO=<b>{$wr['waiting_wo']}</b> | Besok=<b>{$wr['wo_besok']}</b>";
+                        }
+                        $blocks[] = implode("\n", $woLines) . "\n━━━━━━━━━━━━━━━━━━━━━━\n";
                     }
 
                     $no = 1;
@@ -1119,7 +1202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($serverTextSent && !$incImg) {
                     $tgStatus = '<div class="alert-ok">✅ Laporan teks berhasil dikirim ke Telegram Chat ID <b>' . htmlspecialchars($chatId) . '</b> (' . count($messages) . ' pesan, HTTP 200 OK)!</div>';
                 } elseif ($needClientRunner) {
-                    $visualData = $incImg ? build_tg_visual_payload($appData, $scopeSend) : null;
+                    $visualData = $incImg ? build_tg_visual_payload($appData, $scopeSend, $incWo) : null;
                     $relayJson = json_encode([
                         'api_base'    => "https://api.telegram.org/bot{$botToken}",
                         'chat_id'     => $chatId,
@@ -1130,10 +1213,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         'messages'    => $incTxt ? $messages : [],
                         'visual_data' => $visualData,
                         'server_note' => $serverTextError,
-                    ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
+                    ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
 
                     $tgStatus = '<div id="tg-relay-box" class="alert-ok" style="background:#eff6ff; color:#1e3a8a; border-color:#93c5fd;">'
-                        . '⏳ <b>Menyiapkan &amp; Mengunggah Gambar Tabel (.png)' . ($incTxt ? ' + Pesan Teks' : '') . ' ke Telegram...</b>'
+                        . '<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">'
+                        . '<span>⏳ <b>Menyiapkan &amp; Mengunggah Gambar Tabel (.png)' . ($incTxt ? ' + Pesan Teks' : '') . ' ke Telegram...</b></span>'
+                        . '<button type="button" onclick="window.__TG_ABORT=true;" class="btn btn-red" style="padding:5px 12px; font-size:0.78rem;">⛔ Batalkan</button>'
+                        . '</div>'
                         . '<div id="tg-relay-progress" style="margin-top:6px;">Memproses canvas presentasi resolusi tinggi...</div>'
                         . '</div>'
                         . '<script>window.__TG_SEND_CFG=' . $relayJson . ';</script>';
@@ -1152,6 +1238,9 @@ $dailyRows    = $appData['daily_prod_rows'] ?? [];
 $dailyLbl     = (string)($appData['daily_prod_date_label'] ?? '15-Nov-26');
 $dailyDay     = (int)($appData['daily_prod_day'] ?? 15);
 $tglTersedia  = $appData['tanggal_tersedia'] ?? [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+$woSummary    = $appData['wo_summary'] ?? [];
+$woDay        = (int)($woSummary['day'] ?? $dailyDay);
+$woAvailDays  = $woSummary['available_days'] ?? $tglTersedia;
 $targetMtd    = (int)($appData['target_persen_mtd'] ?? 50);
 $periodeLabel = $appData['periode_label'] ?? '15-Nov-2026';
 $hariBerjalan = (int)($appData['hari_berjalan'] ?? 15);
@@ -1286,6 +1375,16 @@ $authUser = $_SESSION['auth_user'] ?? null;
             background: #020617; color: #86efac; padding: 12px; border-radius: 8px;
             font-size: 0.78rem; overflow-x: auto; max-height: 220px;
         }
+        .wo-tab-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+        .wo-tab-btn {
+            background: #e2e8f0; color: #0f172a; border: 1px solid #cbd5e1;
+            padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.84rem;
+        }
+        .wo-tab-btn.active { background: #002060; color: #fff; border-color: #002060; }
+        .wo-panel { display: none; }
+        .wo-panel.active { display: block; }
+        tr.row-wo-ltotal td { background: #dbeafe !important; font-weight: 700; color: #0f172a; }
+        tr.row-wo-gtotal td { background: #fef3c7 !important; font-weight: 800; color: #0f172a; border-top: 2px solid #0f172a; }
     </style>
 </head>
 <body>
@@ -1556,6 +1655,10 @@ $authUser = $_SESSION['auth_user'] ?? null;
                         <input type="number" name="hari_harian" min="1" max="31" value="<?= (int)($paramsCur['hari_harian'] ?? $dailyDay) ?>" required>
                     </div>
                     <div>
+                        <label style="font-size:0.81rem;"><b>Tanggal WO Today (Besok H+1):</b></label>
+                        <input type="number" name="hari_wo" min="1" max="31" value="<?= (int)($paramsCur['hari_wo'] ?? $woDay) ?>" required>
+                    </div>
+                    <div>
                         <label style="font-size:0.81rem;"><b>Total Hari Kerja:</b></label>
                         <input type="number" name="total_hari" min="1" max="31" value="<?= (int)($paramsCur['total_hari'] ?? $totalHari) ?>" required>
                     </div>
@@ -1587,7 +1690,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                         🕒 Update Server Terakhir: <b><?= htmlspecialchars((string)($sumberCur['updated_at'] ?? '-')) ?></b>
                         oleh <b><?= htmlspecialchars((string)($sumberCur['updated_by'] ?? 'System')) ?></b>
                     </div>
-                    <button type="submit" class="btn btn-green" style="padding:12px 24px;">
+                    <button type="submit" class="btn btn-green" style="padding:12px 24px;" onclick="this.textContent='⏳ Memproses Upload ke Server...';">
                         🚀 Upload &amp; Update Semua Data ke Server Sekarang
                     </button>
                 </div>
@@ -1756,6 +1859,203 @@ $authUser = $_SESSION['auth_user'] ?? null;
         <?php endif; ?>
     </div>
 
+    <?php if ($role !== 'Agen'):
+        $woTodayRows   = $woSummary['wo_today_rows'] ?? [];
+        $woWaitingRows = $woSummary['waiting_wo_rows'] ?? [];
+        $woBesokRows   = $woSummary['wo_besok_rows'] ?? [];
+        $woSumRows     = $woSummary['leader_summary'] ?? [];
+        $woTodayLbl    = (string)($woSummary['today_label'] ?? $dailyLbl);
+        $woBesokLbl    = (string)($woSummary['besok_label'] ?? '');
+        $woTodayTot    = $woSummary['wo_today_totals'] ?? ['on_installation' => 0, 'refund' => 0, 'waiting_wo' => 0, 'total' => 0];
+        $woWaitingTot  = (int)($woSummary['waiting_wo_total'] ?? 0);
+        $woBesokTot    = (int)($woSummary['wo_besok_total'] ?? 0);
+        $woOtherSt     = $woSummary['wo_today_other_statuses'] ?? [];
+
+        // Hitung total mengikuti filter scope jika Leader / filter Admin tertentu dipilih
+        $filtWoScope = function ($r) use ($selectedScope) {
+            $rt = $r['row_type'] ?? '';
+            $isGt = ($rt === 'grand_total') || !empty($r['is_grand_total']) || strcasecmp((string)($r['leader'] ?? ''), 'Grand Total') === 0;
+            if ($isGt) return $selectedScope === 'Semua Leader';
+            return $selectedScope === 'Semua Leader' || ($r['leader'] ?? '') === $selectedScope;
+        };
+        $dispTodayTot = 0; $dispWaitTot = 0; $dispBesokTot = 0;
+        $dispOnI = 0; $dispRef = 0; $dispWaitToday = 0;
+        foreach ($woSumRows as $wsr) {
+            if (!empty($wsr['is_grand_total'])) continue;
+            if ($selectedScope !== 'Semua Leader' && ($wsr['leader'] ?? '') !== $selectedScope) continue;
+            $dispOnI       += (int)($wsr['today_on_installation'] ?? 0);
+            $dispRef       += (int)($wsr['today_refund'] ?? 0);
+            $dispWaitToday += (int)($wsr['today_waiting_wo'] ?? 0);
+            $dispTodayTot  += (int)($wsr['today_total'] ?? 0);
+            $dispWaitTot   += (int)($wsr['waiting_wo'] ?? 0);
+            $dispBesokTot  += (int)($wsr['wo_besok'] ?? 0);
+        }
+    ?>
+    <!-- DASHBOARD 1C: MONITORING WORK ORDER (WO TODAY | WAITING WO | WO BESOK) -->
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+            <div>
+                <h3 style="margin:0;">🛠️ 1C. MONITORING WORK ORDER — WO TODAY (<?= htmlspecialchars($woTodayLbl) ?>) | WAITING WO | WO BESOK (<?= htmlspecialchars($woBesokLbl) ?>)</h3>
+                <div style="font-size:0.82rem; color:#475569; margin-top:2px;">Pivot <b>Count of Customer Name</b> per Sales Leader &amp; Salesname berdasarkan kolom <code>Instalasi Date</code> dan <code>Status</code></div>
+            </div>
+            <form method="post" style="margin:0; display:flex; gap:6px; align-items:center;">
+                <input type="hidden" name="action" value="switch_wo_date">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <select name="hari_wo_cek" onchange="this.form.submit()" style="margin:0; width:auto; padding:6px 10px; font-size:0.84rem;">
+                    <?php foreach ($woAvailDays as $wTg): ?>
+                        <option value="<?= (int)$wTg ?>" <?= (int)$wTg === $woDay ? 'selected' : '' ?>>
+                            WO Today: Tgl <?= (int)$wTg ?> <?= htmlspecialchars($lblBlnIni) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="submit" class="btn" style="padding:7px 12px; font-size:0.8rem;">🔄 Hitung WO</button>
+            </form>
+        </div>
+
+        <?php if (empty($woSummary)): ?>
+            <div class="alert-err" style="background:#fffbeb; color:#92400e; border-color:#fcd34d;">
+                ℹ️ Data <b>WO TODAY / WAITING WO / WO BESOK</b> belum tersimpan di cache lama. Klik tombol <b>🔄 Hitung WO</b> di kanan atas atau upload ulang file <code>list_prospect</code> terbaru agar kolom <code>Instalasi Date</code> &amp; <code>Status</code> terhitung otomatis!
+            </div>
+        <?php else: ?>
+            <div class="grid-3" style="margin-bottom:12px;">
+                <div class="metric-box" style="border-left-color:#1d4ed8;">
+                    <div class="metric-label">🛠️ WO TODAY (<?= htmlspecialchars($woTodayLbl) ?>)</div>
+                    <div class="metric-val"><?= number_format($dispTodayTot, 0, ',', '.') ?> Customer</div>
+                    <div class="metric-sub" style="color:#1e40af;">On Install: <?= $dispOnI ?> | Refund: <?= $dispRef ?> | Waiting WO: <?= $dispWaitToday ?></div>
+                </div>
+                <div class="metric-box" style="border-left-color:#d97706;">
+                    <div class="metric-label">⏳ WAITING WO (Bulan Ini)</div>
+                    <div class="metric-val"><?= number_format($dispWaitTot, 0, ',', '.') ?> Customer</div>
+                    <div class="metric-sub" style="color:#b45309;">Status = Waiting WO (Butuh Penjadwalan WO)</div>
+                </div>
+                <div class="metric-box" style="border-left-color:#059669;">
+                    <div class="metric-label">📅 WO BESOK (<?= htmlspecialchars($woBesokLbl) ?>)</div>
+                    <div class="metric-val"><?= number_format($dispBesokTot, 0, ',', '.') ?> Customer</div>
+                    <div class="metric-sub">Jadwal Instalasi Besok (H+1)</div>
+                </div>
+            </div>
+
+            <?php if (!empty($woOtherSt)):
+                $othParts = [];
+                foreach ($woOtherSt as $sk => $sv) $othParts[] = htmlspecialchars($sk) . ': ' . (int)$sv;
+            ?>
+                <div style="font-size:0.78rem; color:#475569; margin-bottom:8px;">
+                    ℹ️ Status lain pada Instalasi Date <b><?= htmlspecialchars($woTodayLbl) ?></b> (di luar On Installation / Refund / Waiting WO): <?= implode(' | ', $othParts) ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="wo-tab-bar">
+                <button type="button" class="wo-tab-btn active" onclick="window.switchWoTab('wo-tab-sum', this)">📊 Ringkasan Per Leader</button>
+                <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-today', this)">1️⃣ WO TODAY (<?= $dispTodayTot ?>)</button>
+                <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-wait', this)">2️⃣ WAITING WO (<?= $dispWaitTot ?>)</button>
+                <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-besok', this)">3️⃣ WO BESOK (<?= $dispBesokTot ?>)</button>
+            </div>
+
+            <div id="wo-tab-sum" class="wo-panel active table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th rowspan="2" class="navy-hdr">Sales Leader</th>
+                            <th colspan="4" class="navy-hdr">WO TODAY (<?= htmlspecialchars($woTodayLbl) ?>)</th>
+                            <th colspan="2" class="red-hdr">Waiting WO &amp; Besok</th>
+                        </tr>
+                        <tr>
+                            <th class="navy-hdr">On Installation</th>
+                            <th class="navy-hdr">Refund</th>
+                            <th class="navy-hdr">Waiting WO</th>
+                            <th class="navy-hdr">Total Today</th>
+                            <th class="red-hdr">Waiting WO</th>
+                            <th class="red-hdr">WO Besok (<?= htmlspecialchars($woBesokLbl) ?>)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($woSumRows as $wr): if (!$filtWoScope($ws = $wr)) continue; $isGtW = !empty($wr['is_grand_total']); ?>
+                            <tr class="<?= $isGtW ? 'row-wo-gtotal' : '' ?>">
+                                <td class="left"><?= htmlspecialchars((string)$wr['leader']) ?></td>
+                                <td><?= (int)$wr['today_on_installation'] ?></td>
+                                <td><?= (int)$wr['today_refund'] ?></td>
+                                <td><?= (int)$wr['today_waiting_wo'] ?></td>
+                                <td><b><?= (int)$wr['today_total'] ?></b></td>
+                                <td><b><?= (int)$wr['waiting_wo'] ?></b></td>
+                                <td><b><?= (int)$wr['wo_besok'] ?></b></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="wo-tab-today" class="wo-panel table-wrap" style="max-height:560px; overflow-y:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sales Leader</th>
+                            <th>Salesname</th>
+                            <th>On Installation</th>
+                            <th>Refund</th>
+                            <th>Waiting WO</th>
+                            <th>Grand Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($woTodayRows as $r): if (!$filtWoScope($r)) continue; $rt = $r['row_type'] ?? 'agent'; ?>
+                            <tr class="<?= $rt === 'grand_total' ? 'row-wo-gtotal' : ($rt === 'leader_total' ? 'row-wo-ltotal' : '') ?>">
+                                <td class="left"><?= $rt === 'agent' ? htmlspecialchars((string)$r['leader']) : '' ?></td>
+                                <td class="left"><?= htmlspecialchars((string)$r['salesname']) ?></td>
+                                <td><?= (int)$r['on_installation'] ?: '' ?></td>
+                                <td><?= (int)$r['refund'] ?: '' ?></td>
+                                <td><?= (int)$r['waiting_wo'] ?: '' ?></td>
+                                <td><b><?= (int)$r['total'] ?></b></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="wo-tab-wait" class="wo-panel table-wrap" style="max-height:560px; overflow-y:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sales Leader</th>
+                            <th>Salesname</th>
+                            <th>Grand Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($woWaitingRows as $r): if (!$filtWoScope($r)) continue; $rt = $r['row_type'] ?? 'agent'; ?>
+                            <tr class="<?= $rt === 'grand_total' ? 'row-wo-gtotal' : ($rt === 'leader_total' ? 'row-wo-ltotal' : '') ?>">
+                                <td class="left"><?= $rt === 'agent' ? htmlspecialchars((string)$r['leader']) : '' ?></td>
+                                <td class="left"><?= htmlspecialchars((string)$r['salesname']) ?></td>
+                                <td><b><?= (int)$r['total'] ?></b></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="wo-tab-besok" class="wo-panel table-wrap" style="max-height:560px; overflow-y:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sales Leader</th>
+                            <th>Salesname</th>
+                            <th>Grand Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($woBesokRows as $r): if (!$filtWoScope($r)) continue; $rt = $r['row_type'] ?? 'agent'; ?>
+                            <tr class="<?= $rt === 'grand_total' ? 'row-wo-gtotal' : ($rt === 'leader_total' ? 'row-wo-ltotal' : '') ?>">
+                                <td class="left"><?= $rt === 'agent' ? htmlspecialchars((string)$r['leader']) : '' ?></td>
+                                <td class="left"><?= htmlspecialchars((string)$r['salesname']) ?></td>
+                                <td><b><?= (int)$r['total'] ?></b></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- DASHBOARD 2: DETAIL AGENT -->
     <div class="card">
         <h3 style="margin-top:0;">📋 2. TABEL DETAIL AGENT, KUOTA HARIAN PAID/SA &amp; ESTIMASI KOMISI (<?= htmlspecialchars($selectedScope) ?>)</h3>
@@ -1918,7 +2218,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
     <?php endif; ?>
 
     <?php if (in_array($role, ['Admin', 'Finance', 'Leader'], true)):
-        $previewJsonSpec = json_encode(build_tg_visual_payload($appData, $selectedScope), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
+        $previewJsonSpec = json_encode(build_tg_visual_payload($appData, $selectedScope, true), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     ?>
     <!-- DASHBOARD 3: KIRIM GAMBAR PRESENTASI & TEKS KE BOT TELEGRAM -->
     <div class="card">
@@ -1964,6 +2264,10 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     <input type="checkbox" name="include_text" value="1" <?= ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['action'] ?? '') !== 'send_telegram' || !empty($_POST['include_text'])) ? 'checked' : '' ?> style="width:auto; margin:0;">
                     📝 Sertakan Pesan Teks Detail
                 </label>
+                <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem; font-weight:700;">
+                    <input type="checkbox" name="include_wo" value="1" <?= ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['action'] ?? '') !== 'send_telegram' || !empty($_POST['include_wo'])) ? 'checked' : '' ?> style="width:auto; margin:0;">
+                    🛠️ Sertakan Ringkasan WO (Today / Waiting / Besok)
+                </label>
             </div>
 
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -1976,9 +2280,27 @@ $authUser = $_SESSION['auth_user'] ?? null;
     </div>
 
     <script>
+    window.switchWoTab = function(panelId, btnEl) {
+        document.querySelectorAll('.wo-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.wo-tab-btn').forEach(b => b.classList.remove('active'));
+        const tgt = document.getElementById(panelId);
+        if (tgt) tgt.classList.add('active');
+        if (btnEl) btnEl.classList.add('active');
+    };
     (function(){
         const PREVIEW_DATA = <?= $previewJsonSpec ?>;
         const F_FACE = "'Segoe UI', Roboto, Arial, sans-serif";
+
+        async function fetchWithTimeout(url, opts, ms) {
+            const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const tId = ctrl ? setTimeout(() => ctrl.abort(new Error('Koneksi timeout (' + Math.round(ms / 1000) + 's)')), ms) : null;
+            try {
+                const reqOpts = ctrl ? Object.assign({}, opts, { signal: ctrl.signal }) : opts;
+                return await fetch(url, reqOpts);
+            } finally {
+                if (tId) clearTimeout(tId);
+            }
+        }
 
         function fmtInt(n) {
             const v = Math.round(Number(n) || 0);
@@ -2291,6 +2613,58 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 });
             }
 
+            // 1C. MONITORING WORK ORDER (WO TODAY | WAITING WO | WO BESOK)
+            if (data.wo_summary && data.wo_summary.leader_summary && data.wo_summary.leader_summary.length) {
+                const ws = data.wo_summary;
+                const wRows = [];
+                const wStyles = [];
+                let idxGtW = -1;
+                for (const wr of ws.leader_summary) {
+                    if (wr.is_gt) {
+                        idxGtW = wRows.length;
+                        wStyles.push({ bg: '#dbeafe', bold: true });
+                    } else {
+                        wStyles.push(null);
+                    }
+                    wRows.push([
+                        wr.leader,
+                        fmtInt(wr.today_on_installation),
+                        fmtInt(wr.today_refund),
+                        fmtInt(wr.today_waiting_wo),
+                        fmtInt(wr.today_total),
+                        fmtInt(wr.waiting_wo),
+                        fmtInt(wr.wo_besok),
+                    ]);
+                }
+                const imgWo = await renderTablePng({
+                    title: `MONITORING WORK ORDER (${ws.today_label} | WAITING WO | ${ws.besok_label})`,
+                    subtitle: `Ringkasan WO Today (On Install / Refund / Waiting WO), Waiting WO Aktif & WO Besok per Leader`,
+                    columns: ['Sales Leader', 'ON\nINSTALL', 'REFUND', 'WAITING\nWO', 'TOTAL\nTODAY', 'WAITING WO\n(AKTIF)', `WO BESOK\n(${ws.besok_label})`],
+                    groupHeaders: [
+                        { label: `WO TODAY (${ws.today_label})`, start: 1, end: 4, bg: '#002060' },
+                        { label: 'ANTREAN & JADWAL BESOK', start: 5, end: 6, bg: '#991b1b' },
+                    ],
+                    headBg: '#002060',
+                    rows: wRows,
+                    align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'],
+                    rowStyles: wStyles,
+                    cellStyle: (i, c) => {
+                        if (i === idxGtW && c === 4) return { bg: '#c9daf8', fg: '#1e3a8a', bold: true };
+                        if (i === idxGtW && c >= 5) return { bg: '#fce4d6', fg: '#9a3412', bold: true };
+                        if (c === 4) return { bg: '#eff6ff', bold: true };
+                        if (c === 5) return { bg: '#fff7ed', bold: true };
+                        return null;
+                    },
+                    notes: [`WO TODAY: Instalasi Date ${ws.today_label}. WAITING WO: Status Waiting WO bulan berjalan. WO BESOK: Jadwal ${ws.besok_label}.`],
+                });
+                out.push({
+                    fileName: `01C_Monitoring_WO_${ws.today_label}.png`,
+                    caption: `🛠️ <b>Monitoring Work Order</b> | WO Today: ${ws.today_label} | Besok: ${ws.besok_label}`,
+                    blob: imgWo.blob,
+                    dataUrl: imgWo.dataUrl,
+                });
+            }
+
             // 2. DETAIL AGENT PER LEADER (TANPA Reguler/Yearly terpisah!)
             if (data.agent_rows && data.agent_rows.length) {
                 const byLdr = new Map();
@@ -2430,7 +2804,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 fd.append('parse_mode', 'HTML');
                 fd.append(mode === 'document' ? 'document' : 'photo', im.blob, im.fileName);
                 const ep = mode === 'document' ? '/sendDocument' : '/sendPhoto';
-                const r = await fetch(cfg.api_base + ep, { method: 'POST', body: fd });
+                const r = await fetchWithTimeout(cfg.api_base + ep, { method: 'POST', body: fd }, 12000);
                 const j = await r.json();
                 return { ok: !!(r.ok && j && j.ok), status: r.status, desc: (j && j.description) ? j.description : ('HTTP ' + r.status) };
             };
@@ -2453,7 +2827,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 fdSrv.append('caption', im.caption);
                 fdSrv.append('img_mode', cfg.img_mode);
                 fdSrv.append('png_file', im.blob, im.fileName);
-                const rs = await fetch('index.php', { method: 'POST', body: fdSrv });
+                const rs = await fetchWithTimeout('index.php', { method: 'POST', body: fdSrv }, 15000);
                 const js = await rs.json().catch(() => null);
                 if (js && js.ok) return { ok: true };
                 throw new Error(browserErr.message || (js && js.description) || 'Gagal mengunggah gambar ke Telegram');
@@ -2461,6 +2835,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
         }
 
         if (window.__TG_SEND_CFG) {
+            window.__TG_ABORT = false;
             (async function(){
                 const cfg = window.__TG_SEND_CFG;
                 const box = document.getElementById('tg-relay-box');
@@ -2470,6 +2845,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     if (cfg.send_images && cfg.visual_data) {
                         const imgs = await buildAllReportPngs(cfg.visual_data);
                         for (let i = 0; i < imgs.length; i++) {
+                            if (window.__TG_ABORT) throw new Error('Pengiriman dibatalkan oleh pengguna.');
                             if (prog) prog.textContent = '🖼️ Mengunggah gambar ' + (i + 1) + '/' + imgs.length + ': ' + imgs[i].fileName + '...';
                             await uploadSinglePng(cfg, imgs[i]);
                             sentImgs++;
@@ -2478,6 +2854,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     }
                     if (cfg.send_text && cfg.messages && cfg.messages.length) {
                         for (let j = 0; j < cfg.messages.length; j++) {
+                            if (window.__TG_ABORT) throw new Error('Pengiriman dibatalkan oleh pengguna.');
                             if (prog) prog.textContent = '📝 Mengirim teks bagian ' + (j + 1) + '/' + cfg.messages.length + '...';
                             const fdTxt = new URLSearchParams({
                                 chat_id: cfg.chat_id,
@@ -2485,7 +2862,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                                 parse_mode: 'HTML',
                                 disable_web_page_preview: 'true'
                             });
-                            const rt = await fetch(cfg.api_base + '/sendMessage', { method: 'POST', body: fdTxt });
+                            const rt = await fetchWithTimeout(cfg.api_base + '/sendMessage', { method: 'POST', body: fdTxt }, 8000);
                             const jt = await rt.json();
                             if (!rt.ok || !jt.ok) {
                                 throw new Error((jt && jt.description) ? jt.description : ('HTTP ' + rt.status));

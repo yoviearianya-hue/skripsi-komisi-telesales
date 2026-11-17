@@ -500,6 +500,1661 @@
         14,
         15
     ],
+    "wo_summary": {
+        "day": 15,
+        "today_label": "15-Nov-26",
+        "besok_label": "16-Nov-26",
+        "available_days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            25
+        ],
+        "wo_today_rows": [
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Ari Harnanto Nugroho",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Asa Zahra Kencana",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Durrotul Fadiilah",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Fauzan Seftiady",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Reinaldi Pandama R",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Rita Fitriani",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Saffa Agatha Faradilla",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Sinarsih Febrianti Dakhi",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Alfian Bagus Setiawan Total",
+                "on_installation": 13,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 13,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Dyah Desy Puspaningrum",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Hermansyah (MST)",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Rexy Ronald",
+                "on_installation": 4,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 4,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Rohmi Amelia",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Ryan Aryoseno",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Siti Muslipah",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Siti Solehah",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Anis Anggraini Total",
+                "on_installation": 14,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 14,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "(blank)",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Andaru Nanda Setiyawan",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Andi Achmad Zaky",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Jonathan Saragih",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Khairrany",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Luki Defiana",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Muhamad Rifki Ramadhan",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Sri Wahyuningsih (MST)",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Eka Hardiansyah Total",
+                "on_installation": 13,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 13,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Didid Novianto",
+                "on_installation": 1,
+                "refund": 1,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Eko Wahyudi",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Fitriyani Soraya",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Jody Kresno Tamtomo",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Khoirul Esti Wulandari",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Natalia Bakara",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Putri Mayasari",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Shera Rega Vilanty",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Fahrul Amrin Total",
+                "on_installation": 11,
+                "refund": 1,
+                "waiting_wo": 0,
+                "total": 12,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Audina Gusliani",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Aulia Rachmayani",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Azimata Firusdi",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Erik Suryadana",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Fatma Sofia Salim",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Fitra Jaya",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Muhammad Indra Pratama",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Rico Sampe Toding",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Riki Ardiansyah",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Serli Juwita",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Yuni Erlina Wati Latuliu",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Yusuf Nugraha",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Firliansyah Total",
+                "on_installation": 17,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 17,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Astuti Pratiwisari",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Deby Karlina",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Dendi Dimas Permana",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Irpan Dio Sanjaya",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Muhammad Syahru Ramdoni",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Naila Apriliani",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Tri Danar Sugiarto",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Yohanes Steven",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Jarot Arie Sasmita Total",
+                "on_installation": 13,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 13,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Defa Delvianthy",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Domminique Jennifer Regita Wattimena",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Ikhsan Fajri",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Muhamad Chandra Andika Rifky",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Nisa Yuanita",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Shalsadilah",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Muhammad Rezky Jaladara Total",
+                "on_installation": 8,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 8,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Fahmi Zakki",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Kuncoro Gali Nugroho",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Muhammad Ikhsan Nulhakim",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Putri Wulan Dari",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Tuti Handayani",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Yunianti",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Tiara Muna Dayuningtyas Total",
+                "on_installation": 10,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 10,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Abimanyu Kusuma",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Adryan Deva Maulana",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Al Alif Andriansyah",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Denson Manalu",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Deny Rahmat Hidayat",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Hastarina",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Kuntum Kharisma Dewi",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Nurpi Apriansyah",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Risda Trisdawanti",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Tika Saraswati Total",
+                "on_installation": 16,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 16,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Andri Darmawan",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Sandra Monica Aprilia Bendsneyder",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Sisca Permata Sucy",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Yovi Arian Total",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Ariska Pratiwi",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Dewi Ratnasari",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Elang Tri Mulia Arya Kusuma",
+                "on_installation": 2,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Mohamad Fikri",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Rafli Aditya",
+                "on_installation": 3,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Said Djandan Mufti",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Suci Apriwulan",
+                "on_installation": 1,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Yudha Irawan Total",
+                "on_installation": 14,
+                "refund": 0,
+                "waiting_wo": 0,
+                "total": 14,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Grand Total",
+                "salesname": "Grand Total",
+                "on_installation": 132,
+                "refund": 1,
+                "waiting_wo": 0,
+                "total": 133,
+                "row_type": "grand_total"
+            }
+        ],
+        "wo_today_totals": {
+            "on_installation": 132,
+            "refund": 1,
+            "waiting_wo": 0,
+            "total": 133
+        },
+        "wo_today_other_statuses": {
+            "Active": 15,
+            "Propose To Cancel": 1,
+            "Reschedule": 5
+        },
+        "waiting_wo_rows": [
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Ari Harnanto Nugroho",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Fauzan Seftiady",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Reinaldi Pandama R",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Rita Fitriani",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "salesname": "Alfian Bagus Setiawan Total",
+                "total": 4,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Putry Cristallianieka Sudirman",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Rohmi Amelia",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Anis Anggraini",
+                "salesname": "Anis Anggraini Total",
+                "total": 2,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Andi Achmad Zaky",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Khairrany",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Luki Defiana",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Muhamad Rifki Ramadhan",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Nurhikmah Handayani",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Eka Hardiansyah Total",
+                "total": 5,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Putri Mayasari",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Tommy prasetyo",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Fahrul Amrin Total",
+                "total": 2,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Audina Gusliani",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Yusuf Nugraha",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Firliansyah Total",
+                "total": 2,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Cyndy Pertiwi Nasution",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Deby Karlina",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Naila Apriliani",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Yohanes Steven",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Jarot Arie Sasmita Total",
+                "total": 5,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Agung Dwi Jayanto",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Ikhsan Fajri",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Rifki Maulana",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Shalsadilah",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Muhammad Rezky Jaladara Total",
+                "total": 6,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Diah Pertiwi",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Dina Damayanti",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Kuncoro Gali Nugroho",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Putri Wulan Dari",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Tuti Handayani",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Yunianti",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Tiara Muna Dayuningtyas Total",
+                "total": 7,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Denson Manalu",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Deny Rahmat Hidayat",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Hastarina",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Kuntum Kharisma Dewi",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Risda Trisdawanti",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Tika Saraswati Total",
+                "total": 6,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Ali Yusup Ramadhan",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Askih Milli Priyanto",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Diana Yasmin",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Yayang Ardi Purnama",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Yovi Arian Total",
+                "total": 6,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Dewi Ratnasari",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Elang Tri Mulia Arya Kusuma",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Habib Kamal",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Mohamad Fikri",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Pungkas Mugo Prakoso",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Rani Febriyanti",
+                "total": 4,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Yudha Irawan Total",
+                "total": 9,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Grand Total",
+                "salesname": "Grand Total",
+                "total": 54,
+                "row_type": "grand_total"
+            }
+        ],
+        "waiting_wo_total": 54,
+        "wo_besok_rows": [
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Andaru Nanda Setiyawan",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Andi Achmad Zaky",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Khairrany",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Nurhikmah Handayani",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Sri Wahyuningsih (MST)",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Eka Hardiansyah Total",
+                "total": 5,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Didid Novianto",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Fitriyani Soraya",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Khoirul Esti Wulandari",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Shera Rega Vilanty",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Tommy prasetyo",
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Zahra Nadiyah Khaerunnisa",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "salesname": "Fahrul Amrin Total",
+                "total": 8,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "(blank)",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Audina Gusliani",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Erik Suryadana",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Fatma Sofia Salim",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Muhammad Indra Pratama",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Rico Sampe Toding",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Yusuf Nugraha",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Firliansyah",
+                "salesname": "Firliansyah Total",
+                "total": 8,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Muhammad Syahru Ramdoni",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Naila Apriliani",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Yohanes Steven",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "salesname": "Jarot Arie Sasmita Total",
+                "total": 3,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Defa Delvianthy",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Ikhsan Fajri",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Shalsadilah",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "salesname": "Muhammad Rezky Jaladara Total",
+                "total": 4,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Suandi",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Yunianti",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "salesname": "Tiara Muna Dayuningtyas Total",
+                "total": 2,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Abimanyu Kusuma",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Adryan Deva Maulana",
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Denson Manalu",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Deny Rahmat Hidayat",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Kuntum Kharisma Dewi",
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Tika Saraswati",
+                "salesname": "Tika Saraswati Total",
+                "total": 9,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Diana Yasmin",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Sandra Monica Aprilia Bendsneyder",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yovi Arian",
+                "salesname": "Yovi Arian Total",
+                "total": 4,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Elang Tri Mulia Arya Kusuma",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Habib Kamal",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Mohamad Fikri",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Pungkas Mugo Prakoso",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Rachman Hadi Sabarian",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Rafli Aditya",
+                "total": 3,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Rani Febriyanti",
+                "total": 2,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Suci Apriwulan",
+                "total": 1,
+                "row_type": "agent"
+            },
+            {
+                "leader": "Yudha Irawan",
+                "salesname": "Yudha Irawan Total",
+                "total": 11,
+                "row_type": "leader_total"
+            },
+            {
+                "leader": "Grand Total",
+                "salesname": "Grand Total",
+                "total": 54,
+                "row_type": "grand_total"
+            }
+        ],
+        "wo_besok_total": 54,
+        "leader_summary": [
+            {
+                "leader": "Alfian Bagus Setiawan",
+                "today_on_installation": 13,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 13,
+                "waiting_wo": 4,
+                "wo_besok": 0,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Anis Anggraini",
+                "today_on_installation": 14,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 14,
+                "waiting_wo": 2,
+                "wo_besok": 0,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Eka Hardiansyah",
+                "today_on_installation": 13,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 13,
+                "waiting_wo": 5,
+                "wo_besok": 5,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Fahrul Amrin",
+                "today_on_installation": 11,
+                "today_refund": 1,
+                "today_waiting_wo": 0,
+                "today_total": 12,
+                "waiting_wo": 2,
+                "wo_besok": 8,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Firliansyah",
+                "today_on_installation": 17,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 17,
+                "waiting_wo": 2,
+                "wo_besok": 8,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Jarot Arie Sasmita",
+                "today_on_installation": 13,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 13,
+                "waiting_wo": 5,
+                "wo_besok": 3,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Muhammad Rezky Jaladara",
+                "today_on_installation": 8,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 8,
+                "waiting_wo": 6,
+                "wo_besok": 4,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Tiara Muna Dayuningtyas",
+                "today_on_installation": 10,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 10,
+                "waiting_wo": 7,
+                "wo_besok": 2,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Tika Saraswati",
+                "today_on_installation": 16,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 16,
+                "waiting_wo": 6,
+                "wo_besok": 9,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Yovi Arian",
+                "today_on_installation": 3,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 3,
+                "waiting_wo": 6,
+                "wo_besok": 4,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Yudha Irawan",
+                "today_on_installation": 14,
+                "today_refund": 0,
+                "today_waiting_wo": 0,
+                "today_total": 14,
+                "waiting_wo": 9,
+                "wo_besok": 11,
+                "is_grand_total": false
+            },
+            {
+                "leader": "Grand Total",
+                "today_on_installation": 132,
+                "today_refund": 1,
+                "today_waiting_wo": 0,
+                "today_total": 133,
+                "waiting_wo": 54,
+                "wo_besok": 54,
+                "is_grand_total": true
+            }
+        ]
+    },
     "params": {
         "sheet": "NOVEMBER'26",
         "bulan_lalu": 10,
@@ -508,6 +2163,7 @@
         "total_hari": 30,
         "hari_berjalan": 15,
         "hari_harian": 15,
+        "hari_wo": 15,
         "rasio_paid": 1.25
     },
     "sumber": {
@@ -530,7 +2186,7 @@
             }
         ],
         "total_baris_prospect": 15184,
-        "updated_at": "2026-11-16 09:16:26",
+        "updated_at": "2026-11-17 04:25:21",
         "updated_by": "Paket Server Terbaru"
     },
     "mtd_rows": [

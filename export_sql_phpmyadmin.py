@@ -58,6 +58,7 @@ def generate_sql_files() -> None:
     df_mtd_ini = modul_app.df_mtd_ini.copy()
     daily_prod_rows = list(getattr(modul_app, "daily_prod_rows", []))
     daily_prod_label = str(getattr(modul_app, "daily_prod_date_label", "15-Nov-26"))
+    wo_summary = dict(getattr(modul_app, "wo_summary", {}) or {})
     kol_oct = modul_app.kol_sa_oct
     kol_nov = modul_app.kol_sa_nov
     kol_gap = modul_app.kol_gap_sa
@@ -174,6 +175,39 @@ def generate_sql_files() -> None:
             for r in daily_prod_rows
         ]
         lines.append(",\n".join(val_dp) + ";\n")
+
+    wo_sum_rows = list(wo_summary.get("leader_summary", []))
+    if wo_sum_rows:
+        wo_t_lbl = str(wo_summary.get("today_label", ""))
+        wo_b_lbl = str(wo_summary.get("besok_label", ""))
+        lines.extend(
+            [
+                "-- ----------------------------------------------------------------------------",
+                "-- 2C. TABEL: rekap_wo_monitoring (WO TODAY | WAITING WO | WO BESOK)",
+                "-- ----------------------------------------------------------------------------",
+                "DROP TABLE IF EXISTS `rekap_wo_monitoring`;",
+                "CREATE TABLE `rekap_wo_monitoring` (",
+                "  `id` int(11) NOT NULL AUTO_INCREMENT,",
+                "  `tgl_wo_today` varchar(30) NOT NULL,",
+                "  `tgl_wo_besok` varchar(30) NOT NULL,",
+                "  `sales_leader` varchar(120) NOT NULL,",
+                "  `today_on_installation` int(11) NOT NULL DEFAULT 0,",
+                "  `today_refund` int(11) NOT NULL DEFAULT 0,",
+                "  `today_waiting_wo` int(11) NOT NULL DEFAULT 0,",
+                "  `today_total` int(11) NOT NULL DEFAULT 0,",
+                "  `waiting_wo` int(11) NOT NULL DEFAULT 0,",
+                "  `wo_besok` int(11) NOT NULL DEFAULT 0,",
+                "  PRIMARY KEY (`id`)",
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+                "",
+                "INSERT INTO `rekap_wo_monitoring` (`tgl_wo_today`, `tgl_wo_besok`, `sales_leader`, `today_on_installation`, `today_refund`, `today_waiting_wo`, `today_total`, `waiting_wo`, `wo_besok`) VALUES",
+            ]
+        )
+        val_wo = [
+            f"({sql_str(wo_t_lbl)}, {sql_str(wo_b_lbl)}, {sql_str(r['leader'])}, {sql_num(r['today_on_installation'])}, {sql_num(r['today_refund'])}, {sql_num(r['today_waiting_wo'])}, {sql_num(r['today_total'])}, {sql_num(r['waiting_wo'])}, {sql_num(r['wo_besok'])})"
+            for r in wo_sum_rows
+        ]
+        lines.append(",\n".join(val_wo) + ";\n")
 
     lines.extend(
         [

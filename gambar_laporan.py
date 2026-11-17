@@ -616,6 +616,75 @@ def buat_gambar_harian_blm_produktif(
     )
 
 
+def buat_gambar_wo_ringkasan(wo_summary: dict) -> bytes:
+    """Merender tabel PNG Ringkasan WO Today, Waiting WO & WO Besok per Sales Leader."""
+    today_lbl = str(wo_summary.get("today_label", ""))
+    besok_lbl = str(wo_summary.get("besok_label", ""))
+    rows_src = wo_summary.get("leader_summary") or []
+
+    kolom = [
+        "SALES LEADER",
+        "ON\nINSTALL",
+        "REFUND",
+        "WAITING\nWO",
+        "TOTAL\nWO TODAY",
+        "WAITING WO\n(AKTIF)",
+        f"WO BESOK\n({besok_lbl})",
+    ]
+    grup_header = [
+        (f"WO TODAY ({today_lbl})", 1, 4, "#002060"),
+        ("ANTREAN & JADWAL BESOK", 5, 6, "#991b1b"),
+    ]
+
+    baris = []
+    gaya = []
+    idx_grand = -1
+    for r in rows_src:
+        is_gt = bool(r.get("is_grand_total")) or str(r.get("leader", "")).strip().lower() == "grand total"
+        if is_gt:
+            idx_grand = len(baris)
+        baris.append(
+            [
+                str(r.get("leader", "")),
+                _fmt_angka(r.get("today_on_installation", 0)),
+                _fmt_angka(r.get("today_refund", 0)),
+                _fmt_angka(r.get("today_waiting_wo", 0)),
+                _fmt_angka(r.get("today_total", 0)),
+                _fmt_angka(r.get("waiting_wo", 0)),
+                _fmt_angka(r.get("wo_besok", 0)),
+            ]
+        )
+        gaya.append({"bg": "#dbeafe", "bold": True} if is_gt else None)
+
+    def gaya_sel(i: int, c: int, _teks: str) -> dict | None:
+        if i == idx_grand:
+            if c == 4:
+                return {"bg": "#c9daf8", "fg": "#1e3a8a", "bold": True}
+            if c in (5, 6):
+                return {"bg": "#fce4d6", "fg": "#9a3412", "bold": True}
+        elif c == 4:
+            return {"bg": "#eff6ff", "bold": True}
+        elif c == 5:
+            return {"bg": "#fff7ed", "bold": True}
+        return None
+
+    waktu = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
+    return render_tabel_png(
+        judul=f"MONITORING WORK ORDER ({today_lbl} | WAITING WO | {besok_lbl})",
+        sub_judul="Ringkasan WO Today (On Installation / Refund / Waiting WO), Antrean Waiting WO & Jadwal WO Besok per Sales Leader",
+        kolom=kolom,
+        baris=baris,
+        rata=["l", "c", "c", "c", "c", "c", "c"],
+        gaya_baris=gaya,
+        gaya_sel=gaya_sel,
+        grup_header=grup_header,
+        catatan=[
+            f"WO TODAY: Instalasi Date {today_lbl} (Status On Installation, Refund, Waiting WO). WAITING WO: Status Waiting WO bulan berjalan. WO BESOK: Jadwal {besok_lbl}.",
+            f"Dibuat otomatis: {waktu}",
+        ],
+    )
+
+
 # =============================================================================
 # FUNGSI UTAMA: SUSUN SEMUA GAMBAR LAPORAN UNTUK TELEGRAM
 # =============================================================================
@@ -638,6 +707,7 @@ def buat_semua_gambar_laporan(
     rasio_paid: float,
     daily_prod_rows: list[dict] | None = None,
     daily_prod_date_label: str = "",
+    wo_summary: dict | None = None,
 ) -> list[tuple[str, bytes, str]]:
     """Menghasilkan daftar (nama_file, png_bytes, caption_html) untuk dikirim ke Telegram."""
     hasil: list[tuple[str, bytes, str]] = []
@@ -662,6 +732,17 @@ def buat_semua_gambar_laporan(
                 f"01B_Harian_Blm_Produktif_{lbl_dl}.png",
                 png_dp,
                 f"📊 <b>Rekap Harian ({_escape_html(lbl_dl)}) &amp; Jumlah Agent Belum Produktif</b>",
+            )
+        )
+
+    if wo_summary and wo_summary.get("leader_summary"):
+        lbl_wo = str(wo_summary.get("today_label") or f"{hari_berjalan}-{nama_bln_tampil}-{str(tahun)[-2:]}")
+        png_wo = buat_gambar_wo_ringkasan(wo_summary)
+        hasil.append(
+            (
+                f"01C_Monitoring_WO_{lbl_wo}.png",
+                png_wo,
+                f"🛠️ <b>Monitoring Work Order</b> | WO Today: {_escape_html(lbl_wo)} | Waiting WO: {int(wo_summary.get('waiting_wo_total', 0))} | Besok: {int(wo_summary.get('wo_besok_total', 0))}",
             )
         )
 

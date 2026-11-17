@@ -318,8 +318,41 @@ function xlsx_daftar_sheet(ZipArchive $zip): array
 /** @return list<string> */
 function xlsx_shared_strings(ZipArchive $zip): array
 {
-    $ss = xlsx_baca_xml($zip, 'xl/sharedStrings.xml');
-    if ($ss === null) {
+    $isi = $zip->getFromName('xl/sharedStrings.xml');
+    if ($isi === false || $isi === '') {
+        return [];
+    }
+    if (class_exists('XMLReader')) {
+        $xr = new XMLReader();
+        if (@$xr->XML($isi, null, LIBXML_NONET | LIBXML_COMPACT | LIBXML_PARSEHUGE)) {
+            $out = [];
+            $inSi = false;
+            $teks = '';
+            while (@$xr->read()) {
+                $t = $xr->nodeType;
+                if ($t === XMLReader::ELEMENT) {
+                    $nm = $xr->localName;
+                    if ($nm === 'si') {
+                        if ($xr->isEmptyElement) {
+                            $out[] = '';
+                        } else {
+                            $inSi = true;
+                            $teks = '';
+                        }
+                    } elseif ($inSi && $nm === 't' && !$xr->isEmptyElement) {
+                        $teks .= $xr->readString();
+                    }
+                } elseif ($t === XMLReader::END_ELEMENT && $xr->localName === 'si' && $inSi) {
+                    $out[] = $teks;
+                    $inSi = false;
+                }
+            }
+            $xr->close();
+            return $out;
+        }
+    }
+    $ss = @simplexml_load_string($isi, 'SimpleXMLElement', LIBXML_NONET | LIBXML_COMPACT | LIBXML_PARSEHUGE);
+    if ($ss === false || $ss === null) {
         return [];
     }
     $ss->registerXPathNamespace('m', NS_SS);
@@ -423,12 +456,107 @@ function xlsx_baca_sheet(string $path, string $namaSheet, ?array &$daftarSheet =
 
     $shared = xlsx_shared_strings($zip);
     $styleTgl = xlsx_style_tanggal($zip);
-    $xml = xlsx_baca_xml($zip, $sheets[$kunci]);
+    $isiSheet = $zip->getFromName($sheets[$kunci]);
     $zip->close();
-    if ($xml === null) {
+    if ($isiSheet === false || $isiSheet === '') {
         throw new RuntimeException('Isi sheet "' . $kunci . '" tidak dapat dibaca.');
     }
 
+    $konversiSel = static function (string $tipe, string $valStr, int $sIdx) use ($shared, $styleTgl) {
+        if ($tipe === 's') {
+            $n = $valStr !== '' ? ($shared[(int)$valStr] ?? '') : null;
+        } elseif ($tipe === 'str') {
+            $n = $valStr;
+        } elseif ($tipe === 'b') {
+            $n = $valStr === '1' ? 1.0 : 0.0;
+        } elseif ($tipe === 'e') {
+            $n = null;
+        } elseif ($tipe === 'd') {
+            try {
+                $n = $valStr !== '' ? new DateTimeImmutable($valStr) : null;
+            } catch (Throwable $e) {
+                $n = null;
+            }
+        } elseif ($valStr !== '' && is_numeric($valStr)) {
+            $f = (float)$valStr;
+            $n = (!empty($styleTgl[$sIdx])) ? xlsx_serial_ke_tanggal($f) : $f;
+        } else {
+            $n = null;
+        }
+        if (is_string($n) && in_array($n, NILAI_NA_PANDAS, true)) {
+            return null;
+        }
+        return $n;
+    };
+
+    // Parser streaming XMLReader (jauh lebih ringan RAM & ~20x lebih cepat dibanding xpath per sel)
+    if (class_exists('XMLReader')) {
+        $xr = new XMLReader();
+        if (@$xr->XML($isiSheet, null, LIBXML_NONET | LIBXML_COMPACT | LIBXML_PARSEHUGE)) {
+            $baris = [];
+            $inCell = false;
+            $cellKIdx = 0;
+            $cellRr = 0;
+            $cellTipe = '';
+            $cellSIdx = 0;
+            $cellHasV = false;
+            $cellVal = '';
+            $cellInline = '';
+            while (@$xr->read()) {
+                $t = $xr->nodeType;
+                if ($t === XMLReader::ELEMENT) {
+                    $nm = $xr->localName;
+                    if ($nm === 'row') {
+                        $rAttr = $xr->getAttribute('r');
+                        $curRowIdx = ($rAttr !== null && $rAttr !== '') ? ((int)$rAttr - 1) : count($baris);
+                        if (!isset($baris[$curRowIdx])) {
+                            $baris[$curRowIdx] = [];
+                        }
+                    } elseif ($nm === 'c') {
+                        $ref = (string)($xr->getAttribute('r') ?? '');
+                        if (preg_match('/^([A-Za-z]+)(\d+)$/', $ref, $mm)) {
+                            $cellKIdx = xlsx_kolom_ke_indeks($mm[1]);
+                            $cellRr = (int)$mm[2] - 1;
+                            $cellTipe = (string)($xr->getAttribute('t') ?? '');
+                            $cellSIdx = (int)($xr->getAttribute('s') ?? 0);
+                            $cellHasV = false;
+                            $cellVal = '';
+                            $cellInline = '';
+                            $inCell = !$xr->isEmptyElement;
+                        } else {
+                            $inCell = false;
+                        }
+                    } elseif ($inCell && $nm === 'v' && !$xr->isEmptyElement) {
+                        $cellHasV = true;
+                        $cellVal = $xr->readString();
+                    } elseif ($inCell && $nm === 't' && $cellTipe === 'inlineStr' && !$xr->isEmptyElement) {
+                        $cellInline .= $xr->readString();
+                    }
+                } elseif ($t === XMLReader::END_ELEMENT && $xr->localName === 'c' && $inCell) {
+                    $inCell = false;
+                    $nilai = null;
+                    if ($cellTipe === 'inlineStr') {
+                        $nilai = in_array($cellInline, NILAI_NA_PANDAS, true) ? null : $cellInline;
+                    } elseif ($cellHasV) {
+                        $nilai = $konversiSel($cellTipe, $cellVal, $cellSIdx);
+                    }
+                    if ($nilai !== null) {
+                        $baris[$cellRr][$cellKIdx] = $nilai;
+                    }
+                }
+            }
+            $xr->close();
+            unset($isiSheet);
+            ksort($baris);
+            return $baris;
+        }
+    }
+
+    $xml = @simplexml_load_string($isiSheet, 'SimpleXMLElement', LIBXML_NONET | LIBXML_COMPACT | LIBXML_PARSEHUGE);
+    unset($isiSheet);
+    if ($xml === false || $xml === null) {
+        throw new RuntimeException('Isi sheet "' . $kunci . '" tidak dapat dibaca.');
+    }
     $xml->registerXPathNamespace('m', NS_SS);
     $baris = [];
     foreach ($xml->xpath('//m:sheetData/m:row') ?: [] as $row) {
@@ -448,31 +576,9 @@ function xlsx_baca_sheet(string $path, string $namaSheet, ?array &$daftarSheet =
                 foreach ($c->xpath('.//m:t') ?: [] as $t) {
                     $teks .= (string)$t;
                 }
-                $nilai = $teks;
+                $nilai = in_array($teks, NILAI_NA_PANDAS, true) ? null : $teks;
             } elseif (isset($c->v)) {
-                $v = (string)$c->v;
-                if ($tipe === 's') {
-                    $nilai = $shared[(int)$v] ?? '';
-                } elseif ($tipe === 'str') {
-                    $nilai = $v;
-                } elseif ($tipe === 'b') {
-                    $nilai = $v === '1' ? 1.0 : 0.0;
-                } elseif ($tipe === 'e') {
-                    $nilai = null;
-                } elseif ($tipe === 'd') {
-                    try {
-                        $nilai = new DateTimeImmutable($v);
-                    } catch (Throwable $e) {
-                        $nilai = null;
-                    }
-                } elseif ($v !== '' && is_numeric($v)) {
-                    $f = (float)$v;
-                    $sIdx = (int)$c['s'];
-                    $nilai = (!empty($styleTgl[$sIdx])) ? xlsx_serial_ke_tanggal($f) : $f;
-                }
-            }
-            if (is_string($nilai) && in_array($nilai, NILAI_NA_PANDAS, true)) {
-                $nilai = null;
+                $nilai = $konversiSel($tipe, (string)$c->v, (int)$c['s']);
             }
             if ($nilai !== null) {
                 $baris[$rr][$kIdx] = $nilai;
@@ -694,14 +800,19 @@ function baca_tabel_html(string $path): array
     }
     $header = null;
     $rows = [];
-    $potongan = explode('</tr>', $html);
-    unset($html);
-    foreach ($potongan as $p) {
-        $posTr = strripos($p, '<tr');
-        if ($posTr === false) {
-            continue;
+    $lenHtml = strlen($html);
+    $offset = 0;
+    while ($offset < $lenHtml) {
+        $posStart = stripos($html, '<tr', $offset);
+        if ($posStart === false) {
+            break;
         }
-        $isi = substr($p, $posTr);
+        $posEnd = stripos($html, '</tr>', $posStart);
+        if ($posEnd === false) {
+            $posEnd = $lenHtml;
+        }
+        $isi = substr($html, $posStart, $posEnd - $posStart);
+        $offset = $posEnd + 5;
         if (!preg_match_all('#<t[dh]\b[^>]*>(.*?)</t[dh]>#is', $isi, $mm)) {
             continue;
         }
@@ -712,6 +823,7 @@ function baca_tabel_html(string $path): array
             $rows[] = $sel;
         }
     }
+    unset($html);
     if ($header === null) {
         throw new RuntimeException('Tabel data tidak ditemukan di file prospect (format file tidak dikenali).');
     }
@@ -860,9 +972,11 @@ function baca_file_prospect(string $path, string $namaTampil): array
     $iTipe = $peta['tipe paket'] ?? null;
     $iHarga = $peta['service price'] ?? null;
     $iCreated = $peta['created date'] ?? null;
+    $iInst = $peta['instalasi date'] ?? null;
     $iActive = $peta['active date'];
     $iPay = $peta['payment date'] ?? null;
     $iStatus = $peta['status payment'] ?? null;
+    $iStatWo = $peta['status'] ?? null;
 
     $hasil = [];
     foreach ($rows as $r) {
@@ -876,11 +990,15 @@ function baca_file_prospect(string $path, string $namaTampil): array
         $active = tanggal_ke_int($get($iActive));
         $created = $iCreated === null ? $active : tanggal_ke_int($get($iCreated));
         $payment = $iPay === null ? $active : tanggal_ke_int($get($iPay));
+        $instalasi = $iInst === null ? null : tanggal_ke_int($get($iInst));
+        $statusWo = $iStatWo === null ? '' : trim((string)($get($iStatWo) ?? ''));
         $harga = ke_angka($get($iHarga));
 
         $pnoVal = trim((string)($get($iPno) ?? ''));
         $cnoVal = trim((string)($get($iCno) ?? ''));
-        $cnameVal = u_upper(rapatkan_spasi((string)($get($iCname) ?? '')));
+        $cnameRaw = trim((string)($get($iCname) ?? ''));
+        $cnameVal = u_upper(rapatkan_spasi($cnameRaw));
+        $hasCust = ($iCname === null) ? true : ($cnameRaw !== '');
         $idKey = ($pnoVal !== '' && ($cnoVal !== '' || $cnameVal !== ''))
             ? ('PK:' . $pnoVal . '|' . $cnoVal . '|' . $cnameVal)
             : ('MD5:' . md5(implode("\x1f", $r)));
@@ -895,6 +1013,9 @@ function baca_file_prospect(string $path, string $namaTampil): array
             $payment,
             $iStatus === null ? null : $get($iStatus),
             $idKey,
+            $instalasi,
+            $statusWo,
+            $hasCust,
         ];
     }
     return ['rows' => $hasil, 'ada_payment' => $iPay !== null, 'ada_created' => $iCreated !== null, 'ada_status' => $iStatus !== null];
@@ -913,6 +1034,9 @@ const P_CREATED = 4;
 const P_ACTIVE = 5;
 const P_PAYMENT = 6;
 const P_STATUS = 7;
+const P_INSTALASI = 9;
+const P_STATUS_WO = 10;
+const P_HAS_CUST = 11;
 
 /**
  * @param list<array> $rows
@@ -1119,11 +1243,282 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
 }
 
 /* ------------------------------------------------------------------------- */
+/* MONITORING WORK ORDER (WO TODAY | WAITING WO | WO BESOK)                  */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Mengembalikan daftar tanggal (hari 1..31) yang memiliki jadwal Instalasi Date di bulan aktif.
+ * @param list<array> $prospect
+ * @return list<int>
+ */
+function daftar_hari_wo_tersedia(array $prospect, int $bulan, int $tahun, int $sertakanHari = 0): array
+{
+    $set = [];
+    foreach ($prospect as $r) {
+        $t = $r[P_INSTALASI] ?? null;
+        if ($t !== null && intdiv((int)$t, 10000) === $tahun && intdiv(((int)$t) % 10000, 100) === $bulan) {
+            $set[((int)$t) % 100] = true;
+        }
+    }
+    if ($sertakanHari >= 1 && $sertakanHari <= 31) {
+        $set[$sertakanHari] = true;
+    }
+    $hariList = array_keys($set);
+    sort($hariList, SORT_NUMERIC);
+    return $hariList;
+}
+
+/**
+ * Menyusun baris Pivot Excel 1-kolom (Sales Leader -> Salesname -> Leader Total -> Grand Total).
+ * @param array<string,array<string,int>> $byLdrAgent
+ * @return array{rows:list<array<string,mixed>>,grand_total:int}
+ */
+function susun_pivot_wo_1kolom(array $byLdrAgent): array
+{
+    $leaders = array_keys($byLdrAgent);
+    usort($leaders, 'strnatcasecmp');
+    $rows = [];
+    $grand = 0;
+    foreach ($leaders as $ldr) {
+        $agenMap = $byLdrAgent[$ldr];
+        $agenNames = array_keys($agenMap);
+        usort($agenNames, 'strnatcasecmp');
+        $sub = 0;
+        foreach ($agenNames as $sn) {
+            $cnt = (int)$agenMap[$sn];
+            $sub += $cnt;
+            $rows[] = [
+                'leader' => $ldr,
+                'salesname' => $sn,
+                'total' => $cnt,
+                'row_type' => 'agent',
+            ];
+        }
+        $grand += $sub;
+        $rows[] = [
+            'leader' => $ldr,
+            'salesname' => $ldr . ' Total',
+            'total' => $sub,
+            'row_type' => 'leader_total',
+        ];
+    }
+    if ($rows) {
+        $rows[] = [
+            'leader' => 'Grand Total',
+            'salesname' => 'Grand Total',
+            'total' => $grand,
+            'row_type' => 'grand_total',
+        ];
+    }
+    return ['rows' => $rows, 'grand_total' => $grand];
+}
+
+/**
+ * Menghitung 3 Tabel Work Order sesuai Pivot Excel perusahaan:
+ *   1. WO TODAY  (Instalasi Date = hariWo, Status in On Installation / Refund / Waiting WO)
+ *   2. WAITING WO (Status = Waiting WO pada bulan aktif)
+ *   3. WO BESOK  (Instalasi Date = hariWo + 1 hari)
+ * @param list<array> $prospect
+ * @return array<string,mixed>
+ */
+function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo): array
+{
+    $hariDlmBulan = cal_days_in_month_aman($bulan, $tahun);
+    $hariValid = max(1, min($hariWo, $hariDlmBulan));
+    $dtToday = new DateTimeImmutable(sprintf('%04d-%02d-%02d', $tahun, $bulan, $hariValid));
+    $dtBesok = $dtToday->modify('+1 day');
+
+    $tglTodayInt = (int)$dtToday->format('Ymd');
+    $tglBesokInt = (int)$dtBesok->format('Ymd');
+    $blnTahunAktif = ($tahun * 100) + $bulan;
+
+    $todayLabel = (int)$dtToday->format('j') . '-' . (NAMA_BULAN_TAMPIL[(int)$dtToday->format('n')] ?? 'Nov') . '-' . substr($dtToday->format('Y'), -2);
+    $besokLabel = (int)$dtBesok->format('j') . '-' . (NAMA_BULAN_TAMPIL[(int)$dtBesok->format('n')] ?? 'Nov') . '-' . substr($dtBesok->format('Y'), -2);
+
+    $todayByLdrAgent = [];
+    $todayOtherStatus = [];
+    $waitingByLdrAgent = [];
+    $besokByLdrAgent = [];
+    $summaryLdr = [];
+
+    foreach ($prospect as $r) {
+        $hasCust = isset($r[P_HAS_CUST]) ? (bool)$r[P_HAS_CUST] : true;
+        if (!$hasCust) {
+            continue;
+        }
+        $ldr = trim((string)($r[P_LDR] ?? ''));
+        if ($ldr === '') {
+            $ldr = '(blank)';
+        }
+        $snRaw = trim((string)($r[P_SLS] ?? ''));
+        $sn = ($snRaw === '' || in_array(u_upper($snRaw), ['NAN', 'NONE', '-'], true)) ? '(blank)' : $snRaw;
+
+        $instInt = isset($r[P_INSTALASI]) && $r[P_INSTALASI] !== null ? (int)$r[P_INSTALASI] : null;
+        $crInt = isset($r[P_CREATED]) && $r[P_CREATED] !== null ? (int)$r[P_CREATED] : null;
+        $stRaw = trim((string)($r[P_STATUS_WO] ?? ''));
+        $stLow = u_lower($stRaw);
+
+        $ensureSummary = static function () use (&$summaryLdr, $ldr): void {
+            if (!isset($summaryLdr[$ldr])) {
+                $summaryLdr[$ldr] = [
+                    'leader' => $ldr,
+                    'today_on_installation' => 0,
+                    'today_refund' => 0,
+                    'today_waiting_wo' => 0,
+                    'today_total' => 0,
+                    'waiting_wo' => 0,
+                    'wo_besok' => 0,
+                ];
+            }
+        };
+
+        // 1. WO TODAY (Instalasi Date == Today, Status filter: On Installation | Refund | Waiting WO)
+        if ($instInt === $tglTodayInt) {
+            if (in_array($stLow, ['on installation', 'refund', 'waiting wo'], true)) {
+                if (!isset($todayByLdrAgent[$ldr][$sn])) {
+                    $todayByLdrAgent[$ldr][$sn] = ['on_installation' => 0, 'refund' => 0, 'waiting_wo' => 0, 'total' => 0];
+                }
+                $ensureSummary();
+                if ($stLow === 'on installation') {
+                    $todayByLdrAgent[$ldr][$sn]['on_installation']++;
+                    $summaryLdr[$ldr]['today_on_installation']++;
+                } elseif ($stLow === 'refund') {
+                    $todayByLdrAgent[$ldr][$sn]['refund']++;
+                    $summaryLdr[$ldr]['today_refund']++;
+                } else {
+                    $todayByLdrAgent[$ldr][$sn]['waiting_wo']++;
+                    $summaryLdr[$ldr]['today_waiting_wo']++;
+                }
+                $todayByLdrAgent[$ldr][$sn]['total']++;
+                $summaryLdr[$ldr]['today_total']++;
+            } elseif ($stRaw !== '') {
+                $todayOtherStatus[$stRaw] = ($todayOtherStatus[$stRaw] ?? 0) + 1;
+            }
+        }
+
+        // 2. WAITING WO (Status == 'Waiting WO' pada bulan aktif)
+        if ($stLow === 'waiting wo') {
+            $crYm = $crInt !== null ? intdiv($crInt, 100) : null;
+            $instYm = $instInt !== null ? intdiv($instInt, 100) : null;
+            if ($crYm === $blnTahunAktif || $instYm === $blnTahunAktif || ($crYm === null && $instYm === null)) {
+                $waitingByLdrAgent[$ldr][$sn] = ($waitingByLdrAgent[$ldr][$sn] ?? 0) + 1;
+                $ensureSummary();
+                $summaryLdr[$ldr]['waiting_wo']++;
+            }
+        }
+
+        // 3. WO BESOK (Instalasi Date == Today + 1 hari)
+        if ($instInt === $tglBesokInt && $stLow !== 'cancelled') {
+            $besokByLdrAgent[$ldr][$sn] = ($besokByLdrAgent[$ldr][$sn] ?? 0) + 1;
+            $ensureSummary();
+            $summaryLdr[$ldr]['wo_besok']++;
+        }
+    }
+
+    // Susun Pivot WO TODAY (multi-kolom)
+    $todayLeaders = array_keys($todayByLdrAgent);
+    usort($todayLeaders, 'strnatcasecmp');
+    $todayRows = [];
+    $gtOn = 0;
+    $gtRef = 0;
+    $gtWait = 0;
+    $gtTot = 0;
+    foreach ($todayLeaders as $ldr) {
+        $agenMap = $todayByLdrAgent[$ldr];
+        $agenNames = array_keys($agenMap);
+        usort($agenNames, 'strnatcasecmp');
+        $subOn = 0;
+        $subRef = 0;
+        $subWait = 0;
+        $subTot = 0;
+        foreach ($agenNames as $sn) {
+            $c = $agenMap[$sn];
+            $subOn += $c['on_installation'];
+            $subRef += $c['refund'];
+            $subWait += $c['waiting_wo'];
+            $subTot += $c['total'];
+            $todayRows[] = [
+                'leader' => $ldr,
+                'salesname' => $sn,
+                'on_installation' => $c['on_installation'],
+                'refund' => $c['refund'],
+                'waiting_wo' => $c['waiting_wo'],
+                'total' => $c['total'],
+                'row_type' => 'agent',
+            ];
+        }
+        $gtOn += $subOn;
+        $gtRef += $subRef;
+        $gtWait += $subWait;
+        $gtTot += $subTot;
+        $todayRows[] = [
+            'leader' => $ldr,
+            'salesname' => $ldr . ' Total',
+            'on_installation' => $subOn,
+            'refund' => $subRef,
+            'waiting_wo' => $subWait,
+            'total' => $subTot,
+            'row_type' => 'leader_total',
+        ];
+    }
+    if ($todayRows) {
+        $todayRows[] = [
+            'leader' => 'Grand Total',
+            'salesname' => 'Grand Total',
+            'on_installation' => $gtOn,
+            'refund' => $gtRef,
+            'waiting_wo' => $gtWait,
+            'total' => $gtTot,
+            'row_type' => 'grand_total',
+        ];
+    }
+
+    $waitingPivot = susun_pivot_wo_1kolom($waitingByLdrAgent);
+    $besokPivot = susun_pivot_wo_1kolom($besokByLdrAgent);
+
+    $sumLeaders = array_keys($summaryLdr);
+    usort($sumLeaders, 'strnatcasecmp');
+    $leaderSummaryRows = [];
+    foreach ($sumLeaders as $ldr) {
+        $rowS = $summaryLdr[$ldr];
+        $rowS['is_grand_total'] = false;
+        $leaderSummaryRows[] = $rowS;
+    }
+    if ($leaderSummaryRows) {
+        $leaderSummaryRows[] = [
+            'leader' => 'Grand Total',
+            'today_on_installation' => $gtOn,
+            'today_refund' => $gtRef,
+            'today_waiting_wo' => $gtWait,
+            'today_total' => $gtTot,
+            'waiting_wo' => $waitingPivot['grand_total'],
+            'wo_besok' => $besokPivot['grand_total'],
+            'is_grand_total' => true,
+        ];
+    }
+
+    return [
+        'day' => $hariValid,
+        'today_label' => $todayLabel,
+        'besok_label' => $besokLabel,
+        'available_days' => daftar_hari_wo_tersedia($prospect, $bulan, $tahun, $hariValid),
+        'wo_today_rows' => $todayRows,
+        'wo_today_totals' => ['on_installation' => $gtOn, 'refund' => $gtRef, 'waiting_wo' => $gtWait, 'total' => $gtTot],
+        'wo_today_other_statuses' => $todayOtherStatus,
+        'waiting_wo_rows' => $waitingPivot['rows'],
+        'waiting_wo_total' => $waitingPivot['grand_total'],
+        'wo_besok_rows' => $besokPivot['rows'],
+        'wo_besok_total' => $besokPivot['grand_total'],
+        'leader_summary' => $leaderSummaryRows,
+    ];
+}
+
+/* ------------------------------------------------------------------------- */
 /* PROSES UTAMA                                                                */
 /* ------------------------------------------------------------------------- */
 
 /**
- * @param array{target_path:string,prospects:list<array{path:string,name:string}>,sheet:string,bulan_lalu:int,bulan_ini:int,tahun:int,total_hari:int,hari_berjalan:int,rasio_paid:float,hari_harian?:int} $o
+ * @param array{target_path:string,prospects:list<array{path:string,name:string}>,sheet:string,bulan_lalu:int,bulan_ini:int,tahun:int,total_hari:int,hari_berjalan:int,rasio_paid:float,hari_harian?:int,hari_wo?:int} $o
  * @return array<string,mixed> payload (struktur sama dengan data_komisi.json)
  */
 function proses_data(array $o): array
@@ -1137,6 +1532,7 @@ function proses_data(array $o): array
     $totalHari = (int)$o['total_hari'];
     $hari = (int)$o['hari_berjalan'];
     $hariHarian = isset($o['hari_harian']) ? (int)$o['hari_harian'] : $hari;
+    $hariWo = isset($o['hari_wo']) ? (int)$o['hari_wo'] : $hariHarian;
     $rasio = (float)$o['rasio_paid'];
 
     $sisaHari = max(1, $totalHari - $hari);
@@ -1372,6 +1768,9 @@ function proses_data(array $o): array
     $dailyProd = hitung_rekap_harian_blm_produktif($prospect, $target, $bulanIni, $tahun, $hariHarian);
     $tglTersedia = daftar_hari_tersedia_bulan($prospect, $bulanIni, $tahun, $hariHarian);
 
+    // 8. Monitoring Work Order (WO TODAY | WAITING WO | WO BESOK)
+    $woSummary = hitung_wo_laporan($prospect, $bulanIni, $tahun, $hariWo);
+
     $namaBln = NAMA_BULAN_TAMPIL[$bulanIni] ?? 'Nov';
     return [
         'periode_label' => $hari . '-' . $namaBln . '-' . $tahun,
@@ -1388,6 +1787,7 @@ function proses_data(array $o): array
         'daily_prod_day' => $dailyProd['day'],
         'daily_prod_rows' => $dailyProd['rows'],
         'tanggal_tersedia' => $tglTersedia,
+        'wo_summary' => $woSummary,
         'params' => [
             'sheet' => $o['sheet'],
             'bulan_lalu' => $bulanLalu,
@@ -1396,6 +1796,7 @@ function proses_data(array $o): array
             'total_hari' => $totalHari,
             'hari_berjalan' => $hari,
             'hari_harian' => $dailyProd['day'],
+            'hari_wo' => $woSummary['day'],
             'rasio_paid' => $rasio,
         ],
         'sumber' => ['target' => basename($o['target_name'] ?? $o['target_path']), 'prospect' => $infoFile, 'total_baris_prospect' => count($prospect)],
