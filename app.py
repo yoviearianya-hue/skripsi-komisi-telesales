@@ -10,7 +10,11 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from gambar_laporan import buat_semua_gambar_laporan
+from gambar_laporan import (
+    buat_gambar_wo_kartu_agent,
+    buat_semua_gambar_laporan,
+    buat_semua_gambar_wo,
+)
 from security_firewall import (
     MAKS_GAGAL_LOGIN,
     baca_log_keamanan_terbaru,
@@ -1004,6 +1008,7 @@ def hitung_wo_laporan_py(
         "wo_besok_rows": [],
         "wo_besok_total": 0,
         "leader_summary": [],
+        "agent_summary": [],
     }
     if df_prospect is None or df_prospect.empty:
         return kosong
@@ -1023,6 +1028,7 @@ def hitung_wo_laporan_py(
     waiting_map: dict[str, dict[str, int]] = {}
     besok_map: dict[str, dict[str, int]] = {}
     summary_ldr: dict[str, dict] = {}
+    summary_agent: dict[str, dict[str, dict]] = {}
 
     bln_thn = (int(tahun_ini), int(bulan_ini))
 
@@ -1047,7 +1053,7 @@ def hitung_wo_laporan_py(
         d_inst = dt_inst.date() if pd.notna(dt_inst) else None
         d_cr = dt_cr.date() if pd.notna(dt_cr) else None
 
-        def _ens() -> dict:
+        def _ens() -> tuple[dict, dict]:
             if ldr not in summary_ldr:
                 summary_ldr[ldr] = {
                     "leader": ldr,
@@ -1058,7 +1064,19 @@ def hitung_wo_laporan_py(
                     "waiting_wo": 0,
                     "wo_besok": 0,
                 }
-            return summary_ldr[ldr]
+            ag_b = summary_agent.setdefault(ldr, {})
+            if sn not in ag_b:
+                ag_b[sn] = {
+                    "leader": ldr,
+                    "salesname": sn,
+                    "today_on_installation": 0,
+                    "today_refund": 0,
+                    "today_waiting_wo": 0,
+                    "today_total": 0,
+                    "waiting_wo": 0,
+                    "wo_besok": 0,
+                }
+            return summary_ldr[ldr], ag_b[sn]
 
         # 1. WO TODAY (Instalasi Date == tgl_wo & Status in On Installation / Refund / Waiting WO)
         if d_inst == tgl_wo:
@@ -1066,18 +1084,22 @@ def hitung_wo_laporan_py(
                 cell = today_map.setdefault(ldr, {}).setdefault(
                     sn, {"on_installation": 0, "refund": 0, "waiting_wo": 0, "total": 0}
                 )
-                sm = _ens()
+                sm, sag = _ens()
                 if st_low == "on installation":
                     cell["on_installation"] += 1
                     sm["today_on_installation"] += 1
+                    sag["today_on_installation"] += 1
                 elif st_low == "refund":
                     cell["refund"] += 1
                     sm["today_refund"] += 1
+                    sag["today_refund"] += 1
                 else:
                     cell["waiting_wo"] += 1
                     sm["today_waiting_wo"] += 1
+                    sag["today_waiting_wo"] += 1
                 cell["total"] += 1
                 sm["today_total"] += 1
+                sag["today_total"] += 1
             elif st_raw:
                 today_other[st_raw] = today_other.get(st_raw, 0) + 1
 
@@ -1088,13 +1110,17 @@ def hitung_wo_laporan_py(
             if cr_ym == bln_thn or in_ym == bln_thn or (cr_ym is None and in_ym is None):
                 waiting_map.setdefault(ldr, {})
                 waiting_map[ldr][sn] = waiting_map[ldr].get(sn, 0) + 1
-                _ens()["waiting_wo"] += 1
+                sm, sag = _ens()
+                sm["waiting_wo"] += 1
+                sag["waiting_wo"] += 1
 
         # 3. WO BESOK (Instalasi Date == tgl_wo + 1 hari)
         if d_inst == tgl_besok and st_low != "cancelled":
             besok_map.setdefault(ldr, {})
             besok_map[ldr][sn] = besok_map[ldr].get(sn, 0) + 1
-            _ens()["wo_besok"] += 1
+            sm, sag = _ens()
+            sm["wo_besok"] += 1
+            sag["wo_besok"] += 1
 
     today_rows: list[dict] = []
     gt_on = gt_ref = gt_wait = gt_tot = 0
@@ -1167,6 +1193,12 @@ def hitung_wo_laporan_py(
             }
         )
 
+    agent_summary_rows = []
+    for ldr_s in sorted(summary_ldr.keys(), key=lambda s: s.lower()):
+        ag_b = summary_agent.get(ldr_s, {})
+        for sn_s in sorted(ag_b.keys(), key=lambda s: s.lower()):
+            agent_summary_rows.append(ag_b[sn_s])
+
     return {
         "day": tgl_wo.day,
         "today_label": today_lbl,
@@ -1184,6 +1216,7 @@ def hitung_wo_laporan_py(
         "wo_besok_rows": besok_rows,
         "wo_besok_total": besok_total,
         "leader_summary": summary_rows,
+        "agent_summary": agent_summary_rows,
     }
 
 
@@ -2668,12 +2701,13 @@ with tab_utama:
                 )
                 st.caption(f"ℹ️ Status lain pada Instalasi Date {wo_summary['today_label']} (tidak masuk tabel Pending WO Today): {info_lain}")
 
-            tab_wos, tab_wo1, tab_wo2, tab_wo3 = st.tabs(
+            tab_wos, tab_wo1, tab_wo2, tab_wo3, tab_wogal = st.tabs(
                 [
                     "📊 Ringkasan Per Leader",
                     f"1️⃣ WO TODAY ({wo_summary['today_label']})",
                     f"2️⃣ WAITING WO ({wo_summary['waiting_wo_total']})",
                     f"3️⃣ WO BESOK ({wo_summary['besok_label']})",
+                    "🖼️ Foto PNG (Ringkasan & Setiap Agent)",
                 ]
             )
             with tab_wos:
@@ -2753,6 +2787,28 @@ with tab_utama:
                     )
                 else:
                     st.info(f"Belum ada jadwal WO Besok ({wo_summary['besok_label']}).")
+            with tab_wogal:
+                wo_imgs = buat_semua_gambar_wo(wo_summary, include_pivot=True, include_tim=True, include_kartu_agent=False)
+                if wo_imgs:
+                    st.markdown("#### 🖼️ Foto Ringkasan, Pivot Lengkap & Per Tim Agent")
+                    for fn_w, bytes_w, cap_w in wo_imgs:
+                        st.image(bytes_w, caption=re.sub(r"<[^>]+>", "", cap_w))
+                        st.download_button(label=f"📥 Download {fn_w}", data=bytes_w, file_name=fn_w, mime="image/png", key=f"dl_wo_{fn_w}")
+
+                    ag_sum_list = wo_summary.get("agent_summary") or []
+                    if ag_sum_list:
+                        st.markdown("#### 👤 Foto Kartu Masing-Masing Agent")
+                        opsi_ag_nm = ["Semua Agent"] + [f"{x['salesname']} ({x['leader']})" for x in ag_sum_list]
+                        pilih_ag_wo = st.selectbox("Pilih Agent untuk Melihat/Mengunduh Foto Pribadi:", opsi_ag_nm, key="sel_wo_kartu_ag")
+                        tampil_ag = ag_sum_list if pilih_ag_wo == "Semua Agent" else [x for x in ag_sum_list if f"{x['salesname']} ({x['leader']})" == pilih_ag_wo]
+                        for idx_ak, ag_r in enumerate(tampil_ag):
+                            png_ak = buat_gambar_wo_kartu_agent(ag_r, wo_summary["today_label"], wo_summary["besok_label"])
+                            safe_ak = re.sub(r"[^A-Za-z0-9]+", "_", str(ag_r["salesname"])).strip("_")
+                            fn_ak = f"01E_WO_Agent_{safe_ak}.png"
+                            st.image(png_ak, caption=f"{ag_r['salesname']} ({ag_r['leader']})")
+                            st.download_button(label=f"📥 Download {fn_ak}", data=png_ak, file_name=fn_ak, mime="image/png", key=f"dl_wo_ak_{idx_ak}_{fn_ak}")
+                else:
+                    st.info("Belum ada data Work Order untuk dirender ke gambar.")
 
         # =====================================================================
         # 4. DASHBOARD 2: DETAIL AGENT & BREAKDOWN KOMISI (Sesuai Gambar 1)
@@ -3470,6 +3526,33 @@ with tab_utama:
                 wo_summary=wo_summary if role_akses != "Agen" else None,
             )
 
+            col_opsi1, col_opsi2, col_opsi3 = st.columns([1, 1, 1.4])
+            with col_opsi1:
+                opsi_kirim_gambar = st.checkbox(
+                    "🖼️ Sertakan Gambar Presentasi",
+                    value=True,
+                )
+                opsi_kirim_wo_agent = st.checkbox(
+                    "👤 Lampirkan Foto Kartu Masing-Masing Agent WO",
+                    value=False,
+                    help="Bila dicentang, setiap agen juga dikirimkan foto kartu WO individual ke Telegram.",
+                )
+            with col_opsi2:
+                opsi_kirim_teks = st.checkbox(
+                    "📝 Sertakan Pesan Teks Detail",
+                    value=True,
+                )
+            with col_opsi3:
+                mode_gambar_tg = st.radio(
+                    "Format Gambar Telegram:",
+                    options=[
+                        "Foto (langsung tampil di chat)",
+                        "File / Dokumen (resolusi asli)",
+                    ],
+                    horizontal=True,
+                    help="Mode Foto lebih praktis dibaca langsung di chat. Mode File menjaga resolusi asli (tidak dikompres Telegram) sehingga tabel lebar tetap tajam saat di-zoom.",
+                )
+
             daftar_gambar_tg: list[tuple[str, bytes, str]] = []
             try:
                 daftar_gambar_tg = buat_semua_gambar_laporan(
@@ -3490,33 +3573,12 @@ with tab_utama:
                     daily_prod_rows=daily_prod_rows if role_akses != "Agen" else None,
                     daily_prod_date_label=daily_prod_date_label,
                     wo_summary=wo_summary if role_akses != "Agen" else None,
+                    include_wo_detail=True,
+                    include_wo_agent_cards=opsi_kirim_wo_agent,
                 )
             except Exception as err_gambar:
                 st.warning(
                     f"⚠️ Gambar presentasi laporan gagal dibuat (pesan teks tetap bisa dikirim): {err_gambar}"
-                )
-
-            col_opsi1, col_opsi2, col_opsi3 = st.columns([1, 1, 1.4])
-            with col_opsi1:
-                opsi_kirim_gambar = st.checkbox(
-                    "🖼️ Sertakan Gambar Presentasi",
-                    value=True,
-                    disabled=not daftar_gambar_tg,
-                )
-            with col_opsi2:
-                opsi_kirim_teks = st.checkbox(
-                    "📝 Sertakan Pesan Teks Detail",
-                    value=True,
-                )
-            with col_opsi3:
-                mode_gambar_tg = st.radio(
-                    "Format Gambar Telegram:",
-                    options=[
-                        "Foto (langsung tampil di chat)",
-                        "File / Dokumen (resolusi asli)",
-                    ],
-                    horizontal=True,
-                    help="Mode Foto lebih praktis dibaca langsung di chat. Mode File menjaga resolusi asli (tidak dikompres Telegram) sehingga tabel lebar tetap tajam saat di-zoom.",
                 )
 
             with st.expander(

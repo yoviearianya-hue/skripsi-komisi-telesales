@@ -1340,6 +1340,7 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
     $waitingByLdrAgent = [];
     $besokByLdrAgent = [];
     $summaryLdr = [];
+    $summaryAgent = [];
 
     foreach ($prospect as $r) {
         $hasCust = isset($r[P_HAS_CUST]) ? (bool)$r[P_HAS_CUST] : true;
@@ -1358,10 +1359,22 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
         $stRaw = trim((string)($r[P_STATUS_WO] ?? ''));
         $stLow = u_lower($stRaw);
 
-        $ensureSummary = static function () use (&$summaryLdr, $ldr): void {
+        $ensureSummary = static function () use (&$summaryLdr, &$summaryAgent, $ldr, $sn): void {
             if (!isset($summaryLdr[$ldr])) {
                 $summaryLdr[$ldr] = [
                     'leader' => $ldr,
+                    'today_on_installation' => 0,
+                    'today_refund' => 0,
+                    'today_waiting_wo' => 0,
+                    'today_total' => 0,
+                    'waiting_wo' => 0,
+                    'wo_besok' => 0,
+                ];
+            }
+            if (!isset($summaryAgent[$ldr][$sn])) {
+                $summaryAgent[$ldr][$sn] = [
+                    'leader' => $ldr,
+                    'salesname' => $sn,
                     'today_on_installation' => 0,
                     'today_refund' => 0,
                     'today_waiting_wo' => 0,
@@ -1382,15 +1395,19 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
                 if ($stLow === 'on installation') {
                     $todayByLdrAgent[$ldr][$sn]['on_installation']++;
                     $summaryLdr[$ldr]['today_on_installation']++;
+                    $summaryAgent[$ldr][$sn]['today_on_installation']++;
                 } elseif ($stLow === 'refund') {
                     $todayByLdrAgent[$ldr][$sn]['refund']++;
                     $summaryLdr[$ldr]['today_refund']++;
+                    $summaryAgent[$ldr][$sn]['today_refund']++;
                 } else {
                     $todayByLdrAgent[$ldr][$sn]['waiting_wo']++;
                     $summaryLdr[$ldr]['today_waiting_wo']++;
+                    $summaryAgent[$ldr][$sn]['today_waiting_wo']++;
                 }
                 $todayByLdrAgent[$ldr][$sn]['total']++;
                 $summaryLdr[$ldr]['today_total']++;
+                $summaryAgent[$ldr][$sn]['today_total']++;
             } elseif ($stRaw !== '') {
                 $todayOtherStatus[$stRaw] = ($todayOtherStatus[$stRaw] ?? 0) + 1;
             }
@@ -1404,6 +1421,7 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
                 $waitingByLdrAgent[$ldr][$sn] = ($waitingByLdrAgent[$ldr][$sn] ?? 0) + 1;
                 $ensureSummary();
                 $summaryLdr[$ldr]['waiting_wo']++;
+                $summaryAgent[$ldr][$sn]['waiting_wo']++;
             }
         }
 
@@ -1412,6 +1430,7 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
             $besokByLdrAgent[$ldr][$sn] = ($besokByLdrAgent[$ldr][$sn] ?? 0) + 1;
             $ensureSummary();
             $summaryLdr[$ldr]['wo_besok']++;
+            $summaryAgent[$ldr][$sn]['wo_besok']++;
         }
     }
 
@@ -1497,6 +1516,16 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
         ];
     }
 
+    $agentSummaryRows = [];
+    foreach ($sumLeaders as $ldr) {
+        $agMapS = $summaryAgent[$ldr] ?? [];
+        $agNamesS = array_keys($agMapS);
+        usort($agNamesS, 'strnatcasecmp');
+        foreach ($agNamesS as $snS) {
+            $agentSummaryRows[] = $agMapS[$snS];
+        }
+    }
+
     return [
         'day' => $hariValid,
         'today_label' => $todayLabel,
@@ -1510,6 +1539,7 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
         'wo_besok_rows' => $besokPivot['rows'],
         'wo_besok_total' => $besokPivot['grand_total'],
         'leader_summary' => $leaderSummaryRows,
+        'agent_summary' => $agentSummaryRows,
     ];
 }
 

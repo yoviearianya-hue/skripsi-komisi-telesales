@@ -622,10 +622,30 @@ function send_telegram_server_file(string $botToken, string $chatId, string $fil
     return ['ok' => false, 'http_code' => 0, 'description' => 'Server gagal upload file ke Telegram'];
 }
 
-function build_tg_visual_payload(array $appData, string $scopeSend, bool $includeWo = true): array {
+function build_tg_visual_payload(array $appData, string $scopeSend, bool $includeWo = true, bool $includeWoCards = false, string $onlyAgent = ''): array {
     $agentRowsTg = $appData['agent_rows'] ?? [];
     $mtdRowsTg   = $appData['mtd_rows'] ?? [];
     $dailyRowsTg = $appData['daily_prod_rows'] ?? [];
+
+    if ($onlyAgent !== '') {
+        $wsSrc = $appData['wo_summary'] ?? [];
+        $onlyKey = normalisasi_nama_agen($onlyAgent);
+        $agOnly = [];
+        foreach (($wsSrc['agent_summary'] ?? []) as $ar) {
+            if (normalisasi_nama_agen($ar['salesname'] ?? '') === $onlyKey) {
+                $agOnly[] = $ar;
+            }
+        }
+        return [
+            'scope' => $scopeSend,
+            'only_agent' => $onlyAgent,
+            'wo_summary' => [
+                'today_label'   => (string)($wsSrc['today_label'] ?? ''),
+                'besok_label'   => (string)($wsSrc['besok_label'] ?? ''),
+                'agent_summary' => $agOnly,
+            ],
+        ];
+    }
 
     $mtdFiltered = [];
     foreach ($mtdRowsTg as $mr) {
@@ -700,10 +720,25 @@ function build_tg_visual_payload(array $appData, string $scopeSend, bool $includ
                 'is_gt'                 => $isGtW,
             ];
         }
+        $filtWoScopeTg = static function (array $r) use ($scopeSend): bool {
+            $rt = (string)($r['row_type'] ?? '');
+            $isGt = ($rt === 'grand_total') || !empty($r['is_grand_total']) || strcasecmp((string)($r['leader'] ?? ''), 'Grand Total') === 0;
+            if ($isGt) return $scopeSend === 'Semua Leader';
+            return $scopeSend === 'Semua Leader' || ((string)($r['leader'] ?? '') === $scopeSend);
+        };
+        $woTodaySafe = array_values(array_filter($wsSrc['wo_today_rows'] ?? [], $filtWoScopeTg));
+        $woWaitSafe  = array_values(array_filter($wsSrc['waiting_wo_rows'] ?? [], $filtWoScopeTg));
+        $woBesokSafe = array_values(array_filter($wsSrc['wo_besok_rows'] ?? [], $filtWoScopeTg));
+        $woAgSafe    = array_values(array_filter($wsSrc['agent_summary'] ?? [], $filtWoScopeTg));
         $woSafe = [
-            'today_label'    => (string)($wsSrc['today_label'] ?? ''),
-            'besok_label'    => (string)($wsSrc['besok_label'] ?? ''),
-            'leader_summary' => $woLdrRows,
+            'today_label'     => (string)($wsSrc['today_label'] ?? ''),
+            'besok_label'     => (string)($wsSrc['besok_label'] ?? ''),
+            'leader_summary'  => $woLdrRows,
+            'wo_today_rows'   => $woTodaySafe,
+            'waiting_wo_rows' => $woWaitSafe,
+            'wo_besok_rows'   => $woBesokSafe,
+            'agent_summary'   => $woAgSafe,
+            'include_cards'   => $includeWoCards,
         ];
     }
 
@@ -1293,6 +1328,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $incImg   = !empty($_POST['include_images']);
             $incTxt   = !empty($_POST['include_text']);
             $incWo    = !empty($_POST['include_wo']);
+            $incWoCrd = !empty($_POST['include_wo_cards']);
 
             $agentRowsTg = $appData['agent_rows'] ?? [];
             $dailyRowsTg = $appData['daily_prod_rows'] ?? [];
@@ -1403,7 +1439,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($serverTextSent && !$incImg) {
                     $tgStatus = '<div class="alert-ok">✅ Laporan teks berhasil dikirim ke Telegram Chat ID <b>' . htmlspecialchars($chatId) . '</b> (' . count($messages) . ' pesan, HTTP 200 OK)!</div>';
                 } elseif ($needClientRunner) {
-                    $visualData = $incImg ? build_tg_visual_payload($appData, $scopeSend, $incWo) : null;
+                    $visualData = $incImg ? build_tg_visual_payload($appData, $scopeSend, $incWo, $incWoCrd) : null;
                     $relayJson = json_encode([
                         'api_base'    => "https://api.telegram.org/bot{$botToken}",
                         'chat_id'     => $chatId,
@@ -1576,16 +1612,31 @@ $authUser = $_SESSION['auth_user'] ?? null;
             background: #020617; color: #86efac; padding: 12px; border-radius: 8px;
             font-size: 0.78rem; overflow-x: auto; max-height: 220px;
         }
-        .wo-tab-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+        .wo-tab-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
         .wo-tab-btn {
             background: #e2e8f0; color: #0f172a; border: 1px solid #cbd5e1;
             padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.84rem;
+            transition: background 0.15s, color 0.15s;
         }
+        .wo-tab-btn:hover { background: #cbd5e1; }
         .wo-tab-btn.active { background: #002060; color: #fff; border-color: #002060; }
         .wo-panel { display: none; }
         .wo-panel.active { display: block; }
+        .wo-panel table thead th { position: sticky; top: 0; z-index: 2; }
+        .wo-panel tbody tr:hover td { background: #f8fafc; }
         tr.row-wo-ltotal td { background: #dbeafe !important; font-weight: 700; color: #0f172a; }
         tr.row-wo-gtotal td { background: #fef3c7 !important; font-weight: 800; color: #0f172a; border-top: 2px solid #0f172a; }
+        .wo-img-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-top: 12px; }
+        .wo-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; margin-top: 12px; }
+        .wo-img-card {
+            background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px;
+            padding: 12px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .wo-img-card img { max-width: 100%; height: auto; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
+        .wo-toolbar {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: end;
+            background: #f1f5f9; border: 1px solid #cbd5e1; padding: 12px 14px; border-radius: 10px; margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -1912,6 +1963,28 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 ⚡ <b>Wajib Kejar Harian: <?= $ag['harus_paid_hr'] ?> Paid/hari &amp; <?= $ag['harus_sa_hr'] ?> SA/hari</b> |
                 💰 Estimasi Komisi: <b><?= rp($ag['est_komisi']) ?></b>
             </p>
+            <?php
+            $agWoMine = null;
+            $agKeyTarget = normalisasi_nama_agen($ag['name'] ?? '');
+            foreach (($woSummary['agent_summary'] ?? []) as $awr) {
+                if (normalisasi_nama_agen($awr['salesname'] ?? '') === $agKeyTarget) {
+                    $agWoMine = $awr;
+                    break;
+                }
+            }
+            if ($agWoMine): ?>
+                <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.2); display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px;">
+                    <span style="font-size:0.88rem; color:#fde047;">
+                        🛠️ <b>WO Pribadi Anda:</b>
+                        WO Today (<?= htmlspecialchars((string)($woSummary['today_label'] ?? '')) ?>): <b><?= (int)$agWoMine['today_total'] ?></b>
+                        (On Install <?= (int)$agWoMine['today_on_installation'] ?> | Refund <?= (int)$agWoMine['today_refund'] ?> | Wait <?= (int)$agWoMine['today_waiting_wo'] ?>) |
+                        Waiting WO: <b><?= (int)$agWoMine['waiting_wo'] ?></b> |
+                        WO Besok (<?= htmlspecialchars((string)($woSummary['besok_label'] ?? '')) ?>): <b><?= (int)$agWoMine['wo_besok'] ?></b>
+                    </span>
+                    <button type="button" onclick="window.renderPersonalWoCard()" class="btn btn-amber" style="padding:6px 14px; font-size:0.82rem;">🖼️ Lihat &amp; Download Foto WO Saya (.png)</button>
+                </div>
+                <div id="agen-wo-card-box" style="display:none; margin-top:10px;"></div>
+            <?php endif; ?>
         </div>
     <?php break; } } endif; ?>
 
@@ -2150,6 +2223,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-today', this)">1️⃣ WO TODAY (<?= $dispTodayTot ?>)</button>
                 <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-wait', this)">2️⃣ WAITING WO (<?= $dispWaitTot ?>)</button>
                 <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-besok', this)">3️⃣ WO BESOK (<?= $dispBesokTot ?>)</button>
+                <button type="button" class="wo-tab-btn" id="wo-btn-gal" onclick="window.woOpenGalleryTab(this)">🖼️ Foto PNG (Ringkasan &amp; Masing-Masing Agent)</button>
             </div>
 
             <div id="wo-tab-sum" class="wo-panel active table-wrap">
@@ -2252,6 +2326,37 @@ $authUser = $_SESSION['auth_user'] ?? null;
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+
+            <div id="wo-tab-gallery" class="wo-panel">
+                <div class="wo-toolbar">
+                    <div style="flex:1; min-width:220px;">
+                        <b style="color:#002060;">🖼️ Galeri Foto PNG Monitoring Work Order</b>
+                        <div style="font-size:0.79rem; color:#475569;">Tersedia foto tabel <b>Ringkasan Leader</b>, <b>Pivot Detail 1/2/3</b>, <b>Per Tim Leader</b>, serta <b>Kartu Foto Masing-Masing Agent</b> siap unduh (PNG / ZIP) &amp; kirim Telegram.</div>
+                    </div>
+                    <button type="button" onclick="window.woRenderTableGallery()" class="btn" style="padding:8px 14px; font-size:0.83rem;">🖼️ Render Foto Ringkasan &amp; Tim</button>
+                    <button type="button" onclick="window.woDownloadZip('tables')" class="btn btn-green" style="padding:8px 14px; font-size:0.83rem;">📦 Download Paket Foto Ringkasan (.zip)</button>
+                </div>
+                <div id="wo-gal-tables"></div>
+
+                <hr style="margin:18px 0; border:0; border-top:1px solid #cbd5e1;">
+                <div class="wo-toolbar">
+                    <div style="min-width:190px; flex:1;">
+                        <label style="font-size:0.8rem;"><b>Filter Leader (Kartu Masing-Masing Agent):</b></label>
+                        <select id="wo-card-ldr-filter" style="margin:2px 0 0 0;" onchange="window.woPopulateAgentSelect()">
+                            <option value="ALL">🌎 Semua Leader dalam Scope</option>
+                        </select>
+                    </div>
+                    <div style="min-width:210px; flex:1;">
+                        <label style="font-size:0.8rem;"><b>Pilih Agent Spesifik:</b></label>
+                        <select id="wo-card-ag-filter" style="margin:2px 0 0 0;">
+                            <option value="ALL">👥 Semua Agent Terpilih</option>
+                        </select>
+                    </div>
+                    <button type="button" onclick="window.woRenderAgentCards()" class="btn btn-amber" style="padding:9px 14px; font-size:0.83rem;">👤 Tampilkan Foto Masing-Masing Agent</button>
+                    <button type="button" onclick="window.woDownloadZip('agents')" class="btn btn-green" style="padding:9px 14px; font-size:0.83rem;">📦 Download Semua Foto Agent (.zip)</button>
+                </div>
+                <div id="wo-gal-agents"></div>
             </div>
         <?php endif; ?>
     </div>
@@ -2418,14 +2523,12 @@ $authUser = $_SESSION['auth_user'] ?? null;
     </div>
     <?php endif; ?>
 
-    <?php if (in_array($role, ['Admin', 'Finance', 'Leader'], true)):
-        $previewJsonSpec = json_encode(build_tg_visual_payload($appData, $selectedScope, true), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-    ?>
+    <?php if (in_array($role, ['Admin', 'Finance', 'Leader'], true)): ?>
     <!-- DASHBOARD 3: KIRIM GAMBAR PRESENTASI & TEKS KE BOT TELEGRAM -->
     <div class="card">
         <h3 style="margin-top:0;">📲 3. KIRIM GAMBAR PRESENTASI &amp; TEKS LENGKAP KE BOT TELEGRAM (<code>@NoticeTelesalesbot</code>)</h3>
         <p style="font-size:0.83rem; color:#475569; margin-top:-6px; margin-bottom:14px;">
-            Sekarang mendukung pengiriman <b>🖼️ Gambar Tabel Presentasi (.png)</b> (Tabel MTD SA, Rekap Harian Blm Produktif, &amp; Detail Target Total per Leader — tanpa bocor detail Reguler/Yearly) <b>+ 📝 Pesan Teks Detail</b> langsung dari website!
+            Sekarang mendukung pengiriman <b>🖼️ Gambar Tabel Presentasi (.png)</b> (Tabel MTD SA, Rekap Harian Blm Produktif, Ringkasan + Detail WO Today / Waiting WO / Besok / Per Tim, &amp; Detail Target Total per Leader — tanpa bocor detail Reguler/Yearly) <b>+ 📝 Pesan Teks Detail</b> langsung dari website!
             Pastikan bot <b>@NoticeTelesalesbot</b> sudah di-<code>/start</code> atau sudah dimasukkan ke grup Telegram tujuan.
         </p>
 
@@ -2456,7 +2559,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 </div>
             </div>
 
-            <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center; margin:4px 0 14px 0;">
+            <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:center; margin:4px 0 14px 0;">
                 <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem; font-weight:700;">
                     <input type="checkbox" name="include_images" value="1" <?= ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['action'] ?? '') !== 'send_telegram' || !empty($_POST['include_images'])) ? 'checked' : '' ?> style="width:auto; margin:0;">
                     🖼️ Sertakan Gambar Presentasi Tabel (.png)
@@ -2467,19 +2570,31 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 </label>
                 <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem; font-weight:700;">
                     <input type="checkbox" name="include_wo" value="1" <?= ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['action'] ?? '') !== 'send_telegram' || !empty($_POST['include_wo'])) ? 'checked' : '' ?> style="width:auto; margin:0;">
-                    🛠️ Sertakan Ringkasan WO (Today / Waiting / Besok)
+                    🛠️ Sertakan Ringkasan &amp; Foto WO (Summary, Pivot 1/2/3 &amp; Tim)
+                </label>
+                <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem; font-weight:700;">
+                    <input type="checkbox" name="include_wo_cards" value="1" <?= !empty($_POST['include_wo_cards']) ? 'checked' : '' ?> style="width:auto; margin:0;">
+                    👤 Lampirkan Juga Foto Kartu Masing-Masing Agent WO
                 </label>
             </div>
 
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <button type="button" onclick="window.tgPreviewGallery()" class="btn btn-amber">👁️ Pratinjau &amp; Download Gambar Tabel (.png)</button>
+                <button type="button" onclick="window.tgPreviewGallery()" class="btn btn-amber">👁️ Pratinjau &amp; Download Semua Gambar (.png)</button>
                 <button type="submit" class="btn" style="flex:1; min-width:260px;">🚀 Kirim Gambar + Teks (<?= htmlspecialchars($selectedScope) ?>) ke Telegram</button>
             </div>
         </form>
 
         <div id="tg-preview-gallery" style="display:none; margin-top:18px; padding-top:14px; border-top:1px solid #cbd5e1;"></div>
     </div>
+    <?php endif; ?>
 
+    <?php
+        $onlyAgJson = ($role === 'Agen') ? (string)($authUser['agent_name'] ?? '') : '';
+        $previewJsonSpec = json_encode(
+            build_tg_visual_payload($appData, $selectedScope, true, false, $onlyAgJson),
+            JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+        );
+    ?>
     <script>
     window.switchWoTab = function(panelId, btnEl) {
         document.querySelectorAll('.wo-panel').forEach(p => p.classList.remove('active'));
@@ -2814,56 +2929,202 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 });
             }
 
-            // 1C. MONITORING WORK ORDER (WO TODAY | WAITING WO | WO BESOK)
-            if (data.wo_summary && data.wo_summary.leader_summary && data.wo_summary.leader_summary.length) {
-                const ws = data.wo_summary;
-                const wRows = [];
-                const wStyles = [];
-                let idxGtW = -1;
-                for (const wr of ws.leader_summary) {
-                    if (wr.is_gt) {
-                        idxGtW = wRows.length;
-                        wStyles.push({ bg: '#dbeafe', bold: true });
+            // 1C. MONITORING WORK ORDER (RINGKASAN + PIVOT 1/2/3 + FOTO TIM PER LEADER + KARTU AGENT)
+            async function renderWoPivotPng(ws, mode) {
+                const isToday = mode === 'today';
+                const isWait = mode === 'waiting';
+                const src = isToday ? (ws.wo_today_rows || []) : (isWait ? (ws.waiting_wo_rows || []) : (ws.wo_besok_rows || []));
+                if (!src.length) return null;
+                const cols = isToday
+                    ? ['Sales Leader', 'Salesname', 'On Installation', 'Refund', 'Waiting WO', 'Grand Total']
+                    : ['Sales Leader', 'Salesname', 'Grand Total'];
+                const rows = [];
+                const rStyles = [];
+                let idxGtP = -1;
+                for (const r of src) {
+                    const rt = r.row_type || 'agent';
+                    if (rt === 'grand_total') { idxGtP = rows.length; rStyles.push({ bg: '#fef3c7', bold: true }); }
+                    else if (rt === 'leader_total') { rStyles.push({ bg: '#dbeafe', bold: true }); }
+                    else { rStyles.push(null); }
+                    const ldrC = (rt === 'agent') ? r.leader : '';
+                    if (isToday) {
+                        rows.push([
+                            ldrC, r.salesname,
+                            r.on_installation ? fmtInt(r.on_installation) : '',
+                            r.refund ? fmtInt(r.refund) : '',
+                            r.waiting_wo ? fmtInt(r.waiting_wo) : '',
+                            fmtInt(r.total),
+                        ]);
                     } else {
-                        wStyles.push(null);
+                        rows.push([ldrC, r.salesname, fmtInt(r.total)]);
                     }
-                    wRows.push([
-                        wr.leader,
-                        fmtInt(wr.today_on_installation),
-                        fmtInt(wr.today_refund),
-                        fmtInt(wr.today_waiting_wo),
-                        fmtInt(wr.today_total),
-                        fmtInt(wr.waiting_wo),
-                        fmtInt(wr.wo_besok),
-                    ]);
                 }
-                const imgWo = await renderTablePng({
-                    title: `MONITORING WORK ORDER (${ws.today_label} | WAITING WO | ${ws.besok_label})`,
-                    subtitle: `Ringkasan WO Today (On Install / Refund / Waiting WO), Waiting WO Aktif & WO Besok per Leader`,
-                    columns: ['Sales Leader', 'ON\nINSTALL', 'REFUND', 'WAITING\nWO', 'TOTAL\nTODAY', 'WAITING WO\n(AKTIF)', `WO BESOK\n(${ws.besok_label})`],
+                const title = isToday
+                    ? `WO TODAY (${ws.today_label}) — DETAIL PER AGENT`
+                    : (isWait ? `WAITING WO (BULAN BERJALAN) — DETAIL PER AGENT` : `WO BESOK (${ws.besok_label}) — JADWAL PER AGENT`);
+                const sub = isToday
+                    ? `Count of Customer Name berdasarkan Instalasi Date ${ws.today_label} & Status WO`
+                    : (isWait ? `Daftar Agen dengan Customer Berstatus Waiting WO` : `Jadwal Instalasi Date ${ws.besok_label} (H+1)`);
+                const headBg = isToday ? '#002060' : (isWait ? '#92400e' : '#065f46');
+                const imgP = await renderTablePng({
+                    title, subtitle: sub, columns: cols, headBg, rows,
+                    align: isToday ? ['l', 'l', 'c', 'c', 'c', 'c'] : ['l', 'l', 'c'],
+                    rowStyles: rStyles,
+                    cellStyle: (i, c) => (c === cols.length - 1 ? { bold: true, bg: i === idxGtP ? '#fef3c7' : undefined } : null),
+                    notes: [`Total baris pivot: ${rows.length}`],
+                });
+                const fName = isToday ? `01C1_WO_TODAY_${ws.today_label}.png` : (isWait ? `01C2_WAITING_WO_${ws.today_label}.png` : `01C3_WO_BESOK_${ws.besok_label}.png`);
+                const cap = isToday ? `1️⃣ <b>WO TODAY (${ws.today_label}) — Detail Agent</b>` : (isWait ? `2️⃣ <b>WAITING WO — Detail Agent</b>` : `3️⃣ <b>WO BESOK (${ws.besok_label}) — Detail Agent</b>`);
+                return { fileName: fName, caption: cap, blob: imgP.blob, dataUrl: imgP.dataUrl };
+            }
+
+            async function renderWoTeamPngs(ws) {
+                const agList = ws.agent_summary || [];
+                if (!agList.length) return [];
+                const byLdrW = new Map();
+                for (const a of agList) {
+                    if (!byLdrW.has(a.leader)) byLdrW.set(a.leader, []);
+                    byLdrW.get(a.leader).push(a);
+                }
+                const resList = [];
+                let seqW = 1;
+                for (const [ldrW, grpW] of byLdrW.entries()) {
+                    const rows = [], rStyles = [];
+                    let sOn = 0, sRef = 0, sWt = 0, sTot = 0, sWwo = 0, sBsk = 0;
+                    grpW.forEach((r, idx) => {
+                        sOn += r.today_on_installation; sRef += r.today_refund; sWt += r.today_waiting_wo;
+                        sTot += r.today_total; sWwo += r.waiting_wo; sBsk += r.wo_besok;
+                        rows.push([
+                            String(idx + 1), r.salesname,
+                            r.today_on_installation ? fmtInt(r.today_on_installation) : '-',
+                            r.today_refund ? fmtInt(r.today_refund) : '-',
+                            r.today_waiting_wo ? fmtInt(r.today_waiting_wo) : '-',
+                            fmtInt(r.today_total), fmtInt(r.waiting_wo), fmtInt(r.wo_besok),
+                        ]);
+                        rStyles.push(null);
+                    });
+                    const idxTotW = rows.length;
+                    rows.push(['', `TOTAL ${ldrW}`, fmtInt(sOn), fmtInt(sRef), fmtInt(sWt), fmtInt(sTot), fmtInt(sWwo), fmtInt(sBsk)]);
+                    rStyles.push({ bg: '#dbeafe', bold: true });
+                    const imgT = await renderTablePng({
+                        title: `WORK ORDER AGENT — TIM ${ldrW.toUpperCase()}`,
+                        subtitle: `WO Today (${ws.today_label}) | Waiting WO | WO Besok (${ws.besok_label})`,
+                        columns: ['NO', 'SALESNAME', 'ON\nINSTALL', 'REFUND', 'WAIT\nWO', 'TOTAL\nTODAY', 'WAIT\nWO', `BESOK\n(${ws.besok_label})`],
+                        groupHeaders: [
+                            { label: `WO TODAY (${ws.today_label})`, start: 2, end: 5, bg: '#002060' },
+                            { label: 'ANTREAN & BESOK', start: 6, end: 7, bg: '#991b1b' },
+                        ],
+                        rows, align: ['c', 'l', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: rStyles,
+                        cellStyle: (i, c) => {
+                            if (c === 5) return i === idxTotW ? { bg: '#c9daf8', fg: '#1e3a8a', bold: true } : { bg: '#eff6ff', bold: true };
+                            if (c >= 6) return i === idxTotW ? { bg: '#fce4d6', fg: '#9a3412', bold: true } : { bg: '#fff7ed', bold: true };
+                            return null;
+                        },
+                        notes: [`Tim ${ldrW}: WO Today=${sTot}, Waiting WO=${sWwo}, WO Besok=${sBsk}`],
+                    });
+                    const safeLw = ldrW.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+                    const escLw = ldrW.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    resList.push({
+                        fileName: `01D_${String(seqW).padStart(2, '0')}_WO_Tim_${safeLw}.png`,
+                        caption: `🛠️ <b>WO Detail Agent — Tim ${escLw}</b> | Today (${ws.today_label}): ${sTot} | Waiting: ${sWwo} | Besok: ${sBsk}`,
+                        blob: imgT.blob,
+                        dataUrl: imgT.dataUrl,
+                    });
+                    seqW++;
+                }
+                return resList;
+            }
+
+            async function renderAgentWoCardPng(ag, todayLbl, besokLbl) {
+                const imgC = await renderTablePng({
+                    title: `KARTU WO AGENT — ${String(ag.salesname).toUpperCase()}`,
+                    subtitle: `Sales Leader: ${ag.leader}  •  WO Today: ${todayLbl}  •  WO Besok: ${besokLbl}`,
+                    columns: ['SALESNAME', 'ON INSTALL', 'REFUND', 'WAIT WO', 'TOTAL TODAY', 'WAITING WO', `BESOK (${besokLbl})`],
                     groupHeaders: [
-                        { label: `WO TODAY (${ws.today_label})`, start: 1, end: 4, bg: '#002060' },
-                        { label: 'ANTREAN & JADWAL BESOK', start: 5, end: 6, bg: '#991b1b' },
+                        { label: `WO TODAY (${todayLbl})`, start: 1, end: 4, bg: '#002060' },
+                        { label: 'ANTREAN & BESOK', start: 5, end: 6, bg: '#991b1b' },
                     ],
-                    headBg: '#002060',
-                    rows: wRows,
+                    rows: [[
+                        ag.salesname,
+                        fmtInt(ag.today_on_installation), fmtInt(ag.today_refund), fmtInt(ag.today_waiting_wo),
+                        fmtInt(ag.today_total), fmtInt(ag.waiting_wo), fmtInt(ag.wo_besok),
+                    ]],
                     align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'],
-                    rowStyles: wStyles,
-                    cellStyle: (i, c) => {
-                        if (i === idxGtW && c === 4) return { bg: '#c9daf8', fg: '#1e3a8a', bold: true };
-                        if (i === idxGtW && c >= 5) return { bg: '#fce4d6', fg: '#9a3412', bold: true };
-                        if (c === 4) return { bg: '#eff6ff', bold: true };
-                        if (c === 5) return { bg: '#fff7ed', bold: true };
+                    rowStyles: [{ bg: '#ffffff', bold: true }],
+                    cellStyle: (_i, c) => {
+                        if (c === 4) return { bg: '#dbeafe', fg: '#1e3a8a', bold: true };
+                        if (c === 5) return { bg: '#fef3c7', fg: '#92400e', bold: true };
+                        if (c === 6) return { bg: '#dcfce7', fg: '#166534', bold: true };
                         return null;
                     },
-                    notes: [`WO TODAY: Instalasi Date ${ws.today_label}. WAITING WO: Status Waiting WO bulan berjalan. WO BESOK: Jadwal ${ws.besok_label}.`],
+                    notes: [`Kartu Monitoring WO Pribadi — ${ag.salesname} (${ag.leader})`],
                 });
-                out.push({
-                    fileName: `01C_Monitoring_WO_${ws.today_label}.png`,
-                    caption: `🛠️ <b>Monitoring Work Order</b> | WO Today: ${ws.today_label} | Besok: ${ws.besok_label}`,
-                    blob: imgWo.blob,
-                    dataUrl: imgWo.dataUrl,
-                });
+                const safeSn = String(ag.salesname).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'Agent';
+                const escSn = String(ag.salesname).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const escLd = String(ag.leader).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return {
+                    fileName: `01E_WO_Agent_${safeSn}.png`,
+                    caption: `👤 <b>Kartu WO — ${escSn}</b> (${escLd}) | Today: ${ag.today_total} | Waiting: ${ag.waiting_wo} | Besok: ${ag.wo_besok}`,
+                    blob: imgC.blob,
+                    dataUrl: imgC.dataUrl,
+                };
+            }
+
+            async function buildWoTableAndTeamPngs(ws, includeCards) {
+                const woOut = [];
+                if (ws.leader_summary && ws.leader_summary.length) {
+                    const wRows = [], wStyles = [];
+                    let idxGtW = -1;
+                    for (const wr of ws.leader_summary) {
+                        if (wr.is_gt) { idxGtW = wRows.length; wStyles.push({ bg: '#dbeafe', bold: true }); }
+                        else { wStyles.push(null); }
+                        wRows.push([
+                            wr.leader, fmtInt(wr.today_on_installation), fmtInt(wr.today_refund),
+                            fmtInt(wr.today_waiting_wo), fmtInt(wr.today_total), fmtInt(wr.waiting_wo), fmtInt(wr.wo_besok),
+                        ]);
+                    }
+                    const imgWo = await renderTablePng({
+                        title: `MONITORING WORK ORDER (${ws.today_label} | WAITING WO | ${ws.besok_label})`,
+                        subtitle: `Ringkasan WO Today (On Install / Refund / Waiting WO), Waiting WO Aktif & WO Besok per Leader`,
+                        columns: ['Sales Leader', 'ON\nINSTALL', 'REFUND', 'WAITING\nWO', 'TOTAL\nTODAY', 'WAITING WO\n(AKTIF)', `WO BESOK\n(${ws.besok_label})`],
+                        groupHeaders: [
+                            { label: `WO TODAY (${ws.today_label})`, start: 1, end: 4, bg: '#002060' },
+                            { label: 'ANTREAN & JADWAL BESOK', start: 5, end: 6, bg: '#991b1b' },
+                        ],
+                        headBg: '#002060', rows: wRows, align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: wStyles,
+                        cellStyle: (i, c) => {
+                            if (i === idxGtW && c === 4) return { bg: '#c9daf8', fg: '#1e3a8a', bold: true };
+                            if (i === idxGtW && c >= 5) return { bg: '#fce4d6', fg: '#9a3412', bold: true };
+                            if (c === 4) return { bg: '#eff6ff', bold: true };
+                            if (c === 5) return { bg: '#fff7ed', bold: true };
+                            return null;
+                        },
+                        notes: [`WO TODAY: Instalasi Date ${ws.today_label}. WAITING WO: Status Waiting WO bulan berjalan. WO BESOK: Jadwal ${ws.besok_label}.`],
+                    });
+                    woOut.push({
+                        fileName: `01C_Monitoring_WO_${ws.today_label}.png`,
+                        caption: `🛠️ <b>Monitoring Work Order</b> | WO Today: ${ws.today_label} | Besok: ${ws.besok_label}`,
+                        blob: imgWo.blob,
+                        dataUrl: imgWo.dataUrl,
+                    });
+                }
+                for (const md of ['today', 'waiting', 'besok']) {
+                    const pImg = await renderWoPivotPng(ws, md);
+                    if (pImg) woOut.push(pImg);
+                }
+                const tImgs = await renderWoTeamPngs(ws);
+                for (const ti of tImgs) woOut.push(ti);
+                if (includeCards && ws.agent_summary && ws.agent_summary.length) {
+                    for (const ag of ws.agent_summary) {
+                        woOut.push(await renderAgentWoCardPng(ag, ws.today_label, ws.besok_label));
+                    }
+                }
+                return woOut;
+            }
+
+            if (data.wo_summary) {
+                const wsItems = await buildWoTableAndTeamPngs(data.wo_summary, !!data.wo_summary.include_cards);
+                for (const wi of wsItems) out.push(wi);
             }
 
             // 2. DETAIL AGENT PER LEADER (TANPA Reguler/Yearly terpisah!)
@@ -2962,65 +3223,299 @@ $authUser = $_SESSION['auth_user'] ?? null;
             return out;
         }
 
+        function appendImageGrid(container, imgs, gridClass) {
+            const grid = document.createElement('div');
+            grid.className = gridClass || 'wo-img-grid';
+            for (const im of imgs) {
+                const card = document.createElement('div');
+                card.className = 'wo-img-card';
+                const bar = document.createElement('div');
+                bar.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;';
+                const ttl = document.createElement('b');
+                ttl.style.fontSize = '0.82rem';
+                ttl.textContent = im.fileName;
+                const dl = document.createElement('a');
+                dl.href = im.dataUrl;
+                dl.download = im.fileName;
+                dl.className = 'btn btn-green';
+                dl.style.cssText = 'padding:5px 10px; font-size:0.78rem;';
+                dl.textContent = '📥 Download .png';
+                bar.appendChild(ttl);
+                bar.appendChild(dl);
+                const imgEl = document.createElement('img');
+                imgEl.src = im.dataUrl;
+                imgEl.alt = im.fileName;
+                card.appendChild(bar);
+                card.appendChild(imgEl);
+                grid.appendChild(card);
+            }
+            container.appendChild(grid);
+        }
+
+        function buildStoredZipBlob(files) {
+            const crcTable = new Uint32Array(256);
+            for (let n = 0; n < 256; n++) {
+                let c = n;
+                for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+                crcTable[n] = c >>> 0;
+            }
+            const crc32 = (u8) => {
+                let c = 0xffffffff;
+                for (let i = 0; i < u8.length; i++) c = crcTable[(c ^ u8[i]) & 0xff] ^ (c >>> 8);
+                return (c ^ 0xffffffff) >>> 0;
+            };
+            const enc = new TextEncoder();
+            const parts = [];
+            const central = [];
+            let offset = 0;
+            for (const f of files) {
+                const nameB = enc.encode(f.name);
+                const data = f.bytes;
+                const crc = crc32(data);
+                const lfh = new Uint8Array(30 + nameB.length);
+                const dv = new DataView(lfh.buffer);
+                dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true);
+                dv.setUint16(8, 0, true); dv.setUint32(14, crc, true);
+                dv.setUint32(18, data.length, true); dv.setUint32(22, data.length, true);
+                dv.setUint16(26, nameB.length, true);
+                lfh.set(nameB, 30);
+                parts.push(lfh, data);
+
+                const cdh = new Uint8Array(46 + nameB.length);
+                const cv = new DataView(cdh.buffer);
+                cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+                cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
+                cv.setUint16(28, nameB.length, true); cv.setUint32(42, offset, true);
+                cdh.set(nameB, 46);
+                central.push(cdh);
+                offset += lfh.length + data.length;
+            }
+            let cdSize = 0;
+            for (const ch of central) { parts.push(ch); cdSize += ch.length; }
+            const eocd = new Uint8Array(22);
+            const ev = new DataView(eocd.buffer);
+            ev.setUint32(0, 0x06054b50, true);
+            ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+            ev.setUint32(12, cdSize, true); ev.setUint32(16, offset, true);
+            parts.push(eocd);
+            return new Blob(parts, { type: 'application/zip' });
+        }
+
+        function getWoFilteredAgents() {
+            const ws = (PREVIEW_DATA && PREVIEW_DATA.wo_summary) ? PREVIEW_DATA.wo_summary : null;
+            if (!ws || !ws.agent_summary) return [];
+            const selL = document.getElementById('wo-card-ldr-filter');
+            const selA = document.getElementById('wo-card-ag-filter');
+            const fLdr = selL ? selL.value : 'ALL';
+            const fAg = selA ? selA.value : 'ALL';
+            return ws.agent_summary.filter(a => {
+                if (fLdr !== 'ALL' && a.leader !== fLdr) return false;
+                if (fAg !== 'ALL' && `${a.leader}||${a.salesname}` !== fAg) return false;
+                return true;
+            });
+        }
+
+        function woInitDropdowns() {
+            const selL = document.getElementById('wo-card-ldr-filter');
+            const selA = document.getElementById('wo-card-ag-filter');
+            const ws = (PREVIEW_DATA && PREVIEW_DATA.wo_summary) ? PREVIEW_DATA.wo_summary : null;
+            if (!selL || !selA || !ws || !ws.agent_summary) return;
+            if (selL.dataset.initDone) return;
+            selL.dataset.initDone = '1';
+            const ldrSet = [...new Set(ws.agent_summary.map(a => a.leader))];
+            for (const l of ldrSet) {
+                const op = document.createElement('option');
+                op.value = l; op.textContent = l;
+                selL.appendChild(op);
+            }
+            window.woPopulateAgentSelect();
+        }
+
+        window.woPopulateAgentSelect = function() {
+            const selL = document.getElementById('wo-card-ldr-filter');
+            const selA = document.getElementById('wo-card-ag-filter');
+            const ws = (PREVIEW_DATA && PREVIEW_DATA.wo_summary) ? PREVIEW_DATA.wo_summary : null;
+            if (!selL || !selA || !ws || !ws.agent_summary) return;
+            const fLdr = selL.value;
+            selA.innerHTML = '<option value="ALL">👥 Semua Agent Terpilih</option>';
+            for (const a of ws.agent_summary) {
+                if (fLdr !== 'ALL' && a.leader !== fLdr) continue;
+                const op = document.createElement('option');
+                op.value = `${a.leader}||${a.salesname}`;
+                op.textContent = `${a.salesname} (${a.leader})`;
+                selA.appendChild(op);
+            }
+        };
+
+        window.woOpenGalleryTab = async function(btnEl) {
+            window.switchWoTab('wo-tab-gallery', btnEl);
+            woInitDropdowns();
+            const tbDiv = document.getElementById('wo-gal-tables');
+            if (tbDiv && !tbDiv.dataset.rendered) {
+                await window.woRenderTableGallery();
+            }
+        };
+
+        window.woRenderTableGallery = async function() {
+            const box = document.getElementById('wo-gal-tables');
+            const ws = (PREVIEW_DATA && PREVIEW_DATA.wo_summary) ? PREVIEW_DATA.wo_summary : null;
+            if (!box || !ws) return;
+            box.innerHTML = '<div style="padding:10px; color:#1e3a8a; font-weight:700;">⏳ Merender foto Ringkasan, Pivot 1/2/3 &amp; Tim per Leader...</div>';
+            try {
+                // Gunakan buildAllReportPngs-style WO subset (Ringkasan + Pivot + Tim)
+                const prevClone = Object.assign({}, PREVIEW_DATA, { mtd_rows: [], daily_rows: [], agent_rows: [] });
+                if (prevClone.wo_summary) prevClone.wo_summary = Object.assign({}, prevClone.wo_summary, { include_cards: false });
+                const imgs = await buildAllReportPngs(prevClone);
+                box.innerHTML = '<b>📸 Foto Ringkasan, Detail Pivot &amp; Setiap Tim Leader (' + imgs.length + ' Foto PNG):</b>';
+                appendImageGrid(box, imgs, 'wo-img-grid');
+                box.dataset.rendered = '1';
+            } catch (err) {
+                box.innerHTML = '<div class="alert-err">❌ Gagal merender foto WO: ' + err.message + '</div>';
+            }
+        };
+
+        async function renderAgentCardsBatch(agList, todayLbl, besokLbl) {
+            const imgs = [];
+            for (const ag of agList) {
+                const r = await renderTablePng({
+                    title: `KARTU WO AGENT — ${String(ag.salesname).toUpperCase()}`,
+                    subtitle: `Sales Leader: ${ag.leader}  •  WO Today: ${todayLbl}  •  WO Besok: ${besokLbl}`,
+                    columns: ['SALESNAME', 'ON INSTALL', 'REFUND', 'WAIT WO', 'TOTAL TODAY', 'WAITING WO', `BESOK (${besokLbl})`],
+                    groupHeaders: [
+                        { label: `WO TODAY (${todayLbl})`, start: 1, end: 4, bg: '#002060' },
+                        { label: 'ANTREAN & BESOK', start: 5, end: 6, bg: '#991b1b' },
+                    ],
+                    rows: [[
+                        ag.salesname,
+                        fmtInt(ag.today_on_installation), fmtInt(ag.today_refund), fmtInt(ag.today_waiting_wo),
+                        fmtInt(ag.today_total), fmtInt(ag.waiting_wo), fmtInt(ag.wo_besok),
+                    ]],
+                    align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'],
+                    rowStyles: [{ bg: '#ffffff', bold: true }],
+                    cellStyle: (_i, c) => {
+                        if (c === 4) return { bg: '#dbeafe', fg: '#1e3a8a', bold: true };
+                        if (c === 5) return { bg: '#fef3c7', fg: '#92400e', bold: true };
+                        if (c === 6) return { bg: '#dcfce7', fg: '#166534', bold: true };
+                        return null;
+                    },
+                    notes: [`Kartu Monitoring WO Pribadi — ${ag.salesname} (${ag.leader})`],
+                });
+                const safeSn = String(ag.salesname).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'Agent';
+                imgs.push({ fileName: `01E_WO_Agent_${safeSn}.png`, blob: r.blob, dataUrl: r.dataUrl });
+            }
+            return imgs;
+        }
+
+        window.woRenderAgentCards = async function() {
+            woInitDropdowns();
+            const box = document.getElementById('wo-gal-agents');
+            const ws = (PREVIEW_DATA && PREVIEW_DATA.wo_summary) ? PREVIEW_DATA.wo_summary : null;
+            if (!box || !ws) return;
+            const list = getWoFilteredAgents();
+            if (!list.length) {
+                box.innerHTML = '<div class="alert-err">ℹ️ Tidak ada agen pada filter yang dipilih.</div>';
+                return;
+            }
+            box.innerHTML = '<div style="padding:10px; color:#92400e; font-weight:700;">⏳ Merender ' + list.length + ' foto kartu WO masing-masing agent...</div>';
+            const imgs = await renderAgentCardsBatch(list, ws.today_label, ws.besok_label);
+            box.innerHTML = '<b>👤 Foto Kartu Masing-Masing Agent (' + imgs.length + ' Foto PNG):</b>';
+            appendImageGrid(box, imgs, 'wo-card-grid');
+        };
+
+        window.woDownloadZip = async function(kind) {
+            woInitDropdowns();
+            const ws = (PREVIEW_DATA && PREVIEW_DATA.wo_summary) ? PREVIEW_DATA.wo_summary : null;
+            if (!ws) return;
+            let imgs = [];
+            let zipName = `Foto_WO_${ws.today_label}.zip`;
+            if (kind === 'tables') {
+                const prevClone = Object.assign({}, PREVIEW_DATA, { mtd_rows: [], daily_rows: [], agent_rows: [] });
+                if (prevClone.wo_summary) prevClone.wo_summary = Object.assign({}, prevClone.wo_summary, { include_cards: false });
+                imgs = await buildAllReportPngs(prevClone);
+                zipName = `Foto_WO_Ringkasan_Pivot_Tim_${ws.today_label}.zip`;
+            } else {
+                const list = getWoFilteredAgents();
+                imgs = await renderAgentCardsBatch(list, ws.today_label, ws.besok_label);
+                zipName = `Foto_WO_Masing_Masing_Agent_${ws.today_label}.zip`;
+            }
+            if (!imgs.length) return;
+            const files = [];
+            for (const im of imgs) {
+                const buf = await im.blob.arrayBuffer();
+                files.push({ name: im.fileName, bytes: new Uint8Array(buf) });
+            }
+            const zBlob = buildStoredZipBlob(files);
+            const url = URL.createObjectURL(zBlob);
+            const a = document.createElement('a');
+            a.href = url; a.download = zipName;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        };
+
+        window.renderPersonalWoCard = async function() {
+            const box = document.getElementById('agen-wo-card-box');
+            const ws = (PREVIEW_DATA && PREVIEW_DATA.wo_summary) ? PREVIEW_DATA.wo_summary : null;
+            if (!box || !ws || !ws.agent_summary || !ws.agent_summary.length) return;
+            box.style.display = 'block';
+            box.innerHTML = '<div style="color:#fde047; font-weight:700;">⏳ Menyiapkan foto kartu WO Anda...</div>';
+            const imgs = await renderAgentCardsBatch(ws.agent_summary, ws.today_label, ws.besok_label);
+            box.innerHTML = '';
+            appendImageGrid(box, imgs, 'wo-card-grid');
+        };
+
         window.tgPreviewGallery = async function() {
             const gal = document.getElementById('tg-preview-gallery');
             if (!gal) return;
             gal.style.display = 'block';
-            gal.innerHTML = '<div style="padding:10px; color:#1e3a8a; font-weight:700;">⏳ Merender gambar tabel presentasi (.png)...</div>';
+            gal.innerHTML = '<div style="padding:10px; color:#1e3a8a; font-weight:700;">⏳ Merender seluruh gambar tabel presentasi &amp; WO (.png)...</div>';
             try {
-                const imgs = await buildAllReportPngs(PREVIEW_DATA);
-                gal.innerHTML = '<h4 style="margin:0 0 10px 0;">🖼️ Pratinjau Gambar Tabel Telegram (' + imgs.length + ' Gambar)</h4>';
-                for (const im of imgs) {
-                    const wrap = document.createElement('div');
-                    wrap.style.cssText = 'background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:12px; margin-bottom:12px;';
-                    const bar = document.createElement('div');
-                    bar.style.cssText = 'display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;';
-                    const ttl = document.createElement('b');
-                    ttl.textContent = im.fileName;
-                    const dl = document.createElement('a');
-                    dl.href = im.dataUrl;
-                    dl.download = im.fileName;
-                    dl.className = 'btn btn-green';
-                    dl.style.cssText = 'padding:6px 12px; font-size:0.8rem;';
-                    dl.textContent = '📥 Download .png';
-                    bar.appendChild(ttl);
-                    bar.appendChild(dl);
-                    const imgEl = document.createElement('img');
-                    imgEl.src = im.dataUrl;
-                    imgEl.style.cssText = 'max-width:100%; height:auto; border:1px solid #cbd5e1; border-radius:6px;';
-                    wrap.appendChild(bar);
-                    wrap.appendChild(imgEl);
-                    gal.appendChild(wrap);
+                const prevCopy = Object.assign({}, PREVIEW_DATA);
+                const incCardEl = document.querySelector('input[name="include_wo_cards"]');
+                const incWoEl = document.querySelector('input[name="include_wo"]');
+                if (!incWoEl || !incWoEl.checked) {
+                    prevCopy.wo_summary = null;
+                } else if (prevCopy.wo_summary) {
+                    prevCopy.wo_summary = Object.assign({}, prevCopy.wo_summary, { include_cards: !!(incCardEl && incCardEl.checked) });
                 }
+                const imgs = await buildAllReportPngs(prevCopy);
+                gal.innerHTML = '<h4 style="margin:0 0 10px 0;">🖼️ Pratinjau Semua Gambar Presentasi &amp; WO (' + imgs.length + ' Gambar PNG)</h4>';
+                appendImageGrid(gal, imgs, 'wo-img-grid');
             } catch (err) {
                 gal.innerHTML = '<div class="alert-err">❌ Gagal membuat pratinjau gambar: ' + err.message + '</div>';
             }
         };
 
-        async function uploadSinglePng(cfg, im) {
+        async function uploadSinglePng(cfg, im, progEl) {
             const tryEndpoint = async (mode) => {
-                const fd = new FormData();
-                fd.append('chat_id', cfg.chat_id);
-                fd.append('caption', im.caption);
-                fd.append('parse_mode', 'HTML');
-                fd.append(mode === 'document' ? 'document' : 'photo', im.blob, im.fileName);
-                const ep = mode === 'document' ? '/sendDocument' : '/sendPhoto';
-                const r = await fetchWithTimeout(cfg.api_base + ep, { method: 'POST', body: fd }, 12000);
-                const j = await r.json();
-                return { ok: !!(r.ok && j && j.ok), status: r.status, desc: (j && j.description) ? j.description : ('HTTP ' + r.status) };
+                for (let att = 0; att < 3; att++) {
+                    const fd = new FormData();
+                    fd.append('chat_id', cfg.chat_id);
+                    fd.append('caption', im.caption);
+                    fd.append('parse_mode', 'HTML');
+                    fd.append(mode === 'document' ? 'document' : 'photo', im.blob, im.fileName);
+                    const ep = mode === 'document' ? '/sendDocument' : '/sendPhoto';
+                    const r = await fetchWithTimeout(cfg.api_base + ep, { method: 'POST', body: fd }, 14000);
+                    const j = await r.json().catch(() => null);
+                    if (r.status === 429 && j && j.parameters && j.parameters.retry_after) {
+                        const waitMs = Math.min((Number(j.parameters.retry_after) + 1) * 1000, 15000);
+                        if (progEl) progEl.textContent = '⏳ Telegram limit 429 — jeda ' + Math.round(waitMs / 1000) + ' detik sebelum lanjut...';
+                        await new Promise(rs => setTimeout(rs, waitMs));
+                        continue;
+                    }
+                    return { ok: !!(r.ok && j && j.ok), status: r.status, desc: (j && j.description) ? j.description : ('HTTP ' + r.status) };
+                }
+                return { ok: false, status: 429, desc: 'Rate limit 429 Telegram' };
             };
 
             try {
                 let res = await tryEndpoint(cfg.img_mode);
                 const dLow = (res.desc || '').toLowerCase();
                 if (!res.ok && cfg.img_mode === 'photo' && res.status === 400 && !dLow.includes('chat not found') && !dLow.includes('forbidden')) {
-                    // Fallback otomatis ke sendDocument jika dimensi/ukuran ditolak sendPhoto Telegram
                     res = await tryEndpoint('document');
                 }
                 if (res.ok) return res;
                 throw new Error(res.desc);
             } catch (browserErr) {
-                // Backup terakhir lewat endpoint PHP server jika browser klien memblokir Telegram
                 const fdSrv = new FormData();
                 fdSrv.append('action', 'send_telegram_blob');
                 fdSrv.append('csrf_token', cfg.csrf_token);
@@ -3045,31 +3540,41 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 try {
                     if (cfg.send_images && cfg.visual_data) {
                         const imgs = await buildAllReportPngs(cfg.visual_data);
+                        const delayMs = imgs.length > 20 ? 950 : 380;
                         for (let i = 0; i < imgs.length; i++) {
                             if (window.__TG_ABORT) throw new Error('Pengiriman dibatalkan oleh pengguna.');
                             if (prog) prog.textContent = '🖼️ Mengunggah gambar ' + (i + 1) + '/' + imgs.length + ': ' + imgs[i].fileName + '...';
-                            await uploadSinglePng(cfg, imgs[i]);
+                            await uploadSinglePng(cfg, imgs[i], prog);
                             sentImgs++;
-                            await new Promise(r => setTimeout(r, 350));
+                            await new Promise(r => setTimeout(r, delayMs));
                         }
                     }
                     if (cfg.send_text && cfg.messages && cfg.messages.length) {
                         for (let j = 0; j < cfg.messages.length; j++) {
                             if (window.__TG_ABORT) throw new Error('Pengiriman dibatalkan oleh pengguna.');
                             if (prog) prog.textContent = '📝 Mengirim teks bagian ' + (j + 1) + '/' + cfg.messages.length + '...';
-                            const fdTxt = new URLSearchParams({
-                                chat_id: cfg.chat_id,
-                                text: cfg.messages[j],
-                                parse_mode: 'HTML',
-                                disable_web_page_preview: 'true'
-                            });
-                            const rt = await fetchWithTimeout(cfg.api_base + '/sendMessage', { method: 'POST', body: fdTxt }, 8000);
-                            const jt = await rt.json();
-                            if (!rt.ok || !jt.ok) {
-                                throw new Error((jt && jt.description) ? jt.description : ('HTTP ' + rt.status));
+                            for (let att = 0; att < 3; att++) {
+                                const fdTxt = new URLSearchParams({
+                                    chat_id: cfg.chat_id,
+                                    text: cfg.messages[j],
+                                    parse_mode: 'HTML',
+                                    disable_web_page_preview: 'true'
+                                });
+                                const rt = await fetchWithTimeout(cfg.api_base + '/sendMessage', { method: 'POST', body: fdTxt }, 8000);
+                                const jt = await rt.json().catch(() => null);
+                                if (rt.status === 429 && jt && jt.parameters && jt.parameters.retry_after) {
+                                    const waitMs = Math.min((Number(jt.parameters.retry_after) + 1) * 1000, 15000);
+                                    if (prog) prog.textContent = '⏳ Telegram limit 429 — jeda ' + Math.round(waitMs / 1000) + ' detik...';
+                                    await new Promise(rs => setTimeout(rs, waitMs));
+                                    continue;
+                                }
+                                if (!rt.ok || !jt || !jt.ok) {
+                                    throw new Error((jt && jt.description) ? jt.description : ('HTTP ' + rt.status));
+                                }
+                                break;
                             }
                             sentMsgs++;
-                            await new Promise(r => setTimeout(r, 250));
+                            await new Promise(r => setTimeout(r, 280));
                         }
                     }
                     if (box) {
@@ -3088,7 +3593,6 @@ $authUser = $_SESSION['auth_user'] ?? null;
         }
     })();
     </script>
-    <?php endif; ?>
 <?php endif; ?>
 </div>
 </body>
