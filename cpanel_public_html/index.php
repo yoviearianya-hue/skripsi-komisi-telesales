@@ -569,22 +569,73 @@ function rp($angka): string {
     return 'Rp ' . number_format((float)$angka, 0, ',', '.');
 }
 
-function ensure_wo_summary_v2(array &$appData, string $poolActiveFile, string $poolDefaultFile, string $dataFile): void {
-    if (empty($appData['params']) || (int)($appData['wo_summary']['calc_version'] ?? 0) >= 2) {
+function ensure_wo_summary_v2(array &$appData, string $poolActiveFile, string $poolDefaultFile, string $dataFile, string $targetActiveFile = '', string $targetDefaultFile = ''): void {
+    $needsRecalc = (int)($appData['calc_engine_version'] ?? 0) < 3;
+    $needsWoV2   = (int)($appData['wo_summary']['calc_version'] ?? 0) < 2;
+    if (empty($appData['params']) || (!$needsRecalc && !$needsWoV2)) {
         return;
     }
     try {
         $poolAuto = load_prospect_pool($poolActiveFile, $poolDefaultFile);
         if (!$poolAuto) return;
+        $cleanMap  = deduplikasi_pool_rows($poolAuto);
+        $cleanPool = array_values($cleanMap);
         $pAuto = $appData['params'];
-        $bIniA = (int)($pAuto['bulan_ini'] ?? 11);
-        $thnA  = (int)($pAuto['tahun'] ?? 2026);
-        $hWoA  = (int)($appData['wo_summary']['day'] ?? ($pAuto['hari_wo'] ?? ($pAuto['hari_harian'] ?? ($appData['hari_berjalan'] ?? 15))));
-        $appData['wo_summary'] = hitung_wo_laporan($poolAuto, $bIniA, $thnA, $hWoA);
-        $appData['params']['hari_wo'] = $appData['wo_summary']['day'];
+        $bLaluA = (int)($pAuto['bulan_lalu'] ?? 10);
+        $bIniA  = (int)($pAuto['bulan_ini'] ?? 11);
+        $thnA   = (int)($pAuto['tahun'] ?? 2026);
+        $tHariA = (int)($pAuto['total_hari'] ?? 30);
+        $hJlnA  = (int)($pAuto['hari_berjalan'] ?? ($appData['hari_berjalan'] ?? 17));
+        $hHarA  = (int)($pAuto['hari_harian'] ?? ($appData['daily_prod_day'] ?? $hJlnA));
+        $hWoA   = (int)($appData['wo_summary']['day'] ?? ($pAuto['hari_wo'] ?? $hHarA));
+        $rasioA = (float)($pAuto['rasio_paid'] ?? 1.25);
+        $sheetA = (string)($pAuto['sheet'] ?? "NOVEMBER'26");
+
+        $tAct = $targetActiveFile !== '' ? $targetActiveFile : (__DIR__ . '/uploads/target_active.xlsx');
+        $tDef = $targetDefaultFile !== '' ? $targetDefaultFile : (__DIR__ . '/uploads/default_target.xlsx');
+        if (!file_exists($tAct) && file_exists($tDef)) {
+            @copy($tDef, $tAct);
+        }
+
+        if ($needsRecalc && file_exists($tAct)) {
+            $oldSumber   = $appData['sumber'] ?? [];
+            $oldBot      = $appData['bot_token_default'] ?? '9242894728:AAF2oYVZlpfcHEIFcC9PdoeFQA6KuwF-njs';
+            $oldTunnel   = $appData['docker_tunnel_url'] ?? '';
+            $recalc = proses_data([
+                'target_path'        => $tAct,
+                'target_name'        => (string)($oldSumber['target'] ?? 'TARGET PER MONTH.xlsx'),
+                'sheet'              => $sheetA,
+                'prospect_rows_awal' => $cleanPool,
+                'prospects'          => [],
+                'bulan_lalu'         => $bLaluA,
+                'bulan_ini'          => $bIniA,
+                'tahun'              => $thnA,
+                'total_hari'         => $tHariA,
+                'hari_berjalan'      => $hJlnA,
+                'hari_harian'        => $hHarA,
+                'hari_wo'            => $hWoA,
+                'rasio_paid'         => $rasioA,
+                'simpan_pool_path'   => $poolActiveFile,
+            ]);
+            if (!empty($oldSumber['prospect'])) {
+                $recalc['sumber']['prospect'] = $oldSumber['prospect'];
+            }
+            $recalc['sumber']['updated_at'] = $oldSumber['updated_at'] ?? date('Y-m-d H:i:s');
+            $recalc['sumber']['updated_by'] = $oldSumber['updated_by'] ?? 'Auto-Clean Engine v3';
+            $recalc['bot_token_default'] = $oldBot;
+            $recalc['docker_tunnel_url'] = $oldTunnel;
+            $appData = $recalc;
+        } else {
+            if (count($cleanPool) !== count($poolAuto) && $poolActiveFile !== '') {
+                @file_put_contents($poolActiveFile, gzencode(json_encode($cleanPool, JSON_UNESCAPED_UNICODE), 6), LOCK_EX);
+            }
+            $appData['wo_summary'] = hitung_wo_laporan($cleanPool, $bIniA, $thnA, $hWoA);
+            $appData['params']['hari_wo'] = $appData['wo_summary']['day'];
+            $appData['calc_engine_version'] = 3;
+        }
         @file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
     } catch (Throwable $e) {
-        // Lewati jika pool belum siap agar dashboard tetap merender aman
+        // Lewati jika pool/target belum siap agar dashboard tetap merender aman
     }
 }
 
@@ -759,7 +810,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'api_s
 // HANDLER DOWNLOAD LAPORAN EXCEL (.XLS) & CSV LANGSUNG DARI SERVER
 // ============================================================================
 if (isset($_GET['download']) && !empty($_SESSION['auth_user'])) {
-    ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile);
+    ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile, $targetActiveFile, $targetDefaultFile);
     $dlType = $_GET['download'];
     $authU = $_SESSION['auth_user'];
     @session_write_close();
@@ -909,7 +960,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $actionStatus = '<div class="alert-err">🚫 Akses ditolak untuk mengubah tanggal laporan.</div>';
         } else {
             try {
-                $hariCekIn = max(1, min(31, (int)($_POST['hari_harian_cek'] ?? 15)));
+                ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile, $targetActiveFile, $targetDefaultFile);
+                $hariCekIn = max(1, min(31, (int)($_POST['hari_harian_cek'] ?? 17)));
                 if (!file_exists($targetActiveFile) && file_exists($targetDefaultFile)) {
                     @copy($targetDefaultFile, $targetActiveFile);
                 }
@@ -938,7 +990,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $actionStatus = '<div class="alert-err">🚫 Akses ditolak untuk mengubah tanggal Monitoring WO.</div>';
         } else {
             try {
-                $hariWoCek = max(1, min(31, (int)($_POST['hari_wo_cek'] ?? ($appData['wo_summary']['day'] ?? ($appData['daily_prod_day'] ?? 15)))));
+                ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile, $targetActiveFile, $targetDefaultFile);
+                $hariWoCek = max(1, min(31, (int)($_POST['hari_wo_cek'] ?? ($appData['wo_summary']['day'] ?? ($appData['daily_prod_day'] ?? 17)))));
                 $poolNow = load_prospect_pool($poolActiveFile, $poolDefaultFile);
                 $pCur = $appData['params'] ?? ['bulan_ini' => 11, 'tahun' => 2026];
                 $woRes = hitung_wo_laporan($poolNow, (int)($pCur['bulan_ini'] ?? 11), (int)($pCur['tahun'] ?? 2026), $hariWoCek);
@@ -1174,6 +1227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $incWo    = !empty($_POST['include_wo']);
             $incWoCrd = !empty($_POST['include_wo_cards']);
 
+            ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile, $targetActiveFile, $targetDefaultFile);
             $agentRowsTg = $appData['agent_rows'] ?? [];
             $dailyRowsTg = $appData['daily_prod_rows'] ?? [];
             $dailyLblTg  = (string)($appData['daily_prod_date_label'] ?? '');
@@ -1321,24 +1375,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-// Variabel tampilan terbaru dari $appData
+// Variabel tampilan terbaru dari $appData (auto-clean & auto-upgrade jika cache server masih versi lama)
+if (!empty($_SESSION['auth_user'])) {
+    ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile, $targetActiveFile, $targetDefaultFile);
+}
 $mtdRows      = $appData['mtd_rows'] ?? [];
 $agentRows    = $appData['agent_rows'] ?? [];
 $dailyRows    = $appData['daily_prod_rows'] ?? [];
-if (!empty($_SESSION['auth_user'])) {
-    ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile);
-}
-$dailyLbl     = (string)($appData['daily_prod_date_label'] ?? '15-Nov-26');
-$dailyDay     = (int)($appData['daily_prod_day'] ?? 15);
-$tglTersedia  = $appData['tanggal_tersedia'] ?? [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+$dailyLbl     = (string)($appData['daily_prod_date_label'] ?? '17-Nov-26');
+$dailyDay     = (int)($appData['daily_prod_day'] ?? 17);
+$tglTersedia  = $appData['tanggal_tersedia'] ?? range(1, 17);
 $woSummary    = $appData['wo_summary'] ?? [];
 $woDay        = (int)($woSummary['day'] ?? $dailyDay);
 $woAvailDays  = $woSummary['available_days'] ?? $tglTersedia;
-$targetMtd    = (int)($appData['target_persen_mtd'] ?? 50);
-$periodeLabel = $appData['periode_label'] ?? '15-Nov-2026';
-$hariBerjalan = (int)($appData['hari_berjalan'] ?? 15);
+$targetMtd    = (int)($appData['target_persen_mtd'] ?? 57);
+$periodeLabel = $appData['periode_label'] ?? '17-Nov-2026';
+$hariBerjalan = (int)($appData['hari_berjalan'] ?? 17);
 $totalHari    = (int)($appData['total_hari'] ?? 30);
-$sisaHari     = (int)($appData['sisa_hari'] ?? 15);
+$sisaHari     = (int)($appData['sisa_hari'] ?? 13);
 $kolOct       = $appData['kol_oct'] ?? ('SA OCT 1-' . $hariBerjalan);
 $kolNov       = $appData['kol_nov'] ?? ('SA NOV 1-' . $hariBerjalan);
 $lblBlnIni    = $appData['label_bulan_ini'] ?? 'NOV';
@@ -1977,7 +2031,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                         if ($selectedScope !== 'Semua Leader' && $dr['leader'] !== $selectedScope) continue;
                     ?>
                         <div style="margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed #cbd5e1;">
-                            <b><?= htmlspecialchars($dr['leader']) ?></b> (<?= (int)$dr['total_agents'] ?> agen):<br>
+                            <b><?= htmlspecialchars($dr['leader']) ?></b> (<?= (int)$dr['total_agents'] ?> slot tim):<br>
                             • <b>0 SO (<?= (int)$dr['blm_so'] ?>)</b>: <?= htmlspecialchars(implode(', ', $dr['agents_blm_so'] ?? []) ?: 'Semua Produktif') ?><br>
                             • <b>0 PAID (<?= (int)$dr['blm_paid'] ?>)</b>: <?= htmlspecialchars(implode(', ', $dr['agents_blm_paid'] ?? []) ?: 'Semua Produktif') ?><br>
                             • <b>0 SA (<?= (int)$dr['blm_sa'] ?>)</b>: <?= htmlspecialchars(implode(', ', $dr['agents_blm_sa'] ?? []) ?: 'Semua Produktif') ?>

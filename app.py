@@ -815,27 +815,38 @@ def get_mtd_so_data(
 
 
 def dedup_prospect_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Menghapus baris duplikat persis & memperbarui status baris dengan Prospect+Customer yang sama."""
+    """Menghapus baris duplikat & menstabilkan kunci Prospect No + Customer Name."""
     if df is None or df.empty:
         return df
     df_c = df.copy()
     if "Prospect No" in df_c.columns:
-        pno = df_c["Prospect No"].fillna("").astype(str).str.strip()
+        pno = df_c["Prospect No"].astype("object").fillna("").astype(str).str.strip()
         cno = (
-            df_c["Customer No"].fillna("").astype(str).str.strip()
+            df_c["Customer No"].astype("object").fillna("").astype(str).str.strip()
             if "Customer No" in df_c.columns
             else pd.Series("", index=df_c.index)
         )
         cname = (
-            df_c["Customer Name"].fillna("").astype(str).str.strip().str.upper()
+            df_c["Customer Name"]
+            .astype("object")
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.upper()
+            .str.replace(r"\s+", " ", regex=True)
             if "Customer Name" in df_c.columns
             else pd.Series("", index=df_c.index)
         )
-        has_pk = (pno != "") & ((cno != "") | (cname != ""))
+        has_pcname = (pno != "") & (cname != "")
+        has_pcno = (pno != "") & (cname == "") & (cno != "")
         df_c["_dedup_key"] = np.where(
-            has_pk,
-            "PK:" + pno + "|" + cno + "|" + cname,
-            pd.Series(df_c.index.astype(str), index=df_c.index),
+            has_pcname,
+            "PK2:" + pno + "|" + cname,
+            np.where(
+                has_pcno,
+                "PKC:" + pno + "|" + cno,
+                pd.Series(df_c.index.astype(str), index=df_c.index),
+            ),
         )
         df_c = df_c.drop_duplicates(subset=["_dedup_key"], keep="last").drop(columns=["_dedup_key"])
     return df_c.drop_duplicates().reset_index(drop=True)
@@ -870,7 +881,8 @@ def hitung_rekap_harian_blm_produktif_py(
         else ""
     )
 
-    so_mask = (
+    valid_ag_mask = ~df_p["_ag_key"].isin(["", "NAN", "NONE", "TOTAL", "-"])
+    so_mask = valid_ag_mask & (
         df_p["Created Date"].dt.date == tgl_cek
         if "Created Date" in df_p.columns
         else pd.Series(False, index=df_p.index)
@@ -880,12 +892,12 @@ def hitung_rekap_harian_blm_produktif_py(
         if "Status Payment" in df_p.columns
         else pd.Series(True, index=df_p.index)
     )
-    paid_mask = (
+    paid_mask = valid_ag_mask & (
         paid_status & (df_p["Payment Date"].dt.date == tgl_cek)
         if "Payment Date" in df_p.columns
         else pd.Series(False, index=df_p.index)
     )
-    sa_mask = (
+    sa_mask = valid_ag_mask & (
         df_p["Active Date"].dt.date == tgl_cek
         if "Active Date" in df_p.columns
         else pd.Series(False, index=df_p.index)
@@ -905,10 +917,7 @@ def hitung_rekap_harian_blm_produktif_py(
 
     agen_per_ldr: dict[str, list[tuple[str, str]]] = {}
     if df_target is not None and not df_target.empty:
-        non_vac = df_target[
-            ~df_target["Agent_Key"].astype(str).str.startswith("VACANT__")
-        ]
-        for _, r in non_vac.iterrows():
+        for _, r in df_target.iterrows():
             ldr = str(r["Leader_Default"]).strip()
             ak = str(r["Agent_Key"]).strip()
             nm = str(r["Nama_Tampil"]).strip()
@@ -2202,10 +2211,10 @@ total_hari_bulan_ini = st.sidebar.number_input(
 )
 
 hari_berjalan_saat_ini = st.sidebar.number_input(
-    "Hari Berjalan Saat Ini (misal 15)",
+    "Hari Berjalan Saat Ini (misal 17)",
     min_value=1,
     max_value=31,
-    value=15,
+    value=17,
     step=1,
 )
 
@@ -2727,7 +2736,7 @@ with tab_utama:
                     if r.get("is_grand_total"):
                         continue
                     st.markdown(
-                        f"**{escape_html_tg(r['leader'])}** ({r['total_agents']} agen aktif) — "
+                        f"**{escape_html_tg(r['leader'])}** ({r['total_agents']} slot tim) — "
                         f"0 SO ({r['blm_so']}): `{', '.join(r['agents_blm_so']) or 'Semua Produktif'}` | "
                         f"0 PAID ({r['blm_paid']}): `{', '.join(r['agents_blm_paid']) or 'Semua Produktif'}` | "
                         f"0 SA ({r['blm_sa']}): `{', '.join(r['agents_blm_sa']) or 'Semua Produktif'}`"

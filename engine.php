@@ -999,9 +999,11 @@ function baca_file_prospect(string $path, string $namaTampil): array
         $cnameRaw = trim((string)($get($iCname) ?? ''));
         $cnameVal = u_upper(rapatkan_spasi($cnameRaw));
         $hasCust = ($iCname === null) ? true : ($cnameRaw !== '');
-        $idKey = ($pnoVal !== '' && ($cnoVal !== '' || $cnameVal !== ''))
-            ? ('PK:' . $pnoVal . '|' . $cnoVal . '|' . $cnameVal)
-            : ('MD5:' . md5(implode("\x1f", $r)));
+        $idKey = ($pnoVal !== '' && $cnameVal !== '')
+            ? ('PK2:' . $pnoVal . '|' . $cnameVal)
+            : (($pnoVal !== '' && $cnoVal !== '')
+                ? ('PKC:' . $pnoVal . '|' . $cnoVal)
+                : ('MD5:' . md5(implode("\x1f", $r))));
 
         $hasil[] = [
             normalisasi_nama_leader($get($iLdr)),
@@ -1019,6 +1021,85 @@ function baca_file_prospect(string $path, string $namaTampil): array
         ];
     }
     return ['rows' => $hasil, 'ada_payment' => $iPay !== null, 'ada_created' => $iCreated !== null, 'ada_status' => $iStatus !== null];
+}
+
+/**
+ * Menormalkan primary key prospect dari format lama PK:pno|cno|cname ke PK2:pno|cname
+ * agar baris yg Customer No-nya baru terisi saat pembayaran tidak menjadi duplikat.
+ */
+function normalisasi_pk_prospect(string $rawKey): string
+{
+    if (str_starts_with($rawKey, 'PK2:') || str_starts_with($rawKey, 'PKC:') || str_starts_with($rawKey, 'MD5:')) {
+        return $rawKey;
+    }
+    if (str_starts_with($rawKey, 'PK:')) {
+        $parts = explode('|', substr($rawKey, 3), 3);
+        if (count($parts) === 3) {
+            $pno = trim($parts[0]);
+            $cno = trim($parts[1]);
+            $cname = u_upper(rapatkan_spasi(trim($parts[2])));
+            if ($pno !== '' && $cname !== '') {
+                return 'PK2:' . $pno . '|' . $cname;
+            }
+            if ($pno !== '' && $cno !== '') {
+                return 'PKC:' . $pno . '|' . $cno;
+            }
+        }
+    }
+    return $rawKey;
+}
+
+/** Skor kelengkapan status baris untuk memilih versi terbaru saat deduplikasi pool lama. */
+function skor_kelengkapan_row(array $row): int
+{
+    $score = 0;
+    if (isset($row[5]) && $row[5] !== null && $row[5] !== '') {
+        $score += 4;
+    }
+    if (u_upper(trim((string)($row[7] ?? ''))) === 'PAID') {
+        $score += 2;
+    }
+    if (isset($row[6]) && $row[6] !== null && $row[6] !== '') {
+        $score += 1;
+    }
+    return $score;
+}
+
+/** Menggabungkan & membersihkan duplikat dari pool prospect yang sudah tersimpan di server. */
+function deduplikasi_pool_rows(array $rows): array
+{
+    $byKey = [];
+    foreach ($rows as $row) {
+        if (!is_array($row) || !isset($row[8])) {
+            continue;
+        }
+        $normKey = normalisasi_pk_prospect((string)$row[8]);
+        $row[8] = $normKey;
+        if (!isset($byKey[$normKey]) || skor_kelengkapan_row($row) >= skor_kelengkapan_row($byKey[$normKey])) {
+            $byKey[$normKey] = $row;
+        }
+    }
+    return $byKey;
+}
+
+/** Mendeteksi bulan (YYYYMM) yang dimuat secara utuh oleh sebuah file upload prospect. */
+function deteksi_bulan_penuh_rows(array $rows, int $minRowsPerMonth = 50): array
+{
+    $counts = [];
+    foreach ($rows as $row) {
+        $cr = isset($row[4]) && $row[4] !== null ? (int)$row[4] : 0;
+        if ($cr >= 20000101) {
+            $ym = intdiv($cr, 100);
+            $counts[$ym] = ($counts[$ym] ?? 0) + 1;
+        }
+    }
+    $full = [];
+    foreach ($counts as $ym => $cnt) {
+        if ($cnt >= $minRowsPerMonth) {
+            $full[$ym] = true;
+        }
+    }
+    return $full;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1116,14 +1197,15 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
         $ldr = trim((string)($r[P_LDR] ?? ''));
         $agKey = normalisasi_nama_agen($r[P_SLS] ?? '');
         $validAg = !in_array($agKey, ['', 'NAN', 'NONE', 'TOTAL', '-'], true);
+        if (!$validAg) {
+            continue;
+        }
 
         if (($r[P_CREATED] ?? null) === $tglInt) {
             if ($ldr !== '') {
                 $soLdr[$ldr] = ($soLdr[$ldr] ?? 0) + 1;
             }
-            if ($validAg) {
-                $soAgen[$agKey] = ($soAgen[$agKey] ?? 0) + 1;
-            }
+            $soAgen[$agKey] = ($soAgen[$agKey] ?? 0) + 1;
         }
 
         $isPaid = u_upper(trim((string)($r[P_STATUS] ?? ''))) === 'PAID';
@@ -1131,26 +1213,22 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
             if ($ldr !== '') {
                 $paidLdr[$ldr] = ($paidLdr[$ldr] ?? 0) + 1;
             }
-            if ($validAg) {
-                $paidAgen[$agKey] = ($paidAgen[$agKey] ?? 0) + 1;
-            }
+            $paidAgen[$agKey] = ($paidAgen[$agKey] ?? 0) + 1;
         }
 
         if (($r[P_ACTIVE] ?? null) === $tglInt) {
             if ($ldr !== '') {
                 $saLdr[$ldr] = ($saLdr[$ldr] ?? 0) + 1;
             }
-            if ($validAg) {
-                $saAgen[$agKey] = ($saAgen[$agKey] ?? 0) + 1;
-            }
+            $saAgen[$agKey] = ($saAgen[$agKey] ?? 0) + 1;
         }
     }
 
-    // Kelompokkan seluruh agen aktif (non-Vacant) per Leader dari sheet Target
+    // Kelompokkan seluruh slot tim (termasuk slot Vacant) per Leader dari sheet Target
     $agenPerLdr = [];
     foreach ($target as $t) {
         $k = (string)($t['Agent_Key'] ?? '');
-        if ($k === '' || str_starts_with($k, 'VACANT__')) {
+        if ($k === '') {
             continue;
         }
         $ldr = trim((string)($t['Leader_Default'] ?? ''));
@@ -1674,20 +1752,13 @@ function proses_data(array $o): array
         throw new RuntimeException('Tidak ada data agen yang terbaca dari sheet "' . $o['sheet'] . '" pada file Target. Pastikan sheet berisi blok "TEAM ... NAMA" dan nama sheet sudah benar.');
     }
 
-    // 2. Prospect (gabung pool awal + update/overwrite baris dengan Prospect+Customer yang sama dari file terbaru)
+    // 2. Prospect (bersihkan duplikat pool awal + perbarui bulan penuh/baris terbaru tanpa duplikat)
     $poolByKey = [];
     $infoFile = [];
     $adaPayment = true;
     if (!empty($o['prospect_rows_awal']) && is_array($o['prospect_rows_awal'])) {
-        $masukAwal = 0;
-        foreach ($o['prospect_rows_awal'] as $row) {
-            if (!is_array($row) || !isset($row[8])) {
-                continue;
-            }
-            $k = (string)$row[8];
-            $poolByKey[$k] = $row;
-            $masukAwal++;
-        }
+        $poolByKey = deduplikasi_pool_rows($o['prospect_rows_awal']);
+        $masukAwal = count($poolByKey);
         if ($masukAwal > 0) {
             $infoFile[] = ['name' => 'Database Server Aktif', 'rows' => count($o['prospect_rows_awal']), 'rows_baru' => $masukAwal];
         }
@@ -1695,13 +1766,23 @@ function proses_data(array $o): array
     foreach (($o['prospects'] ?? []) as $pf) {
         $b = baca_file_prospect($pf['path'], $pf['name']);
         $adaPayment = $adaPayment && $b['ada_payment'];
+        // Jika file baru memuat 1 bulan penuh (>= 50 baris Created pada bulan tsb), ganti bersih data bulan tsb agar baris batal/edit tidak tertinggal
+        $bulanPenuh = deteksi_bulan_penuh_rows($b['rows']);
+        if (!empty($bulanPenuh) && !empty($poolByKey)) {
+            foreach ($poolByKey as $pkExisting => $rowExisting) {
+                $crEx = isset($rowExisting[P_CREATED]) && $rowExisting[P_CREATED] !== null ? (int)$rowExisting[P_CREATED] : 0;
+                $ymEx = $crEx >= 20000101 ? intdiv($crEx, 100) : 0;
+                if ($ymEx > 0 && isset($bulanPenuh[$ymEx])) {
+                    unset($poolByKey[$pkExisting]);
+                }
+            }
+        }
         $masuk = 0;
         foreach ($b['rows'] as $row) {
             $k = (string)$row[8];
             if (!isset($poolByKey[$k])) {
                 $masuk++;
             }
-            // Overwrite jika key PK sudah ada agar status terbaru (PAID/Active) selalu dipakai tanpa duplikasi
             $poolByKey[$k] = $row;
         }
         $infoFile[] = ['name' => $pf['name'], 'rows' => count($b['rows']), 'rows_baru' => $masuk];
@@ -1899,6 +1980,7 @@ function proses_data(array $o): array
 
     $namaBln = NAMA_BULAN_TAMPIL[$bulanIni] ?? 'Nov';
     return [
+        'calc_engine_version' => 3,
         'periode_label' => $hari . '-' . $namaBln . '-' . $tahun,
         'hari_berjalan' => $hari,
         'total_hari' => $totalHari,

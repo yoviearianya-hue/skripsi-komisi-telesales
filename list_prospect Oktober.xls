@@ -12722,7 +12722,7 @@ KOTA dan KODE POS JAKARTA SELATAN 12480</td>
         <td>Ads Personal</td>
         <td>WO-02102026-3693643</td>
         <td>BKS-BRT-D03-S02-A06</td>
-        <td>9</td> 
+        <td>11</td> 
         <td>  ## JL DAHLIA RAYA No NO 54 RT RT 000 RW RW 000 Kelurahan JAKA SAMPURNA Kecamatan BEKASI BARAT Kota BEKASI Provinsi JAWA BARAT  </td> 
         <td>-6.234636700,106.97824468</td>         
         <td>JL DAHLIA RAYA NO 54 PERUMNAS 1 KEL JAKASAMPURNA KEC BEKASI BARAT KOTA BEKASI JAWA BARAT</td> 
@@ -112171,7 +112171,7 @@ SAMPING LAPANGAN PAGAR WARNA COKLAT</td>
         <td>PONDOK GEDE</td>
         <td></td>
         <td>Facebook</td>
-        <td>WO-19102026-3772358</td>
+        <td>WO-08112026-3880399</td>
         <td>BKS-PDG-D25-S01-A04</td>
         <td>14</td> 
         <td>  ##JL RAYA JATI MAKMUR JL RAYA JATI MAKMUR No 27 RT 006 RW 011 Kelurahan JATIMAKMUR Kecamatan PONDOK GEDE Kota BEKASI Provinsi JAWA BARAT  </td> 
@@ -132384,10 +132384,10 @@ PATOKAN RUMAH  Gerbang Hitam  Rooftop Hitam</td>
         <td>150000</td>
         <td>166500</td>
         <td>2026-10-22 16:15:24</td>
-        <td>2026-10-24 13:00:00</td>
-        <td></td>
+        <td>2026-11-09 11:00:00</td>
+        <td>2026-11-09</td>
         <td>2026-10-22 16:21:00</td>
-        <td>Reschedule</td>
+        <td>Active</td>
         <td>PAID</td>
         <td>CBI-GSN-D01-000448</td>
         <td>GUNUNG SINDUR</td>
@@ -132396,11 +132396,11 @@ PATOKAN RUMAH  Gerbang Hitam  Rooftop Hitam</td>
         <td>WO-22102026-3789028</td>
         <td>CBI-GSN-D01-S04-A01</td>
         <td>4</td> 
-        <td>  ## JL BABAKAN III No 126  RT  RW  Kelurahan GUNUNG SINDUR Kecamatan GUNUNG SINDUR Kota BOGOR Provinsi JAWA BARAT  </td> 
+        <td>    ## JL BABAKAN III No 126  RT  RW  Kelurahan GUNUNG SINDUR Kecamatan GUNUNG SINDUR Kota BOGOR Provinsi JAWA BARAT  DONE</td> 
         <td>-6.357839880363176,106.70199523807868</td>         
         <td>JL BABAKAN III NO 126 BAKTI JAYA KEC SETU KOTA TANGERANG SELATAN BANTEN 15315</td> 
         <td>MISITEL</td> 
-        <td></td> 
+        <td>TNGMST002</td> 
     </tr>
         <tr>
         <td>221026162345</td>
@@ -135705,7 +135705,7 @@ KOTA SEMARANG 50274</td>
         <td>2026-11-04 17:00:00</td>
         <td></td>
         <td>2026-10-26 08:26:00</td>
-        <td>Propose To Cancel</td>
+        <td>Refund</td>
         <td>PAID</td>
         <td>JKT-CPY-D17-H-00649</td>
         <td>CIPAYUNG</td>
@@ -153046,9 +153046,9 @@ PATOKAN RUMAH  SAMPING FOTOKOPI I AM COMPUTER PAGER COKLAT DARI KAYU </td>
         <td>CIRACAS</td>
         <td></td>
         <td>RUPS DSSA</td>
-        <td>WO-26102026-3810164</td>
-        <td>JKT-CRS-D15-S01-A07</td>
-        <td>9</td> 
+        <td>WO-07112026-3877850</td>
+        <td>JKT-CRS-D15-S01-A06</td>
+        <td>14</td> 
         <td>  ## JL ABDURAHMAN No 122E RT 011 RW 005  Kelurahan CIBUBUR Kecamatan CIRACAS Kota JAKARTA TIMUR Provinsi DKI JAKARTA  Done</td> 
         <td>-6.361052051325195,106.88059737208849</td>         
         <td>JL ABDURAHMAN NO  122E RT  011 RW  005 KEL  CIBUBUR KEC CIRACAS PATOKAN RUMAH SAMPING YAYASAN KASIH BHAKTI MANDIRI DEKAT TURUNAN</td> 
@@ -166139,7 +166139,7 @@ KECAMATAN CIMANGGIS KOTA DEPOK 16454</td>
         <td>Internal</td>
         <td>WO-27102026-3817941</td>
         <td>JKT-KJT-D02-S04-A08</td>
-        <td>5</td> 
+        <td>13</td> 
         <td>  ## JALAN JAANI NASIR  No 39 RT 001 RW 010 Kelurahan CAWANG Kecamatan KRAMAT JATI Kota JAKARTA TIMUR Provinsi DKI JAKARTA  DONE</td> 
         <td>-6.2504086897704205,106.86745879165798</td>         
         <td>jalan jaani nasir gg H toyib rt 001 rw 010 nomor 39
@@ -174013,16 +174013,16 @@ KOTA DAN KODE POS PALEMBANG 30126</td>
         <td>2026-11-02 17:00:00</td>
         <td></td>
         <td>2026-10-30 14:05:00</td>
-        <td>Propose To Cancel</td>
+        <td>READY</td>
         <td>PAID</td>
-        <td>JKT-PMR-D06-H-000497</td>
+        <td>JKT-PMR-D06-H-000073</td>
         <td>PALMERAH</td>
         <td></td>
         <td>Facebook</td>
         <td>WO-30102026-3832155</td>
         <td>JKT-PMR-D06-S01-A06</td>
         <td>4</td> 
-        <td>  ##RUMAH JL SULAIMAN No 25 RT 002 RW 004 Kelurahan KEMANGGISAN Kecamatan PALMERAH Kota JAKARTA BARAT Provinsi DKI JAKARTA  Cancelled - FAT Tidak Ditemukan Impact Relokasi PU</td> 
+        <td>#Need More Info from Sales#RUMAH JL SULAIMAN No 25 RT 002 RW 004 Kelurahan KEMANGGISAN Kecamatan PALMERAH Kota JAKARTA BARAT Provinsi DKI JAKARTA  Cancelled - FAT Tidak Ditemukan Impact Relokasi PU</td> 
         <td>-6.1992310409944835,106.79538980680883</td>         
         <td>JL SULAIMAN NO 25 RT 02 RW 04 KEL KEMANGGISAN KEC PALMERAH KOTA DAN KODE POS 11480</td> 
         <td>Quantum</td> 
@@ -179468,10 +179468,10 @@ Tikor Customer
         <td>115000</td>
         <td>127650</td>
         <td>2026-10-29 15:52:17</td>
-        <td>2026-10-31 13:00:00</td>
+        <td>2026-11-08 09:00:00</td>
         <td></td>
         <td>2026-10-29 15:59:00</td>
-        <td>Reschedule</td>
+        <td>Propose To Cancel</td>
         <td>PAID</td>
         <td>JKT-KMY-D06-H-000033</td>
         <td>KEMAYORAN</td>
@@ -179480,15 +179480,15 @@ Tikor Customer
         <td>WO-29102026-3828233</td>
         <td>JKT-KMY-D06-S01-A06</td>
         <td>4</td> 
-        <td> ## JL TEMBAGA DALAM No Y542A RT 014 RW 003 Kelurahan HARAPAN MULYA Kecamatan KEMAYORAN Kota JAKARTA TIMUR Provinsi DKI JAKARTA 
+        <td>  ## JL TEMBAGA DALAM No Y542A RT 014 RW 003 Kelurahan HARAPAN MULYA Kecamatan KEMAYORAN Kota JAKARTA TIMUR Provinsi DKI JAKARTA 
 
 FAT ALTERNATIF JKT-KMY-D05-S02-A10
 TIKOR FAT -6.174341, 106.854090
- </td> 
+ OK</td> 
         <td>-6.1740976052318235,106.85500247344171</td>         
         <td>JL TEMBAGA DALAM 1 NO Y542A ?RT 014 RW 003 ?KEL HARAPAN MULIA KEC KEMAYORAN ?KOTA  JAKARTA PUSAT 10640</td> 
         <td>MISITEL</td> 
-        <td></td> 
+        <td>JKSMST112</td> 
     </tr>
         <tr>
         <td>291026154850</td>
@@ -180396,7 +180396,7 @@ PATOKAN RUMAH : KONTRAKAN JONGGA BELAKANG SHOROOM TRIPLE 7 MOTOR</td>
         <td>150000</td>
         <td>166500</td>
         <td>2026-10-29 17:35:08</td>
-        <td>2026-11-08 09:00:00</td>
+        <td>2026-11-08 00:00:00</td>
         <td>2026-11-08</td>
         <td>2026-10-29 18:10:00</td>
         <td>Active</td>
@@ -193777,7 +193777,7 @@ Leader Partner : arfan nasir"</td>
         <td>2026-11-01 17:00:00</td>
         <td></td>
         <td>2026-10-31 14:04:00</td>
-        <td>Propose To Cancel</td>
+        <td>Refund</td>
         <td>PAID</td>
         <td>JKT-STB-D05-H-000088</td>
         <td>SETIABUDI</td>
@@ -195343,7 +195343,7 @@ KEL JATI MURNI KEC PONDOK MELATI BEKASI 17431</td>
         <td>2026-11-01 19:00:00</td>
         <td></td>
         <td>2026-10-31 15:44:00</td>
-        <td>Propose To Cancel</td>
+        <td>Refund</td>
         <td>PAID</td>
         <td>BKS-PDG-D38-H-000048</td>
         <td>PONDOK GEDE</td>
@@ -195471,10 +195471,10 @@ PATOKAN RUMAH SEBELAH TOKO KUE MUTIARA</td>
         <td>150000</td>
         <td>166500</td>
         <td>2026-10-31 15:48:29</td>
-        <td>2026-11-03 13:00:00</td>
+        <td>2026-11-05 19:00:00</td>
         <td></td>
         <td>2026-11-02 15:09:00</td>
-        <td>Reschedule</td>
+        <td>Refund</td>
         <td>PAID</td>
         <td>BKS-JTA-D05-H-000320</td>
         <td>JATIASIH</td>
@@ -195483,11 +195483,46 @@ PATOKAN RUMAH SEBELAH TOKO KUE MUTIARA</td>
         <td>WO-02112026-3850217</td>
         <td>BKS-JTA-D05-S03-A04</td>
         <td>7</td> 
-        <td> ##RUMAH  JL WIBAWA MUKTI II  No  BLOK A LANTAI 4 NO 2 RT 001 RW 007 Kelurahan JATISARI Kecamatan JATIASIH Kota BEKASI Provinsi JAWA BARAT  </td> 
+        <td>  ##RUMAH  JL WIBAWA MUKTI II  No  BLOK A LANTAI 4 NO 2 RT 001 RW 007 Kelurahan JATISARI Kecamatan JATIASIH Kota BEKASI Provinsi JAWA BARAT  TIKOR CUSTOMER :
+-6.345889,106.942136 
+
+Paket Internet : Oxylite 50
+
+FAT ID : BKS-JTA-D05-S03-A04
+ 
+Status WO : CANCEL 
+Alasan Pembatalan : NO COVERAGE
+Detail NO COVERAGE : 
+KONFIRMASI FAT BANG
+
+AN : PHILIPUS HARLYBERTUS ARYAGUNA KEBAN
+ID : 27621787
+WO-02112026-3850217
+
+TIKOR CUSTOMER :
+-6.345889,106.942136
+
+TIM VISIT, TIM CEK FAT SESUAI WO UNTUK JALUR CROSING JL RAYA AKTIF JATISARI BANG. UNTUK POSISI RUMAH CST BERADA DIRUSUN DAN BERADA DILANTAI 4. UNTUK DIJALUR KABEL GAADA KABEL OPTIK BANG, ADANYA KABEL GEDE SEMUA.
+
+BKS-JTA-D05-S03-A04
+-6.346273,106.943072
+
+DIBANTU SOLUSINYA BANG
+
+Gilang Bagindo:
+BKS-JTA-D05-S03-JB1-C02-A07
+-6.346565, 106.941666
+sini gimana
+
+Alif Firman Saputra:
+BKS-JTA-D05-S03-JB1-C02-A07
+-6.346565, 106.941666
+ 
+jarak 350m± by maps dan untuk jalur satu satunya bang dan lebih muter¿¿¿¿</td> 
         <td>-6.34589569616467,106.94222403008743</td>         
         <td>JL WIBAWA MUKTI II RUSUNAWA TNI AU BLOK A LANTAI 4 NO 2 RT 001 RW 007 KEL JATISARI KEC JATIASIH KOTA BEKASI 17426</td> 
-        <td></td> 
-        <td></td> 
+        <td>MISITEL</td> 
+        <td>BKSMST052</td> 
     </tr>
         <tr>
         <td>311026154859</td>
@@ -195635,10 +195670,10 @@ KOTA BANDUNG KODE POS 40281</td>
         <td>150000</td>
         <td>166500</td>
         <td>2026-10-31 16:02:39</td>
-        <td>2026-11-02 15:00:00</td>
+        <td>2026-11-03 13:00:00</td>
         <td></td>
         <td>2026-10-31 16:09:00</td>
-        <td>Reschedule</td>
+        <td>Refund</td>
         <td>PAID</td>
         <td>JKT-JGK-D04-H-000528</td>
         <td>JAGAKARSA</td>
@@ -195647,11 +195682,11 @@ KOTA BANDUNG KODE POS 40281</td>
         <td>WO-31102026-3840618</td>
         <td>JKT-JGK-D04-S04-A06</td>
         <td>11</td> 
-        <td> ##RUMAH  JL KRAMAT BABAKAN No 96 RT 003 RW 001 Kelurahan JAGAKARSA Kecamatan JAGAKARSA Kota JAKARTA SELATAN Provinsi DKI JAKARTA  </td> 
+        <td>  ##RUMAH  JL KRAMAT BABAKAN No 96 RT 003 RW 001 Kelurahan JAGAKARSA Kecamatan JAGAKARSA Kota JAKARTA SELATAN Provinsi DKI JAKARTA  ok</td> 
         <td>-6.3318165488,-6.3318165488</td>         
         <td>JL KRAMAT BABAKAN NO 96 RT 3 RW 1 JAGAKARSA KEC JAGAKARSA KOTA JAKARTA SELATAN DAERAH KHUSUS IBUKOTA JAKARTA 12620</td> 
         <td>MISITEL</td> 
-        <td></td> 
+        <td>JKSMST119</td> 
     </tr>
         <tr>
         <td>311026160534</td>
@@ -195942,7 +195977,7 @@ KABUPATEN BOGOR 16680</td>
         <td>Internal</td>
         <td>WO-31102026-3840743</td>
         <td>JKT-CRS-D09-S03-A11</td>
-        <td>8</td> 
+        <td>4</td> 
         <td>   ## GG SABIUN No 18 RT 005 RW 004 Kelurahan CIRACAS Kecamatan CIRACAS Kota JAKARTA TIMUR Provinsi DKI JAKARTA  ok</td> 
         <td>-6.317083893520726,106.87056372668943</td>         
         <td>GG SABIUN NO 18G RT 005 RW 004 KEL SUSUKAN KEC CIRACAS KOTA JAKARTA TIMUR</td> 
@@ -196356,7 +196391,7 @@ Disetujui oleh dispatcher :ibnu muhammad</td>
         <td>2026-11-01 09:00:00</td>
         <td></td>
         <td>2026-10-31 17:09:00</td>
-        <td>Propose To Cancel</td>
+        <td>Refund</td>
         <td>PAID</td>
         <td>BKS-PDG-D38-H-000047</td>
         <td>PONDOK GEDE</td>
