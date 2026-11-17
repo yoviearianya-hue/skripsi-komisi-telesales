@@ -711,12 +711,15 @@ function build_tg_visual_payload(array $appData, string $scopeSend, bool $includ
             if (!$isGtW && $scopeSend !== 'Semua Leader' && ($wr['leader'] ?? '') !== $scopeSend) continue;
             $woLdrRows[] = [
                 'leader'                => (string)($wr['leader'] ?? ''),
+                'today_sa'              => (int)($wr['today_sa'] ?? 0),
                 'today_on_installation' => (int)($wr['today_on_installation'] ?? 0),
-                'today_refund'          => (int)($wr['today_refund'] ?? 0),
+                'today_reschedule'      => (int)($wr['today_reschedule'] ?? 0),
                 'today_waiting_wo'      => (int)($wr['today_waiting_wo'] ?? 0),
+                'today_refund'          => (int)($wr['today_refund'] ?? 0),
+                'today_other'           => (int)($wr['today_other'] ?? 0),
                 'today_total'           => (int)($wr['today_total'] ?? 0),
-                'waiting_wo'            => (int)($wr['waiting_wo'] ?? 0),
                 'wo_besok'              => (int)($wr['wo_besok'] ?? 0),
+                'waiting_wo'            => (int)($wr['waiting_wo'] ?? 0),
                 'is_gt'                 => $isGtW,
             ];
         }
@@ -731,14 +734,16 @@ function build_tg_visual_payload(array $appData, string $scopeSend, bool $includ
         $woBesokSafe = array_values(array_filter($wsSrc['wo_besok_rows'] ?? [], $filtWoScopeTg));
         $woAgSafe    = array_values(array_filter($wsSrc['agent_summary'] ?? [], $filtWoScopeTg));
         $woSafe = [
-            'today_label'     => (string)($wsSrc['today_label'] ?? ''),
-            'besok_label'     => (string)($wsSrc['besok_label'] ?? ''),
-            'leader_summary'  => $woLdrRows,
-            'wo_today_rows'   => $woTodaySafe,
-            'waiting_wo_rows' => $woWaitSafe,
-            'wo_besok_rows'   => $woBesokSafe,
-            'agent_summary'   => $woAgSafe,
-            'include_cards'   => $includeWoCards,
+            'today_label'       => (string)($wsSrc['today_label'] ?? ''),
+            'besok_label'       => (string)($wsSrc['besok_label'] ?? ''),
+            'besok_range_label' => (string)($wsSrc['besok_range_label'] ?? ('>= ' . (string)($wsSrc['besok_label'] ?? ''))),
+            'wo_today_columns'  => array_values($wsSrc['wo_today_columns'] ?? []),
+            'leader_summary'    => $woLdrRows,
+            'wo_today_rows'     => $woTodaySafe,
+            'waiting_wo_rows'   => $woWaitSafe,
+            'wo_besok_rows'     => $woBesokSafe,
+            'agent_summary'     => $woAgSafe,
+            'include_cards'     => $includeWoCards,
         ];
     }
 
@@ -763,6 +768,25 @@ function build_tg_visual_payload(array $appData, string $scopeSend, bool $includ
 
 function rp($angka): string {
     return 'Rp ' . number_format((float)$angka, 0, ',', '.');
+}
+
+function ensure_wo_summary_v2(array &$appData, string $poolActiveFile, string $poolDefaultFile, string $dataFile): void {
+    if (empty($appData['params']) || (int)($appData['wo_summary']['calc_version'] ?? 0) >= 2) {
+        return;
+    }
+    try {
+        $poolAuto = load_prospect_pool($poolActiveFile, $poolDefaultFile);
+        if (!$poolAuto) return;
+        $pAuto = $appData['params'];
+        $bIniA = (int)($pAuto['bulan_ini'] ?? 11);
+        $thnA  = (int)($pAuto['tahun'] ?? 2026);
+        $hWoA  = (int)($appData['wo_summary']['day'] ?? ($pAuto['hari_wo'] ?? ($pAuto['hari_harian'] ?? ($appData['hari_berjalan'] ?? 15))));
+        $appData['wo_summary'] = hitung_wo_laporan($poolAuto, $bIniA, $thnA, $hWoA);
+        $appData['params']['hari_wo'] = $appData['wo_summary']['day'];
+        @file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
+    } catch (Throwable $e) {
+        // Lewati jika pool belum siap agar dashboard tetap merender aman
+    }
 }
 
 // Muat Konfigurasi Awal
@@ -936,6 +960,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'api_s
 // HANDLER DOWNLOAD LAPORAN EXCEL (.XLS) & CSV LANGSUNG DARI SERVER
 // ============================================================================
 if (isset($_GET['download']) && !empty($_SESSION['auth_user'])) {
+    ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile);
     $dlType = $_GET['download'];
     $authU = $_SESSION['auth_user'];
     @session_write_close();
@@ -978,12 +1003,20 @@ if (isset($_GET['download']) && !empty($_SESSION['auth_user'])) {
         }
         $dlWoSum = $appData['wo_summary'] ?? [];
         if (!empty($dlWoSum['leader_summary'])) {
-            echo '</table><br><h3>1C. MONITORING WORK ORDER (WO TODAY ' . htmlspecialchars((string)($dlWoSum['today_label'] ?? '')) . ' | WAITING WO | WO BESOK ' . htmlspecialchars((string)($dlWoSum['besok_label'] ?? '')) . ')</h3>';
-            echo '<table border="1"><tr><th>Sales Leader</th><th>WO Today On Install</th><th>WO Today Refund</th><th>WO Today Waiting WO</th><th>Total WO Today</th><th>Waiting WO (Bulan Ini)</th><th>WO Besok</th></tr>';
+            echo '</table><br><h3>1C. MONITORING WORK ORDER (1. WO TODAY ' . htmlspecialchars((string)($dlWoSum['today_label'] ?? '')) . ' &amp; SA | 2. WO BESOK ' . htmlspecialchars((string)($dlWoSum['besok_range_label'] ?? ($dlWoSum['besok_label'] ?? ''))) . ' | 3. WAITING WO BLANK)</h3>';
+            echo '<table border="1"><tr><th>Sales Leader</th><th>Total WO Today</th><th>SA (Active)</th><th>On Install</th><th>Reschedule</th><th>Waiting WO Today</th><th>Lainnya</th><th>WO Besok (&gt;= H+1)</th><th>Waiting WO (Blank)</th></tr>';
             foreach ($dlWoSum['leader_summary'] as $wr) {
                 if (!empty($wr['is_grand_total']) && $dlScope !== 'Semua Leader') continue;
                 if (empty($wr['is_grand_total']) && $dlScope !== 'Semua Leader' && $wr['leader'] !== $dlScope) continue;
-                echo '<tr><td>' . htmlspecialchars((string)$wr['leader']) . "</td><td>{$wr['today_on_installation']}</td><td>{$wr['today_refund']}</td><td>{$wr['today_waiting_wo']}</td><td>{$wr['today_total']}</td><td>{$wr['waiting_wo']}</td><td>{$wr['wo_besok']}</td></tr>";
+                $sTot = (int)($wr['today_total'] ?? 0);
+                $sSa  = (int)($wr['today_sa'] ?? 0);
+                $sOn  = (int)($wr['today_on_installation'] ?? 0);
+                $sRes = (int)($wr['today_reschedule'] ?? 0);
+                $sWt  = (int)($wr['today_waiting_wo'] ?? 0);
+                $sOth = (int)($wr['today_other'] ?? 0);
+                $sBsk = (int)($wr['wo_besok'] ?? 0);
+                $sWwo = (int)($wr['waiting_wo'] ?? 0);
+                echo '<tr><td>' . htmlspecialchars((string)$wr['leader']) . "</td><td>{$sTot}</td><td>{$sSa}</td><td>{$sOn}</td><td>{$sRes}</td><td>{$sWt}</td><td>{$sOth}</td><td>{$sBsk}</td><td>{$sWwo}</td></tr>";
             }
         }
         echo '</table><br><h3>2. DETAIL TARGET & KOMISI AGENT</h3><table border="1"><tr><th>SALES LEADER</th><th>SALES NAME</th><th>MASA KERJA</th><th>LEVEL</th><th>TARGET ALL</th>';
@@ -1071,42 +1104,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     } elseif ($_POST['action'] === 'switch_daily_date' && !empty($_SESSION['auth_user'])) {
         // Ubah Tanggal Cek Rekap Harian & Agent Blm Produktif secara instan di server tanpa Docker / tanpa re-upload
+        $curRoleSw = $_SESSION['auth_user']['role'] ?? '';
         @session_write_close();
-        try {
-            $hariCekIn = max(1, min(31, (int)($_POST['hari_harian_cek'] ?? 15)));
-            if (!file_exists($targetActiveFile) && file_exists($targetDefaultFile)) {
-                @copy($targetDefaultFile, $targetActiveFile);
+        if (!in_array($curRoleSw, ['Admin', 'Finance', 'Leader'], true)) {
+            $actionStatus = '<div class="alert-err">🚫 Akses ditolak untuk mengubah tanggal laporan.</div>';
+        } else {
+            try {
+                $hariCekIn = max(1, min(31, (int)($_POST['hari_harian_cek'] ?? 15)));
+                if (!file_exists($targetActiveFile) && file_exists($targetDefaultFile)) {
+                    @copy($targetDefaultFile, $targetActiveFile);
+                }
+                $poolNow = load_prospect_pool($poolActiveFile, $poolDefaultFile);
+                $pCur = $appData['params'] ?? ['sheet' => "NOVEMBER'26", 'bulan_lalu' => 10, 'bulan_ini' => 11, 'tahun' => 2026, 'total_hari' => 30, 'hari_berjalan' => 15, 'rasio_paid' => 1.25];
+                $hDlmBln = cal_days_in_month_aman((int)$pCur['bulan_ini'], (int)$pCur['tahun']);
+                $tglTargetObj = new DateTimeImmutable(sprintf('%04d-%02d-%02d', (int)$pCur['tahun'], (int)$pCur['bulan_ini'], min((int)$pCur['hari_berjalan'], $hDlmBln)));
+                $targetRows = baca_data_target($targetActiveFile, (string)$pCur['sheet'], $tglTargetObj);
+                $dp = hitung_rekap_harian_blm_produktif($poolNow, $targetRows, (int)$pCur['bulan_ini'], (int)$pCur['tahun'], $hariCekIn);
+                $appData['daily_prod_date_label'] = $dp['date_label'];
+                $appData['daily_prod_day'] = $dp['day'];
+                $appData['daily_prod_rows'] = $dp['rows'];
+                $appData['params']['hari_harian'] = $dp['day'];
+                $appData['tanggal_tersedia'] = daftar_hari_tersedia_bulan($poolNow, (int)$pCur['bulan_ini'], (int)$pCur['tahun'], $dp['day']);
+                file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
+                $actionStatus = '<div class="alert-ok">📅 Tanggal Tabel Harian &amp; Agent Blm Produktif diubah ke <b>' . htmlspecialchars($dp['date_label']) . '</b> langsung di server!</div>';
+            } catch (Throwable $e) {
+                $actionStatus = '<div class="alert-err">❌ Gagal mengganti tanggal harian: ' . htmlspecialchars($e->getMessage()) . '</div>';
             }
-            $poolNow = load_prospect_pool($poolActiveFile, $poolDefaultFile);
-            $pCur = $appData['params'] ?? ['sheet' => "NOVEMBER'26", 'bulan_lalu' => 10, 'bulan_ini' => 11, 'tahun' => 2026, 'total_hari' => 30, 'hari_berjalan' => 15, 'rasio_paid' => 1.25];
-            $hDlmBln = cal_days_in_month_aman((int)$pCur['bulan_ini'], (int)$pCur['tahun']);
-            $tglTargetObj = new DateTimeImmutable(sprintf('%04d-%02d-%02d', (int)$pCur['tahun'], (int)$pCur['bulan_ini'], min((int)$pCur['hari_berjalan'], $hDlmBln)));
-            $targetRows = baca_data_target($targetActiveFile, (string)$pCur['sheet'], $tglTargetObj);
-            $dp = hitung_rekap_harian_blm_produktif($poolNow, $targetRows, (int)$pCur['bulan_ini'], (int)$pCur['tahun'], $hariCekIn);
-            $appData['daily_prod_date_label'] = $dp['date_label'];
-            $appData['daily_prod_day'] = $dp['day'];
-            $appData['daily_prod_rows'] = $dp['rows'];
-            $appData['params']['hari_harian'] = $dp['day'];
-            $appData['tanggal_tersedia'] = daftar_hari_tersedia_bulan($poolNow, (int)$pCur['bulan_ini'], (int)$pCur['tahun'], $dp['day']);
-            file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
-            $actionStatus = '<div class="alert-ok">📅 Tanggal Tabel Harian &amp; Agent Blm Produktif diubah ke <b>' . htmlspecialchars($dp['date_label']) . '</b> langsung di server!</div>';
-        } catch (Throwable $e) {
-            $actionStatus = '<div class="alert-err">❌ Gagal mengganti tanggal harian: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
     } elseif ($_POST['action'] === 'switch_wo_date' && !empty($_SESSION['auth_user'])) {
-        // Ubah Tanggal Monitoring WO Today (WO Besok otomatis H+1) langsung di server
+        // Ubah Tanggal Monitoring WO Today (WO Besok otomatis > Today) langsung di server
+        $curRoleSw = $_SESSION['auth_user']['role'] ?? '';
         @session_write_close();
-        try {
-            $hariWoCek = max(1, min(31, (int)($_POST['hari_wo_cek'] ?? ($appData['wo_summary']['day'] ?? ($appData['daily_prod_day'] ?? 15)))));
-            $poolNow = load_prospect_pool($poolActiveFile, $poolDefaultFile);
-            $pCur = $appData['params'] ?? ['bulan_ini' => 11, 'tahun' => 2026];
-            $woRes = hitung_wo_laporan($poolNow, (int)($pCur['bulan_ini'] ?? 11), (int)($pCur['tahun'] ?? 2026), $hariWoCek);
-            $appData['wo_summary'] = $woRes;
-            $appData['params']['hari_wo'] = $woRes['day'];
-            file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
-            $actionStatus = '<div class="alert-ok">🛠️ Monitoring Work Order diperbarui: <b>WO Today ' . htmlspecialchars($woRes['today_label']) . '</b> | <b>Waiting WO: ' . (int)$woRes['waiting_wo_total'] . '</b> | <b>WO Besok (' . htmlspecialchars($woRes['besok_label']) . '): ' . (int)$woRes['wo_besok_total'] . '</b>!</div>';
-        } catch (Throwable $e) {
-            $actionStatus = '<div class="alert-err">❌ Gagal memperbarui tanggal WO: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        if (!in_array($curRoleSw, ['Admin', 'Finance', 'Leader'], true)) {
+            $actionStatus = '<div class="alert-err">🚫 Akses ditolak untuk mengubah tanggal Monitoring WO.</div>';
+        } else {
+            try {
+                $hariWoCek = max(1, min(31, (int)($_POST['hari_wo_cek'] ?? ($appData['wo_summary']['day'] ?? ($appData['daily_prod_day'] ?? 15)))));
+                $poolNow = load_prospect_pool($poolActiveFile, $poolDefaultFile);
+                $pCur = $appData['params'] ?? ['bulan_ini' => 11, 'tahun' => 2026];
+                $woRes = hitung_wo_laporan($poolNow, (int)($pCur['bulan_ini'] ?? 11), (int)($pCur['tahun'] ?? 2026), $hariWoCek);
+                $appData['wo_summary'] = $woRes;
+                $appData['params']['hari_wo'] = $woRes['day'];
+                file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
+                $woTotR = (int)($woRes['wo_today_totals']['total'] ?? 0);
+                $woSaR  = (int)($woRes['wo_today_totals']['sa'] ?? 0);
+                $actionStatus = '<div class="alert-ok">🛠️ Monitoring WO diperbarui: <b>1. WO Today ' . htmlspecialchars($woRes['today_label']) . ': ' . $woTotR . ' (SA ' . $woSaR . ')</b> | <b>2. WO Besok (&gt;= ' . htmlspecialchars($woRes['besok_label']) . '): ' . (int)$woRes['wo_besok_total'] . '</b> | <b>3. Waiting WO (Blank): ' . (int)$woRes['waiting_wo_total'] . '</b>!</div>';
+            } catch (Throwable $e) {
+                $actionStatus = '<div class="alert-err">❌ Gagal memperbarui tanggal WO: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            }
         }
     } elseif ($_POST['action'] === 'upload_excel_data' && !empty($_SESSION['auth_user'])) {
         $curRole = $_SESSION['auth_user']['role'] ?? '';
@@ -1372,12 +1417,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                     $woSumTg = $appData['wo_summary'] ?? [];
                     if ($incWo && !empty($woSumTg['leader_summary'])) {
-                        $woLines = ["🛠️ <b>MONITORING WORK ORDER (Today " . $escTg((string)($woSumTg['today_label'] ?? '')) . " | Besok " . $escTg((string)($woSumTg['besok_label'] ?? '')) . ")</b>"];
+                        $besokRngTg = (string)($woSumTg['besok_range_label'] ?? ('>= ' . (string)($woSumTg['besok_label'] ?? '')));
+                        $woLines = ["🛠️ <b>MONITORING WORK ORDER (1. Today " . $escTg((string)($woSumTg['today_label'] ?? '')) . " &amp; SA | 2. Besok " . $escTg($besokRngTg) . " | 3. Waiting WO)</b>"];
                         foreach ($woSumTg['leader_summary'] as $wr) {
                             $isGtW = !empty($wr['is_grand_total']);
                             if ($isGtW && $scopeSend !== 'Semua Leader') continue;
                             if (!$isGtW && $scopeSend !== 'Semua Leader' && ($wr['leader'] ?? '') !== $scopeSend) continue;
-                            $woLines[] = ($isGtW ? "🏆 <b>" : "• <b>") . $escTg((string)($wr['leader'] ?? '')) . "</b>: WO Today=<b>{$wr['today_total']}</b> (On Inst={$wr['today_on_installation']}, Refund={$wr['today_refund']}, Wait={$wr['today_waiting_wo']}) | Waiting WO=<b>{$wr['waiting_wo']}</b> | Besok=<b>{$wr['wo_besok']}</b>";
+                            $tTot = (int)($wr['today_total'] ?? 0);
+                            $tSa  = (int)($wr['today_sa'] ?? 0);
+                            $tOn  = (int)($wr['today_on_installation'] ?? 0);
+                            $tRes = (int)($wr['today_reschedule'] ?? 0);
+                            $tWt  = (int)($wr['today_waiting_wo'] ?? 0);
+                            $tOth = (int)($wr['today_other'] ?? 0);
+                            $tBsk = (int)($wr['wo_besok'] ?? 0);
+                            $tWwo = (int)($wr['waiting_wo'] ?? 0);
+                            $woLines[] = ($isGtW ? "🏆 <b>" : "• <b>") . $escTg((string)($wr['leader'] ?? '')) . "</b>: WO Today=<b>{$tTot}</b> (<b>SA={$tSa}</b>, On Inst={$tOn}, Resched={$tRes}, Wait={$tWt}, Lain={$tOth}) | WO Besok=<b>{$tBsk}</b> | Waiting WO=<b>{$tWwo}</b>";
                         }
                         $blocks[] = implode("\n", $woLines) . "\n━━━━━━━━━━━━━━━━━━━━━━\n";
                     }
@@ -1472,6 +1526,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $mtdRows      = $appData['mtd_rows'] ?? [];
 $agentRows    = $appData['agent_rows'] ?? [];
 $dailyRows    = $appData['daily_prod_rows'] ?? [];
+if (!empty($_SESSION['auth_user'])) {
+    ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile);
+}
 $dailyLbl     = (string)($appData['daily_prod_date_label'] ?? '15-Nov-26');
 $dailyDay     = (int)($appData['daily_prod_day'] ?? 15);
 $tglTersedia  = $appData['tanggal_tersedia'] ?? [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
@@ -1976,10 +2033,10 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.2); display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px;">
                     <span style="font-size:0.88rem; color:#fde047;">
                         🛠️ <b>WO Pribadi Anda:</b>
-                        WO Today (<?= htmlspecialchars((string)($woSummary['today_label'] ?? '')) ?>): <b><?= (int)$agWoMine['today_total'] ?></b>
-                        (On Install <?= (int)$agWoMine['today_on_installation'] ?> | Refund <?= (int)$agWoMine['today_refund'] ?> | Wait <?= (int)$agWoMine['today_waiting_wo'] ?>) |
-                        Waiting WO: <b><?= (int)$agWoMine['waiting_wo'] ?></b> |
-                        WO Besok (<?= htmlspecialchars((string)($woSummary['besok_label'] ?? '')) ?>): <b><?= (int)$agWoMine['wo_besok'] ?></b>
+                        1. WO Today (<?= htmlspecialchars((string)($woSummary['today_label'] ?? '')) ?>): <b><?= (int)($agWoMine['today_total'] ?? 0) ?></b>
+                        (<b>SA <?= (int)($agWoMine['today_sa'] ?? 0) ?></b> | On Install <?= (int)($agWoMine['today_on_installation'] ?? 0) ?> | Resched <?= (int)($agWoMine['today_reschedule'] ?? 0) ?> | Wait <?= (int)($agWoMine['today_waiting_wo'] ?? 0) ?>) |
+                        2. WO Besok (<?= htmlspecialchars((string)($woSummary['besok_range_label'] ?? ($woSummary['besok_label'] ?? ''))) ?>): <b><?= (int)($agWoMine['wo_besok'] ?? 0) ?></b> |
+                        3. Waiting WO (Blank): <b><?= (int)($agWoMine['waiting_wo'] ?? 0) ?></b>
                     </span>
                     <button type="button" onclick="window.renderPersonalWoCard()" class="btn btn-amber" style="padding:6px 14px; font-size:0.82rem;">🖼️ Lihat &amp; Download Foto WO Saya (.png)</button>
                 </div>
@@ -2134,16 +2191,17 @@ $authUser = $_SESSION['auth_user'] ?? null;
     </div>
 
     <?php if ($role !== 'Agen'):
-        $woTodayRows   = $woSummary['wo_today_rows'] ?? [];
-        $woWaitingRows = $woSummary['waiting_wo_rows'] ?? [];
-        $woBesokRows   = $woSummary['wo_besok_rows'] ?? [];
-        $woSumRows     = $woSummary['leader_summary'] ?? [];
-        $woTodayLbl    = (string)($woSummary['today_label'] ?? $dailyLbl);
-        $woBesokLbl    = (string)($woSummary['besok_label'] ?? '');
-        $woTodayTot    = $woSummary['wo_today_totals'] ?? ['on_installation' => 0, 'refund' => 0, 'waiting_wo' => 0, 'total' => 0];
-        $woWaitingTot  = (int)($woSummary['waiting_wo_total'] ?? 0);
-        $woBesokTot    = (int)($woSummary['wo_besok_total'] ?? 0);
-        $woOtherSt     = $woSummary['wo_today_other_statuses'] ?? [];
+        $woTodayCols    = $woSummary['wo_today_columns'] ?? [];
+        $woTodayRows    = $woSummary['wo_today_rows'] ?? [];
+        $woWaitingRows  = $woSummary['waiting_wo_rows'] ?? [];
+        $woBesokRows    = $woSummary['wo_besok_rows'] ?? [];
+        $woSumRows      = $woSummary['leader_summary'] ?? [];
+        $woTodayLbl     = (string)($woSummary['today_label'] ?? $dailyLbl);
+        $woBesokLbl     = (string)($woSummary['besok_label'] ?? '');
+        $woBesokRngLbl  = (string)($woSummary['besok_range_label'] ?? ('>= ' . $woBesokLbl));
+        $woBesokH1Tot   = (int)($woSummary['wo_besok_h1_total'] ?? 0);
+        $woBesokLaterTot = (int)($woSummary['wo_besok_later_total'] ?? 0);
+        $woWaitBrk      = $woSummary['waiting_wo_breakdown'] ?? [];
 
         // Hitung total mengikuti filter scope jika Leader / filter Admin tertentu dipilih
         $filtWoScope = function ($r) use ($selectedScope) {
@@ -2152,25 +2210,50 @@ $authUser = $_SESSION['auth_user'] ?? null;
             if ($isGt) return $selectedScope === 'Semua Leader';
             return $selectedScope === 'Semua Leader' || ($r['leader'] ?? '') === $selectedScope;
         };
-        $dispTodayTot = 0; $dispWaitTot = 0; $dispBesokTot = 0;
-        $dispOnI = 0; $dispRef = 0; $dispWaitToday = 0;
+        $dispTodayTot = 0; $dispTodaySa = 0; $dispOnI = 0; $dispResch = 0;
+        $dispWaitToday = 0; $dispOther = 0; $dispBesokTot = 0; $dispWaitTot = 0;
         foreach ($woSumRows as $wsr) {
             if (!empty($wsr['is_grand_total'])) continue;
             if ($selectedScope !== 'Semua Leader' && ($wsr['leader'] ?? '') !== $selectedScope) continue;
-            $dispOnI       += (int)($wsr['today_on_installation'] ?? 0);
-            $dispRef       += (int)($wsr['today_refund'] ?? 0);
-            $dispWaitToday += (int)($wsr['today_waiting_wo'] ?? 0);
             $dispTodayTot  += (int)($wsr['today_total'] ?? 0);
-            $dispWaitTot   += (int)($wsr['waiting_wo'] ?? 0);
+            $dispTodaySa   += (int)($wsr['today_sa'] ?? 0);
+            $dispOnI       += (int)($wsr['today_on_installation'] ?? 0);
+            $dispResch     += (int)($wsr['today_reschedule'] ?? 0);
+            $dispWaitToday += (int)($wsr['today_waiting_wo'] ?? 0);
+            $dispOther     += (int)($wsr['today_other'] ?? 0);
             $dispBesokTot  += (int)($wsr['wo_besok'] ?? 0);
+            $dispWaitTot   += (int)($wsr['waiting_wo'] ?? 0);
+        }
+        $dispStCounts = [];
+        foreach ($woTodayRows as $trSt) {
+            if (($trSt['row_type'] ?? '') !== 'agent') continue;
+            if ($selectedScope !== 'Semua Leader' && ($trSt['leader'] ?? '') !== $selectedScope) continue;
+            foreach (($trSt['statuses'] ?? []) as $stK => $stV) {
+                $dispStCounts[$stK] = ($dispStCounts[$stK] ?? 0) + (int)$stV;
+            }
+        }
+        $todaySubParts = [];
+        foreach ($woTodayCols as $cnSub) {
+            $cntSub = (int)($dispStCounts[$cnSub] ?? 0);
+            if ($cntSub > 0) {
+                $lblSub = strcasecmp($cnSub, 'Active') === 0 ? 'SA (Active)' : $cnSub;
+                $todaySubParts[] = htmlspecialchars($lblSub) . ': <b>' . $cntSub . '</b>';
+            }
+        }
+        $saPctToday = $dispTodayTot > 0 ? round(($dispTodaySa / $dispTodayTot) * 100) : 0;
+        $waitBrkParts = [];
+        if ($selectedScope === 'Semua Leader') {
+            foreach ($woWaitBrk as $wbK => $wbV) {
+                if ((int)$wbV > 0) $waitBrkParts[] = htmlspecialchars((string)$wbK) . ': ' . (int)$wbV;
+            }
         }
     ?>
-    <!-- DASHBOARD 1C: MONITORING WORK ORDER (WO TODAY | WAITING WO | WO BESOK) -->
+    <!-- DASHBOARD 1C: MONITORING WORK ORDER (1. WO TODAY & SA | 2. WO BESOK | 3. WAITING WO) -->
     <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
             <div>
-                <h3 style="margin:0;">🛠️ 1C. MONITORING WORK ORDER — WO TODAY (<?= htmlspecialchars($woTodayLbl) ?>) | WAITING WO | WO BESOK (<?= htmlspecialchars($woBesokLbl) ?>)</h3>
-                <div style="font-size:0.82rem; color:#475569; margin-top:2px;">Pivot <b>Count of Customer Name</b> per Sales Leader &amp; Salesname berdasarkan kolom <code>Instalasi Date</code> dan <code>Status</code></div>
+                <h3 style="margin:0;">🛠️ 1C. MONITORING WORK ORDER — 1. WO TODAY (<?= htmlspecialchars($woTodayLbl) ?>) | 2. WO BESOK | 3. WAITING WO</h3>
+                <div style="font-size:0.82rem; color:#475569; margin-top:2px;">Pivot <b>Count of Customer Name</b> per Sales Leader &amp; Salesname dari kolom <code>Instalasi Date</code> dan <code>Status</code></div>
             </div>
             <form method="post" style="margin:0; display:flex; gap:6px; align-items:center;">
                 <input type="hidden" name="action" value="switch_wo_date">
@@ -2188,41 +2271,42 @@ $authUser = $_SESSION['auth_user'] ?? null;
 
         <?php if (empty($woSummary)): ?>
             <div class="alert-err" style="background:#fffbeb; color:#92400e; border-color:#fcd34d;">
-                ℹ️ Data <b>WO TODAY / WAITING WO / WO BESOK</b> belum tersimpan di cache lama. Klik tombol <b>🔄 Hitung WO</b> di kanan atas atau upload ulang file <code>list_prospect</code> terbaru agar kolom <code>Instalasi Date</code> &amp; <code>Status</code> terhitung otomatis!
+                ℹ️ Data <b>WO TODAY / WO BESOK / WAITING WO</b> belum tersimpan di cache lama. Klik tombol <b>🔄 Hitung WO</b> di kanan atas atau upload ulang file <code>list_prospect</code> terbaru agar kolom <code>Instalasi Date</code> &amp; <code>Status</code> terhitung otomatis!
             </div>
         <?php else: ?>
             <div class="grid-3" style="margin-bottom:12px;">
                 <div class="metric-box" style="border-left-color:#1d4ed8;">
-                    <div class="metric-label">🛠️ WO TODAY (<?= htmlspecialchars($woTodayLbl) ?>)</div>
-                    <div class="metric-val"><?= number_format($dispTodayTot, 0, ',', '.') ?> Customer</div>
-                    <div class="metric-sub" style="color:#1e40af;">On Install: <?= $dispOnI ?> | Refund: <?= $dispRef ?> | Waiting WO: <?= $dispWaitToday ?></div>
-                </div>
-                <div class="metric-box" style="border-left-color:#d97706;">
-                    <div class="metric-label">⏳ WAITING WO (Bulan Ini)</div>
-                    <div class="metric-val"><?= number_format($dispWaitTot, 0, ',', '.') ?> Customer</div>
-                    <div class="metric-sub" style="color:#b45309;">Status = Waiting WO (Butuh Penjadwalan WO)</div>
+                    <div class="metric-label">1️⃣ WO TODAY (<?= htmlspecialchars($woTodayLbl) ?>)</div>
+                    <div class="metric-val">
+                        <?= number_format($dispTodayTot, 0, ',', '.') ?> Customer
+                        <span style="font-size:1rem; background:#dcfce7; color:#166534; padding:2px 9px; border-radius:999px; margin-left:4px; vertical-align:middle;">SA: <?= number_format($dispTodaySa, 0, ',', '.') ?> (<?= $saPctToday ?>%)</span>
+                    </div>
+                    <div class="metric-sub" style="color:#1e40af;"><?= $todaySubParts ? implode(' | ', $todaySubParts) : 'Belum ada data status' ?></div>
                 </div>
                 <div class="metric-box" style="border-left-color:#059669;">
-                    <div class="metric-label">📅 WO BESOK (<?= htmlspecialchars($woBesokLbl) ?>)</div>
+                    <div class="metric-label">2️⃣ WO BESOK (<?= htmlspecialchars($woBesokRngLbl) ?>)</div>
                     <div class="metric-val"><?= number_format($dispBesokTot, 0, ',', '.') ?> Customer</div>
-                    <div class="metric-sub">Jadwal Instalasi Besok (H+1)</div>
+                    <div class="metric-sub" style="color:#065f46;">
+                        Instalasi Date &gt; <?= htmlspecialchars($woTodayLbl) ?> (Status = ALL)
+                        <?php if ($selectedScope === 'Semua Leader'): ?>
+                            • H+1 (<?= htmlspecialchars($woBesokLbl) ?>): <b><?= $woBesokH1Tot ?></b> | Lusa+: <b><?= $woBesokLaterTot ?></b>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="metric-box" style="border-left-color:#d97706;">
+                    <div class="metric-label">3️⃣ WAITING WO (Instalasi Blank)</div>
+                    <div class="metric-val"><?= number_format($dispWaitTot, 0, ',', '.') ?> Customer</div>
+                    <div class="metric-sub" style="color:#b45309;">
+                        <?= $waitBrkParts ? implode(' | ', $waitBrkParts) : 'Instalasi Date = (blank) | Back To Sales, READY, Reschedule, Waiting WO' ?>
+                    </div>
                 </div>
             </div>
 
-            <?php if (!empty($woOtherSt)):
-                $othParts = [];
-                foreach ($woOtherSt as $sk => $sv) $othParts[] = htmlspecialchars($sk) . ': ' . (int)$sv;
-            ?>
-                <div style="font-size:0.78rem; color:#475569; margin-bottom:8px;">
-                    ℹ️ Status lain pada Instalasi Date <b><?= htmlspecialchars($woTodayLbl) ?></b> (di luar On Installation / Refund / Waiting WO): <?= implode(' | ', $othParts) ?>
-                </div>
-            <?php endif; ?>
-
             <div class="wo-tab-bar">
                 <button type="button" class="wo-tab-btn active" onclick="window.switchWoTab('wo-tab-sum', this)">📊 Ringkasan Per Leader</button>
-                <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-today', this)">1️⃣ WO TODAY (<?= $dispTodayTot ?>)</button>
-                <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-wait', this)">2️⃣ WAITING WO (<?= $dispWaitTot ?>)</button>
-                <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-besok', this)">3️⃣ WO BESOK (<?= $dispBesokTot ?>)</button>
+                <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-today', this)">1️⃣ WO TODAY (<?= $dispTodayTot ?> | SA <?= $dispTodaySa ?>)</button>
+                <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-besok', this)">2️⃣ WO BESOK (<?= $dispBesokTot ?>)</button>
+                <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-wait', this)">3️⃣ WAITING WO (<?= $dispWaitTot ?>)</button>
                 <button type="button" class="wo-tab-btn" id="wo-btn-gal" onclick="window.woOpenGalleryTab(this)">🖼️ Foto PNG (Ringkasan &amp; Masing-Masing Agent)</button>
             </div>
 
@@ -2231,28 +2315,32 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     <thead>
                         <tr>
                             <th rowspan="2" class="navy-hdr">Sales Leader</th>
-                            <th colspan="4" class="navy-hdr">WO TODAY (<?= htmlspecialchars($woTodayLbl) ?>)</th>
-                            <th colspan="2" class="red-hdr">Waiting WO &amp; Besok</th>
+                            <th colspan="6" class="navy-hdr">1. WO TODAY (<?= htmlspecialchars($woTodayLbl) ?>)</th>
+                            <th colspan="2" class="red-hdr">2. Besok &amp; 3. Waiting WO</th>
                         </tr>
                         <tr>
-                            <th class="navy-hdr">On Installation</th>
-                            <th class="navy-hdr">Refund</th>
-                            <th class="navy-hdr">Waiting WO</th>
                             <th class="navy-hdr">Total Today</th>
-                            <th class="red-hdr">Waiting WO</th>
-                            <th class="red-hdr">WO Besok (<?= htmlspecialchars($woBesokLbl) ?>)</th>
+                            <th class="navy-hdr">SA (Active)</th>
+                            <th class="navy-hdr">On Install</th>
+                            <th class="navy-hdr">Reschedule</th>
+                            <th class="navy-hdr">Waiting WO</th>
+                            <th class="navy-hdr">Lainnya</th>
+                            <th class="red-hdr">WO Besok (<?= htmlspecialchars($woBesokRngLbl) ?>)</th>
+                            <th class="red-hdr">Waiting WO (Blank)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($woSumRows as $wr): if (!$filtWoScope($ws = $wr)) continue; $isGtW = !empty($wr['is_grand_total']); ?>
+                        <?php foreach ($woSumRows as $wr): if (!$filtWoScope($wr)) continue; $isGtW = !empty($wr['is_grand_total']); ?>
                             <tr class="<?= $isGtW ? 'row-wo-gtotal' : '' ?>">
                                 <td class="left"><?= htmlspecialchars((string)$wr['leader']) ?></td>
-                                <td><?= (int)$wr['today_on_installation'] ?></td>
-                                <td><?= (int)$wr['today_refund'] ?></td>
-                                <td><?= (int)$wr['today_waiting_wo'] ?></td>
-                                <td><b><?= (int)$wr['today_total'] ?></b></td>
-                                <td><b><?= (int)$wr['waiting_wo'] ?></b></td>
-                                <td><b><?= (int)$wr['wo_besok'] ?></b></td>
+                                <td><b><?= (int)($wr['today_total'] ?? 0) ?></b></td>
+                                <td style="background:#dcfce7; color:#166534;"><b><?= (int)($wr['today_sa'] ?? 0) ?></b></td>
+                                <td><?= (int)($wr['today_on_installation'] ?? 0) ?></td>
+                                <td><?= (int)($wr['today_reschedule'] ?? 0) ?></td>
+                                <td><?= (int)($wr['today_waiting_wo'] ?? 0) ?></td>
+                                <td><?= (int)($wr['today_other'] ?? 0) ?></td>
+                                <td><b><?= (int)($wr['wo_besok'] ?? 0) ?></b></td>
+                                <td><b><?= (int)($wr['waiting_wo'] ?? 0) ?></b></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -2265,20 +2353,41 @@ $authUser = $_SESSION['auth_user'] ?? null;
                         <tr>
                             <th>Sales Leader</th>
                             <th>Salesname</th>
-                            <th>On Installation</th>
-                            <th>Refund</th>
-                            <th>Waiting WO</th>
+                            <?php foreach ($woTodayCols as $colNm): ?>
+                                <th><?= htmlspecialchars(strcasecmp($colNm, 'Active') === 0 ? 'Active (SA)' : $colNm) ?></th>
+                            <?php endforeach; ?>
                             <th>Grand Total</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($woTodayRows as $r): if (!$filtWoScope($r)) continue; $rt = $r['row_type'] ?? 'agent'; ?>
+                        <?php foreach ($woTodayRows as $r): if (!$filtWoScope($r)) continue; $rt = $r['row_type'] ?? 'agent'; $stMapR = $r['statuses'] ?? []; ?>
                             <tr class="<?= $rt === 'grand_total' ? 'row-wo-gtotal' : ($rt === 'leader_total' ? 'row-wo-ltotal' : '') ?>">
                                 <td class="left"><?= $rt === 'agent' ? htmlspecialchars((string)$r['leader']) : '' ?></td>
                                 <td class="left"><?= htmlspecialchars((string)$r['salesname']) ?></td>
-                                <td><?= (int)$r['on_installation'] ?: '' ?></td>
-                                <td><?= (int)$r['refund'] ?: '' ?></td>
-                                <td><?= (int)$r['waiting_wo'] ?: '' ?></td>
+                                <?php foreach ($woTodayCols as $colNm): $vCell = (int)($stMapR[$colNm] ?? 0); $isSaC = strcasecmp($colNm, 'Active') === 0; ?>
+                                    <td style="<?= $isSaC ? 'background:#f0fdf4; color:#166534; font-weight:700;' : '' ?>"><?= ($vCell > 0 || $rt === 'grand_total') ? $vCell : '' ?></td>
+                                <?php endforeach; ?>
+                                <td><b><?= (int)($r['total'] ?? 0) ?></b></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="wo-tab-besok" class="wo-panel table-wrap" style="max-height:560px; overflow-y:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sales Leader</th>
+                            <th>Salesname</th>
+                            <th>Grand Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($woBesokRows as $r): if (!$filtWoScope($r)) continue; $rt = $r['row_type'] ?? 'agent'; ?>
+                            <tr class="<?= $rt === 'grand_total' ? 'row-wo-gtotal' : ($rt === 'leader_total' ? 'row-wo-ltotal' : '') ?>">
+                                <td class="left"><?= $rt === 'agent' ? htmlspecialchars((string)$r['leader']) : '' ?></td>
+                                <td class="left"><?= htmlspecialchars((string)$r['salesname']) ?></td>
                                 <td><b><?= (int)$r['total'] ?></b></td>
                             </tr>
                         <?php endforeach; ?>
@@ -2297,27 +2406,6 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     </thead>
                     <tbody>
                         <?php foreach ($woWaitingRows as $r): if (!$filtWoScope($r)) continue; $rt = $r['row_type'] ?? 'agent'; ?>
-                            <tr class="<?= $rt === 'grand_total' ? 'row-wo-gtotal' : ($rt === 'leader_total' ? 'row-wo-ltotal' : '') ?>">
-                                <td class="left"><?= $rt === 'agent' ? htmlspecialchars((string)$r['leader']) : '' ?></td>
-                                <td class="left"><?= htmlspecialchars((string)$r['salesname']) ?></td>
-                                <td><b><?= (int)$r['total'] ?></b></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="wo-tab-besok" class="wo-panel table-wrap" style="max-height:560px; overflow-y:auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Sales Leader</th>
-                            <th>Salesname</th>
-                            <th>Grand Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($woBesokRows as $r): if (!$filtWoScope($r)) continue; $rt = $r['row_type'] ?? 'agent'; ?>
                             <tr class="<?= $rt === 'grand_total' ? 'row-wo-gtotal' : ($rt === 'leader_total' ? 'row-wo-ltotal' : '') ?>">
                                 <td class="left"><?= $rt === 'agent' ? htmlspecialchars((string)$r['leader']) : '' ?></td>
                                 <td class="left"><?= htmlspecialchars((string)$r['salesname']) ?></td>
@@ -2841,6 +2929,46 @@ $authUser = $_SESSION['auth_user'] ?? null;
             });
         }
 
+        async function renderAgentWoCardPng(ag, todayLbl, besokLbl) {
+            const totI = Number(ag.today_total || 0), saI = Number(ag.today_sa || 0);
+            const onI = Number(ag.today_on_installation || 0), resI = Number(ag.today_reschedule || 0);
+            const wtI = Number(ag.today_waiting_wo || 0), othI = Number(ag.today_other || 0);
+            const bskI = Number(ag.wo_besok || 0), wwoI = Number(ag.waiting_wo || 0);
+            const imgC = await renderTablePng({
+                title: `KARTU WO AGENT — ${String(ag.salesname).toUpperCase()}`,
+                subtitle: `Sales Leader: ${ag.leader}  •  WO Today: ${todayLbl}  •  WO Besok: >= ${besokLbl}`,
+                columns: ['SALESNAME', 'TOTAL TODAY', 'SA (ACTIVE)', 'ON INSTALL', 'RESCHED', 'WAIT WO', 'LAINNYA', `WO BESOK (>=${besokLbl})`, 'WAITING WO'],
+                groupHeaders: [
+                    { label: `1. WO TODAY (${todayLbl})`, start: 1, end: 6, bg: '#002060' },
+                    { label: '2. BESOK & 3. WAITING WO', start: 7, end: 8, bg: '#065f46' },
+                ],
+                rows: [[
+                    ag.salesname,
+                    fmtInt(totI), fmtInt(saI), fmtInt(onI), fmtInt(resI), fmtInt(wtI), fmtInt(othI),
+                    fmtInt(bskI), fmtInt(wwoI),
+                ]],
+                align: ['l', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'],
+                rowStyles: [{ bg: '#ffffff', bold: true }],
+                cellStyle: (_i, c) => {
+                    if (c === 1) return { bg: '#dbeafe', fg: '#1e3a8a', bold: true };
+                    if (c === 2) return { bg: '#bbf7d0', fg: '#14532d', bold: true };
+                    if (c === 7) return { bg: '#dcfce7', fg: '#065f46', bold: true };
+                    if (c === 8) return { bg: '#fef3c7', fg: '#92400e', bold: true };
+                    return null;
+                },
+                notes: [`Kartu Monitoring WO Pribadi — ${ag.salesname} (${ag.leader})`],
+            });
+            const safeSn = String(ag.salesname).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'Agent';
+            const escSn = String(ag.salesname).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escLd = String(ag.leader).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return {
+                fileName: `01E_WO_Agent_${safeSn}.png`,
+                caption: `👤 <b>Kartu WO — ${escSn}</b> (${escLd}) | Today: ${totI} (SA ${saI}) | Besok: ${bskI} | Waiting: ${wwoI}`,
+                blob: imgC.blob,
+                dataUrl: imgC.dataUrl,
+            };
+        }
+
         async function buildAllReportPngs(data) {
             const out = [];
 
@@ -2932,12 +3060,20 @@ $authUser = $_SESSION['auth_user'] ?? null;
             // 1C. MONITORING WORK ORDER (RINGKASAN + PIVOT 1/2/3 + FOTO TIM PER LEADER + KARTU AGENT)
             async function renderWoPivotPng(ws, mode) {
                 const isToday = mode === 'today';
-                const isWait = mode === 'waiting';
-                const src = isToday ? (ws.wo_today_rows || []) : (isWait ? (ws.waiting_wo_rows || []) : (ws.wo_besok_rows || []));
+                const isBesok = mode === 'besok';
+                const src = isToday ? (ws.wo_today_rows || []) : (isBesok ? (ws.wo_besok_rows || []) : (ws.waiting_wo_rows || []));
                 if (!src.length) return null;
-                const cols = isToday
-                    ? ['Sales Leader', 'Salesname', 'On Installation', 'Refund', 'Waiting WO', 'Grand Total']
-                    : ['Sales Leader', 'Salesname', 'Grand Total'];
+                const besokRng = ws.besok_range_label || ('>= ' + ws.besok_label);
+                const todayCols = Array.isArray(ws.wo_today_columns) ? ws.wo_today_columns : [];
+                let idxSaCol = -1;
+                let cols;
+                if (isToday) {
+                    const dispSt = todayCols.map(c => (String(c).toLowerCase() === 'active' ? 'Active (SA)' : c));
+                    if (dispSt.indexOf('Active (SA)') >= 0) idxSaCol = 2 + dispSt.indexOf('Active (SA)');
+                    cols = ['Sales Leader', 'Salesname', ...dispSt, 'Grand Total'];
+                } else {
+                    cols = ['Sales Leader', 'Salesname', 'Grand Total'];
+                }
                 const rows = [];
                 const rStyles = [];
                 let idxGtP = -1;
@@ -2948,39 +3084,44 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     else { rStyles.push(null); }
                     const ldrC = (rt === 'agent') ? r.leader : '';
                     if (isToday) {
-                        rows.push([
-                            ldrC, r.salesname,
-                            r.on_installation ? fmtInt(r.on_installation) : '',
-                            r.refund ? fmtInt(r.refund) : '',
-                            r.waiting_wo ? fmtInt(r.waiting_wo) : '',
-                            fmtInt(r.total),
-                        ]);
+                        const stMap = r.statuses || {};
+                        const stVals = todayCols.map(c => {
+                            const v = Number(stMap[c] || 0);
+                            return (v > 0 || rt === 'grand_total') ? fmtInt(v) : '';
+                        });
+                        rows.push([ldrC, r.salesname, ...stVals, fmtInt(r.total)]);
                     } else {
                         rows.push([ldrC, r.salesname, fmtInt(r.total)]);
                     }
                 }
                 const title = isToday
-                    ? `WO TODAY (${ws.today_label}) — DETAIL PER AGENT`
-                    : (isWait ? `WAITING WO (BULAN BERJALAN) — DETAIL PER AGENT` : `WO BESOK (${ws.besok_label}) — JADWAL PER AGENT`);
+                    ? `1. WO TODAY (${ws.today_label}) — DETAIL PER AGENT & SA`
+                    : (isBesok ? `2. WO BESOK (${besokRng}) — JADWAL INSTALASI` : `3. WAITING WO (INSTALASI BLANK) — DETAIL PER AGENT`);
                 const sub = isToday
-                    ? `Count of Customer Name berdasarkan Instalasi Date ${ws.today_label} & Status WO`
-                    : (isWait ? `Daftar Agen dengan Customer Berstatus Waiting WO` : `Jadwal Instalasi Date ${ws.besok_label} (H+1)`);
-                const headBg = isToday ? '#002060' : (isWait ? '#92400e' : '#065f46');
+                    ? `Count of Customer Name pada Instalasi Date ${ws.today_label} (Status = ALL, Active = SA)`
+                    : (isBesok ? `Instalasi Date > ${ws.today_label} (Multiple Items, Status = ALL)` : `Instalasi Date = (blank) | Status: Back To Sales, READY, Reschedule, Waiting WO`);
+                const headBg = isToday ? '#002060' : (isBesok ? '#065f46' : '#92400e');
+                const alignArr = isToday ? ['l', 'l', ...todayCols.map(() => 'c'), 'c'] : ['l', 'l', 'c'];
                 const imgP = await renderTablePng({
                     title, subtitle: sub, columns: cols, headBg, rows,
-                    align: isToday ? ['l', 'l', 'c', 'c', 'c', 'c'] : ['l', 'l', 'c'],
+                    align: alignArr,
                     rowStyles: rStyles,
-                    cellStyle: (i, c) => (c === cols.length - 1 ? { bold: true, bg: i === idxGtP ? '#fef3c7' : undefined } : null),
+                    cellStyle: (i, c) => {
+                        if (c === cols.length - 1) return { bold: true, bg: i === idxGtP ? '#fef3c7' : undefined };
+                        if (idxSaCol >= 0 && c === idxSaCol) return { bold: true, bg: i === idxGtP ? '#bbf7d0' : '#f0fdf4', fg: '#166534' };
+                        return null;
+                    },
                     notes: [`Total baris pivot: ${rows.length}`],
                 });
-                const fName = isToday ? `01C1_WO_TODAY_${ws.today_label}.png` : (isWait ? `01C2_WAITING_WO_${ws.today_label}.png` : `01C3_WO_BESOK_${ws.besok_label}.png`);
-                const cap = isToday ? `1️⃣ <b>WO TODAY (${ws.today_label}) — Detail Agent</b>` : (isWait ? `2️⃣ <b>WAITING WO — Detail Agent</b>` : `3️⃣ <b>WO BESOK (${ws.besok_label}) — Detail Agent</b>`);
+                const fName = isToday ? `01C1_WO_TODAY_${ws.today_label}.png` : (isBesok ? `01C2_WO_BESOK_${ws.besok_label}.png` : `01C3_WAITING_WO_${ws.today_label}.png`);
+                const cap = isToday ? `1️⃣ <b>WO TODAY (${ws.today_label}) — Detail Agent &amp; SA</b>` : (isBesok ? `2️⃣ <b>WO BESOK (${besokRng}) — Detail Agent</b>` : `3️⃣ <b>WAITING WO (Instalasi Blank) — Detail Agent</b>`);
                 return { fileName: fName, caption: cap, blob: imgP.blob, dataUrl: imgP.dataUrl };
             }
 
             async function renderWoTeamPngs(ws) {
                 const agList = ws.agent_summary || [];
                 if (!agList.length) return [];
+                const besokRng = ws.besok_range_label || ('>= ' + ws.besok_label);
                 const byLdrW = new Map();
                 for (const a of agList) {
                     if (!byLdrW.has(a.leader)) byLdrW.set(a.leader, []);
@@ -2990,43 +3131,47 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 let seqW = 1;
                 for (const [ldrW, grpW] of byLdrW.entries()) {
                     const rows = [], rStyles = [];
-                    let sOn = 0, sRef = 0, sWt = 0, sTot = 0, sWwo = 0, sBsk = 0;
+                    let sTot = 0, sSa = 0, sOn = 0, sRes = 0, sWt = 0, sOth = 0, sBsk = 0, sWwo = 0;
                     grpW.forEach((r, idx) => {
-                        sOn += r.today_on_installation; sRef += r.today_refund; sWt += r.today_waiting_wo;
-                        sTot += r.today_total; sWwo += r.waiting_wo; sBsk += r.wo_besok;
+                        const cTot = Number(r.today_total || 0), cSa = Number(r.today_sa || 0);
+                        const cOn = Number(r.today_on_installation || 0), cRes = Number(r.today_reschedule || 0);
+                        const cWt = Number(r.today_waiting_wo || 0), cOth = Number(r.today_other || 0);
+                        const cBsk = Number(r.wo_besok || 0), cWwo = Number(r.waiting_wo || 0);
+                        sTot += cTot; sSa += cSa; sOn += cOn; sRes += cRes; sWt += cWt; sOth += cOth; sBsk += cBsk; sWwo += cWwo;
                         rows.push([
                             String(idx + 1), r.salesname,
-                            r.today_on_installation ? fmtInt(r.today_on_installation) : '-',
-                            r.today_refund ? fmtInt(r.today_refund) : '-',
-                            r.today_waiting_wo ? fmtInt(r.today_waiting_wo) : '-',
-                            fmtInt(r.today_total), fmtInt(r.waiting_wo), fmtInt(r.wo_besok),
+                            fmtInt(cTot), cSa ? fmtInt(cSa) : '-', cOn ? fmtInt(cOn) : '-',
+                            cRes ? fmtInt(cRes) : '-', cWt ? fmtInt(cWt) : '-', cOth ? fmtInt(cOth) : '-',
+                            fmtInt(cBsk), fmtInt(cWwo),
                         ]);
                         rStyles.push(null);
                     });
                     const idxTotW = rows.length;
-                    rows.push(['', `TOTAL ${ldrW}`, fmtInt(sOn), fmtInt(sRef), fmtInt(sWt), fmtInt(sTot), fmtInt(sWwo), fmtInt(sBsk)]);
+                    rows.push(['', `TOTAL ${ldrW}`, fmtInt(sTot), fmtInt(sSa), fmtInt(sOn), fmtInt(sRes), fmtInt(sWt), fmtInt(sOth), fmtInt(sBsk), fmtInt(sWwo)]);
                     rStyles.push({ bg: '#dbeafe', bold: true });
                     const imgT = await renderTablePng({
                         title: `WORK ORDER AGENT — TIM ${ldrW.toUpperCase()}`,
-                        subtitle: `WO Today (${ws.today_label}) | Waiting WO | WO Besok (${ws.besok_label})`,
-                        columns: ['NO', 'SALESNAME', 'ON\nINSTALL', 'REFUND', 'WAIT\nWO', 'TOTAL\nTODAY', 'WAIT\nWO', `BESOK\n(${ws.besok_label})`],
+                        subtitle: `1. WO Today (${ws.today_label} + SA)  •  2. WO Besok (${besokRng})  •  3. Waiting WO (Blank)`,
+                        columns: ['NO', 'SALESNAME', 'TOTAL\nTODAY', 'SA\n(ACTIVE)', 'ON\nINSTALL', 'RESCHED', 'WAIT\nWO', 'LAINNYA', `BESOK\n(${besokRng})`, 'WAITING\nWO'],
                         groupHeaders: [
-                            { label: `WO TODAY (${ws.today_label})`, start: 2, end: 5, bg: '#002060' },
-                            { label: 'ANTREAN & BESOK', start: 6, end: 7, bg: '#991b1b' },
+                            { label: `1. WO TODAY (${ws.today_label})`, start: 2, end: 7, bg: '#002060' },
+                            { label: '2. BESOK & 3. WAITING WO', start: 8, end: 9, bg: '#065f46' },
                         ],
-                        rows, align: ['c', 'l', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: rStyles,
+                        rows, align: ['c', 'l', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: rStyles,
                         cellStyle: (i, c) => {
-                            if (c === 5) return i === idxTotW ? { bg: '#c9daf8', fg: '#1e3a8a', bold: true } : { bg: '#eff6ff', bold: true };
-                            if (c >= 6) return i === idxTotW ? { bg: '#fce4d6', fg: '#9a3412', bold: true } : { bg: '#fff7ed', bold: true };
+                            if (c === 2) return i === idxTotW ? { bg: '#c9daf8', fg: '#1e3a8a', bold: true } : { bg: '#eff6ff', bold: true };
+                            if (c === 3) return i === idxTotW ? { bg: '#bbf7d0', fg: '#14532d', bold: true } : { bg: '#f0fdf4', fg: '#166534', bold: true };
+                            if (c === 8) return i === idxTotW ? { bg: '#d1fae5', fg: '#065f46', bold: true } : { bg: '#ecfdf5', bold: true };
+                            if (c === 9) return i === idxTotW ? { bg: '#fde68a', fg: '#92400e', bold: true } : { bg: '#fffbeb', bold: true };
                             return null;
                         },
-                        notes: [`Tim ${ldrW}: WO Today=${sTot}, Waiting WO=${sWwo}, WO Besok=${sBsk}`],
+                        notes: [`Tim ${ldrW}: WO Today=${sTot} (SA=${sSa}) | WO Besok=${sBsk} | Waiting WO=${sWwo}`],
                     });
                     const safeLw = ldrW.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
                     const escLw = ldrW.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     resList.push({
                         fileName: `01D_${String(seqW).padStart(2, '0')}_WO_Tim_${safeLw}.png`,
-                        caption: `🛠️ <b>WO Detail Agent — Tim ${escLw}</b> | Today (${ws.today_label}): ${sTot} | Waiting: ${sWwo} | Besok: ${sBsk}`,
+                        caption: `🛠️ <b>WO Detail Agent — Tim ${escLw}</b> | Today (${ws.today_label}): ${sTot} (SA ${sSa}) | Besok: ${sBsk} | Waiting: ${sWwo}`,
                         blob: imgT.blob,
                         dataUrl: imgT.dataUrl,
                     });
@@ -3035,43 +3180,9 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 return resList;
             }
 
-            async function renderAgentWoCardPng(ag, todayLbl, besokLbl) {
-                const imgC = await renderTablePng({
-                    title: `KARTU WO AGENT — ${String(ag.salesname).toUpperCase()}`,
-                    subtitle: `Sales Leader: ${ag.leader}  •  WO Today: ${todayLbl}  •  WO Besok: ${besokLbl}`,
-                    columns: ['SALESNAME', 'ON INSTALL', 'REFUND', 'WAIT WO', 'TOTAL TODAY', 'WAITING WO', `BESOK (${besokLbl})`],
-                    groupHeaders: [
-                        { label: `WO TODAY (${todayLbl})`, start: 1, end: 4, bg: '#002060' },
-                        { label: 'ANTREAN & BESOK', start: 5, end: 6, bg: '#991b1b' },
-                    ],
-                    rows: [[
-                        ag.salesname,
-                        fmtInt(ag.today_on_installation), fmtInt(ag.today_refund), fmtInt(ag.today_waiting_wo),
-                        fmtInt(ag.today_total), fmtInt(ag.waiting_wo), fmtInt(ag.wo_besok),
-                    ]],
-                    align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'],
-                    rowStyles: [{ bg: '#ffffff', bold: true }],
-                    cellStyle: (_i, c) => {
-                        if (c === 4) return { bg: '#dbeafe', fg: '#1e3a8a', bold: true };
-                        if (c === 5) return { bg: '#fef3c7', fg: '#92400e', bold: true };
-                        if (c === 6) return { bg: '#dcfce7', fg: '#166534', bold: true };
-                        return null;
-                    },
-                    notes: [`Kartu Monitoring WO Pribadi — ${ag.salesname} (${ag.leader})`],
-                });
-                const safeSn = String(ag.salesname).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'Agent';
-                const escSn = String(ag.salesname).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const escLd = String(ag.leader).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                return {
-                    fileName: `01E_WO_Agent_${safeSn}.png`,
-                    caption: `👤 <b>Kartu WO — ${escSn}</b> (${escLd}) | Today: ${ag.today_total} | Waiting: ${ag.waiting_wo} | Besok: ${ag.wo_besok}`,
-                    blob: imgC.blob,
-                    dataUrl: imgC.dataUrl,
-                };
-            }
-
             async function buildWoTableAndTeamPngs(ws, includeCards) {
                 const woOut = [];
+                const besokRng = ws.besok_range_label || ('>= ' + ws.besok_label);
                 if (ws.leader_summary && ws.leader_summary.length) {
                     const wRows = [], wStyles = [];
                     let idxGtW = -1;
@@ -3079,36 +3190,42 @@ $authUser = $_SESSION['auth_user'] ?? null;
                         if (wr.is_gt) { idxGtW = wRows.length; wStyles.push({ bg: '#dbeafe', bold: true }); }
                         else { wStyles.push(null); }
                         wRows.push([
-                            wr.leader, fmtInt(wr.today_on_installation), fmtInt(wr.today_refund),
-                            fmtInt(wr.today_waiting_wo), fmtInt(wr.today_total), fmtInt(wr.waiting_wo), fmtInt(wr.wo_besok),
+                            wr.leader, fmtInt(wr.today_total || 0), fmtInt(wr.today_sa || 0),
+                            fmtInt(wr.today_on_installation || 0), fmtInt(wr.today_reschedule || 0),
+                            fmtInt(wr.today_waiting_wo || 0), fmtInt(wr.today_other || 0),
+                            fmtInt(wr.wo_besok || 0), fmtInt(wr.waiting_wo || 0),
                         ]);
                     }
                     const imgWo = await renderTablePng({
-                        title: `MONITORING WORK ORDER (${ws.today_label} | WAITING WO | ${ws.besok_label})`,
-                        subtitle: `Ringkasan WO Today (On Install / Refund / Waiting WO), Waiting WO Aktif & WO Besok per Leader`,
-                        columns: ['Sales Leader', 'ON\nINSTALL', 'REFUND', 'WAITING\nWO', 'TOTAL\nTODAY', 'WAITING WO\n(AKTIF)', `WO BESOK\n(${ws.besok_label})`],
+                        title: `MONITORING WORK ORDER (${ws.today_label} | WO BESOK | WAITING WO)`,
+                        subtitle: `1. WO TODAY (${ws.today_label} + SA Active)  •  2. WO BESOK (${besokRng}, Status ALL)  •  3. WAITING WO (Blank)`,
+                        columns: ['Sales Leader', 'TOTAL\nTODAY', 'SA\n(ACTIVE)', 'ON\nINSTALL', 'RESCHED', 'WAIT\nWO', 'LAINNYA', `WO BESOK\n(${besokRng})`, 'WAITING WO\n(BLANK)'],
                         groupHeaders: [
-                            { label: `WO TODAY (${ws.today_label})`, start: 1, end: 4, bg: '#002060' },
-                            { label: 'ANTREAN & JADWAL BESOK', start: 5, end: 6, bg: '#991b1b' },
+                            { label: `1. WO TODAY (${ws.today_label})`, start: 1, end: 6, bg: '#002060' },
+                            { label: '2. BESOK & 3. WAITING WO', start: 7, end: 8, bg: '#065f46' },
                         ],
-                        headBg: '#002060', rows: wRows, align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: wStyles,
+                        headBg: '#002060', rows: wRows, align: ['l', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: wStyles,
                         cellStyle: (i, c) => {
-                            if (i === idxGtW && c === 4) return { bg: '#c9daf8', fg: '#1e3a8a', bold: true };
-                            if (i === idxGtW && c >= 5) return { bg: '#fce4d6', fg: '#9a3412', bold: true };
-                            if (c === 4) return { bg: '#eff6ff', bold: true };
-                            if (c === 5) return { bg: '#fff7ed', bold: true };
+                            if (i === idxGtW && c === 1) return { bg: '#c9daf8', fg: '#1e3a8a', bold: true };
+                            if (i === idxGtW && c === 2) return { bg: '#bbf7d0', fg: '#14532d', bold: true };
+                            if (i === idxGtW && c === 7) return { bg: '#d1fae5', fg: '#065f46', bold: true };
+                            if (i === idxGtW && c === 8) return { bg: '#fde68a', fg: '#92400e', bold: true };
+                            if (c === 1) return { bg: '#eff6ff', bold: true };
+                            if (c === 2) return { bg: '#f0fdf4', fg: '#166534', bold: true };
+                            if (c === 7) return { bg: '#ecfdf5', bold: true };
+                            if (c === 8) return { bg: '#fffbeb', bold: true };
                             return null;
                         },
-                        notes: [`WO TODAY: Instalasi Date ${ws.today_label}. WAITING WO: Status Waiting WO bulan berjalan. WO BESOK: Jadwal ${ws.besok_label}.`],
+                        notes: [`1. WO TODAY: Semua status pd ${ws.today_label} (Active = SA). 2. WO BESOK: Semua Instalasi Date > ${ws.today_label}. 3. WAITING WO: Instalasi Blank (Back To Sales/READY/Reschedule/Waiting WO).`],
                     });
                     woOut.push({
                         fileName: `01C_Monitoring_WO_${ws.today_label}.png`,
-                        caption: `🛠️ <b>Monitoring Work Order</b> | WO Today: ${ws.today_label} | Besok: ${ws.besok_label}`,
+                        caption: `🛠️ <b>Monitoring Work Order</b> | 1. Today (${ws.today_label}) | 2. Besok (${besokRng}) | 3. Waiting WO`,
                         blob: imgWo.blob,
                         dataUrl: imgWo.dataUrl,
                     });
                 }
-                for (const md of ['today', 'waiting', 'besok']) {
+                for (const md of ['today', 'besok', 'waiting']) {
                     const pImg = await renderWoPivotPng(ws, md);
                     if (pImg) woOut.push(pImg);
                 }
@@ -3377,31 +3494,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
         async function renderAgentCardsBatch(agList, todayLbl, besokLbl) {
             const imgs = [];
             for (const ag of agList) {
-                const r = await renderTablePng({
-                    title: `KARTU WO AGENT — ${String(ag.salesname).toUpperCase()}`,
-                    subtitle: `Sales Leader: ${ag.leader}  •  WO Today: ${todayLbl}  •  WO Besok: ${besokLbl}`,
-                    columns: ['SALESNAME', 'ON INSTALL', 'REFUND', 'WAIT WO', 'TOTAL TODAY', 'WAITING WO', `BESOK (${besokLbl})`],
-                    groupHeaders: [
-                        { label: `WO TODAY (${todayLbl})`, start: 1, end: 4, bg: '#002060' },
-                        { label: 'ANTREAN & BESOK', start: 5, end: 6, bg: '#991b1b' },
-                    ],
-                    rows: [[
-                        ag.salesname,
-                        fmtInt(ag.today_on_installation), fmtInt(ag.today_refund), fmtInt(ag.today_waiting_wo),
-                        fmtInt(ag.today_total), fmtInt(ag.waiting_wo), fmtInt(ag.wo_besok),
-                    ]],
-                    align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'],
-                    rowStyles: [{ bg: '#ffffff', bold: true }],
-                    cellStyle: (_i, c) => {
-                        if (c === 4) return { bg: '#dbeafe', fg: '#1e3a8a', bold: true };
-                        if (c === 5) return { bg: '#fef3c7', fg: '#92400e', bold: true };
-                        if (c === 6) return { bg: '#dcfce7', fg: '#166534', bold: true };
-                        return null;
-                    },
-                    notes: [`Kartu Monitoring WO Pribadi — ${ag.salesname} (${ag.leader})`],
-                });
-                const safeSn = String(ag.salesname).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'Agent';
-                imgs.push({ fileName: `01E_WO_Agent_${safeSn}.png`, blob: r.blob, dataUrl: r.dataUrl });
+                imgs.push(await renderAgentWoCardPng(ag, todayLbl, besokLbl));
             }
             return imgs;
         }

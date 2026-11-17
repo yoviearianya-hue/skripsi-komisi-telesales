@@ -234,18 +234,18 @@ CREATE TABLE `rekap_wo_monitoring` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `rekap_wo_monitoring` (`tgl_wo_today`, `tgl_wo_besok`, `sales_leader`, `today_on_installation`, `today_refund`, `today_waiting_wo`, `today_total`, `waiting_wo`, `wo_besok`) VALUES
-('15-Nov-26', '16-Nov-26', 'Alfian Bagus Setiawan', 13, 0, 0, 13, 4, 0),
-('15-Nov-26', '16-Nov-26', 'Anis Anggraini', 14, 0, 0, 14, 2, 0),
-('15-Nov-26', '16-Nov-26', 'Eka Hardiansyah', 13, 0, 0, 13, 5, 5),
-('15-Nov-26', '16-Nov-26', 'Fahrul Amrin', 11, 1, 0, 12, 2, 8),
-('15-Nov-26', '16-Nov-26', 'Firliansyah', 17, 0, 0, 17, 2, 8),
-('15-Nov-26', '16-Nov-26', 'Jarot Arie Sasmita', 13, 0, 0, 13, 5, 3),
+('15-Nov-26', '16-Nov-26', 'Alfian Bagus Setiawan', 13, 0, 0, 15, 4, 0),
+('15-Nov-26', '16-Nov-26', 'Anis Anggraini', 14, 0, 0, 17, 2, 3),
+('15-Nov-26', '16-Nov-26', 'Eka Hardiansyah', 13, 0, 0, 14, 4, 6),
+('15-Nov-26', '16-Nov-26', 'Fahrul Amrin', 11, 1, 0, 14, 2, 8),
+('15-Nov-26', '16-Nov-26', 'Firliansyah', 17, 0, 0, 21, 5, 9),
+('15-Nov-26', '16-Nov-26', 'Jarot Arie Sasmita', 13, 0, 0, 14, 4, 6),
 ('15-Nov-26', '16-Nov-26', 'Muhammad Rezky Jaladara', 8, 0, 0, 8, 6, 4),
-('15-Nov-26', '16-Nov-26', 'Tiara Muna Dayuningtyas', 10, 0, 0, 10, 7, 2),
-('15-Nov-26', '16-Nov-26', 'Tika Saraswati', 16, 0, 0, 16, 6, 9),
-('15-Nov-26', '16-Nov-26', 'Yovi Arian', 3, 0, 0, 3, 6, 4),
-('15-Nov-26', '16-Nov-26', 'Yudha Irawan', 14, 0, 0, 14, 9, 11),
-('15-Nov-26', '16-Nov-26', 'Grand Total', 132, 1, 0, 133, 54, 54);
+('15-Nov-26', '16-Nov-26', 'Tiara Muna Dayuningtyas', 10, 0, 0, 11, 6, 2),
+('15-Nov-26', '16-Nov-26', 'Tika Saraswati', 16, 0, 0, 18, 6, 13),
+('15-Nov-26', '16-Nov-26', 'Yovi Arian', 3, 0, 0, 6, 6, 4),
+('15-Nov-26', '16-Nov-26', 'Yudha Irawan', 14, 0, 0, 16, 9, 13),
+('15-Nov-26', '16-Nov-26', 'Grand Total', 132, 1, 0, 154, 54, 68);
 
 -- ----------------------------------------------------------------------------
 -- 3. TABEL: detail_komisi_dan_kuota_agen (Detail Performa, Kuota Harian & Komisi)
