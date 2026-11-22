@@ -1300,12 +1300,9 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
     $dateLabel = sprintf('%d-%s-%02d', $hariValid, $namaBln, $tahun % 100);
 
     $soLdr = [];
-    $gpLdr = [];
     $paidLdr = [];
     $saLdr = [];
     $soAgen = [];
-    $gpAgen = [];
-    $unpaidSoAgen = [];
     $paidAgen = [];
     $saAgen = [];
 
@@ -1318,24 +1315,13 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
         }
 
         $stPay = u_upper(trim((string)($r[P_STATUS] ?? '')));
-        $stWo = u_upper(trim((string)($r[P_STATUS_WO] ?? '')));
         $isPaid = $stPay === 'PAID';
-        $isGp = $stPay === 'GENERATE PAYMENT' || $stWo === 'GENERATE PAYMENT';
 
         if (($r[P_CREATED] ?? null) === $tglInt) {
             if ($ldr !== '') {
                 $soLdr[$ldr] = ($soLdr[$ldr] ?? 0) + 1;
-                if ($isGp) {
-                    $gpLdr[$ldr] = ($gpLdr[$ldr] ?? 0) + 1;
-                }
             }
             $soAgen[$agKey] = ($soAgen[$agKey] ?? 0) + 1;
-            if ($isGp) {
-                $gpAgen[$agKey] = ($gpAgen[$agKey] ?? 0) + 1;
-            }
-            if (!$isPaid) {
-                $unpaidSoAgen[$agKey] = ($unpaidSoAgen[$agKey] ?? 0) + 1;
-            }
         }
 
         if ($isPaid && ($r[P_PAYMENT] ?? null) === $tglInt) {
@@ -1374,7 +1360,7 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
     foreach (array_keys($agenPerLdr) as $l) {
         $semuaLdrSet[$l] = true;
     }
-    foreach ([$soLdr, $gpLdr, $paidLdr, $saLdr] as $mapL) {
+    foreach ([$soLdr, $paidLdr, $saLdr] as $mapL) {
         foreach ($mapL as $l => $v) {
             if ($v > 0) {
                 $semuaLdrSet[$l] = true;
@@ -1385,7 +1371,6 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
     $rows = [];
     foreach (array_keys($semuaLdrSet) as $ldr) {
         $soVal = (int)($soLdr[$ldr] ?? 0);
-        $gpVal = (int)($gpLdr[$ldr] ?? 0);
         $paidVal = (int)($paidLdr[$ldr] ?? 0);
         $saVal = (int)($saLdr[$ldr] ?? 0);
 
@@ -1394,7 +1379,8 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
         $listBlmPaid = [];
         $listBlmSa = [];
         $paidItems = [];
-        $gpItems = [];
+        $sudahGpItems = [];
+        $gpBlmPaidItems = [];
         $listTidakPaid = [];
         $agentDetails = [];
 
@@ -1403,33 +1389,26 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
             $nm = $ag['name'];
             $isVac = str_starts_with($ak, 'VACANT__');
             $agSo = (int)($soAgen[$ak] ?? 0);
-            $agGp = (int)($gpAgen[$ak] ?? 0);
             $agPaid = (int)($paidAgen[$ak] ?? 0);
-            $agUnpaidSo = (int)($unpaidSoAgen[$ak] ?? 0);
-            $agOtherUnpaid = max(0, $agUnpaidSo - $agGp);
             $agSa = (int)($saAgen[$ak] ?? 0);
 
             if ($agSo === 0) {
                 $listBlmSo[] = $nm;
+            } else {
+                $sudahGpItems[] = ['cnt' => $agSo, 'label' => "{$nm} ({$agSo})"];
             }
             if ($agPaid === 0) {
                 $listBlmPaid[] = $nm;
                 if ($isVac) {
                     $listTidakPaid[] = $nm;
-                } elseif ($agGp > 0 && $agOtherUnpaid > 0) {
-                    $listTidakPaid[] = "{$nm} ({$agGp} GP, {$agOtherUnpaid} NEW/Blm Paid)";
-                } elseif ($agGp > 0) {
-                    $listTidakPaid[] = "{$nm} ({$agGp} GP — Blm PAID)";
-                } elseif ($agUnpaidSo > 0) {
-                    $listTidakPaid[] = "{$nm} ({$agUnpaidSo} SO Blm PAID)";
+                } elseif ($agSo > 0) {
+                    $gpBlmPaidItems[] = ['cnt' => $agSo, 'label' => "{$nm} ({$agSo} GP/SO)"];
+                    $listTidakPaid[] = "{$nm} ({$agSo} GP/SO — Blm PAID)";
                 } else {
-                    $listTidakPaid[] = "{$nm} (0 SO)";
+                    $listTidakPaid[] = "{$nm} (0 SO/GP)";
                 }
             } else {
                 $paidItems[] = ['cnt' => $agPaid, 'label' => "{$nm} ({$agPaid})"];
-            }
-            if ($agGp > 0) {
-                $gpItems[] = ['cnt' => $agGp, 'label' => "{$nm} ({$agGp} GP)"];
             }
             if ($agSa === 0) {
                 $listBlmSa[] = $nm;
@@ -1437,16 +1416,12 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
 
             if ($isVac) {
                 $stHarian = '⬜ Slot Vacant';
-            } elseif ($agPaid > 0 && $agUnpaidSo > 0) {
-                $stHarian = $agGp > 0 ? '✅ Sudah PAID + 💳 Ada GP' : '✅ Sudah PAID + ⏳ Pending SO';
             } elseif ($agPaid > 0) {
                 $stHarian = '✅ Sudah PAID';
-            } elseif ($agGp > 0) {
-                $stHarian = '💳 Sudah GP (Tidak PAID)';
-            } elseif ($agUnpaidSo > 0) {
-                $stHarian = '⏳ Baru SO/NEW (Tidak PAID)';
+            } elseif ($agSo > 0) {
+                $stHarian = '💳 Sudah GP / SO (Blm PAID)';
             } else {
-                $stHarian = '❌ Tidak PAID (0 SO)';
+                $stHarian = '❌ Tidak PAID (0 SO/GP)';
             }
 
             $agentDetails[] = [
@@ -1454,43 +1429,44 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
                 'name' => $nm,
                 'is_vacant' => $isVac,
                 'so' => $agSo,
-                'gp' => $agGp,
                 'paid' => $agPaid,
-                'tidak_paid_so' => $agUnpaidSo,
                 'sa' => $agSa,
                 'status_harian' => $stHarian,
             ];
         }
 
         usort($paidItems, fn($a, $b) => [$b['cnt'], $a['label']] <=> [$a['cnt'], $b['label']]);
-        usort($gpItems, fn($a, $b) => [$b['cnt'], $a['label']] <=> [$a['cnt'], $b['label']]);
+        usort($sudahGpItems, fn($a, $b) => [$b['cnt'], $a['label']] <=> [$a['cnt'], $b['label']]);
+        usort($gpBlmPaidItems, fn($a, $b) => [$b['cnt'], $a['label']] <=> [$a['cnt'], $b['label']]);
         usort($agentDetails, function ($a, $b) {
             $va = $a['is_vacant'] ? 1 : 0;
             $vb = $b['is_vacant'] ? 1 : 0;
-            return [$va, $b['paid'], $b['gp'], $b['so'], $b['sa'], $a['name']]
-                <=> [$vb, $a['paid'], $a['gp'], $a['so'], $a['sa'], $b['name']];
+            return [$va, $b['paid'], $b['so'], $b['sa'], $a['name']]
+                <=> [$vb, $a['paid'], $a['so'], $a['sa'], $b['name']];
         });
 
         $listPaidStr = array_column($paidItems, 'label');
-        $listGpStr = array_column($gpItems, 'label');
+        $listSudahGpStr = array_column($sudahGpItems, 'label');
+        $listGpBlmPaidStr = array_column($gpBlmPaidItems, 'label');
 
         $rows[] = [
             'leader' => $ldr,
             'so' => $soVal,
-            'gp' => $gpVal,
             'paid' => $paidVal,
             'sa' => $saVal,
             'blm_so' => count($listBlmSo),
             'blm_paid' => count($listBlmPaid),
             'blm_sa' => count($listBlmSa),
             'sudah_paid_agents' => count($listPaidStr),
-            'sudah_gp_agents' => count($listGpStr),
+            'sudah_gp_agents' => count($listSudahGpStr),
+            'gp_blm_paid_agents' => count($listGpBlmPaidStr),
             'total_agents' => count($daftarAg),
             'agents_blm_so' => $listBlmSo,
             'agents_blm_paid' => $listBlmPaid,
             'agents_blm_sa' => $listBlmSa,
             'agents_paid' => $listPaidStr,
-            'agents_gp' => $listGpStr,
+            'agents_sudah_gp' => $listSudahGpStr,
+            'agents_gp' => $listGpBlmPaidStr,
             'agents_tidak_paid' => $listTidakPaid,
             'agent_details' => $agentDetails,
             'is_grand_total' => false,
@@ -1506,7 +1482,6 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
     $rows[] = [
         'leader' => 'Grand Total',
         'so' => array_sum(array_column($rows, 'so')),
-        'gp' => array_sum(array_column($rows, 'gp')),
         'paid' => array_sum(array_column($rows, 'paid')),
         'sa' => array_sum(array_column($rows, 'sa')),
         'blm_so' => array_sum(array_column($rows, 'blm_so')),
@@ -1514,11 +1489,13 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
         'blm_sa' => array_sum(array_column($rows, 'blm_sa')),
         'sudah_paid_agents' => array_sum(array_column($rows, 'sudah_paid_agents')),
         'sudah_gp_agents' => array_sum(array_column($rows, 'sudah_gp_agents')),
+        'gp_blm_paid_agents' => array_sum(array_column($rows, 'gp_blm_paid_agents')),
         'total_agents' => array_sum(array_column($rows, 'total_agents')),
         'agents_blm_so' => [],
         'agents_blm_paid' => [],
         'agents_blm_sa' => [],
         'agents_paid' => [],
+        'agents_sudah_gp' => [],
         'agents_gp' => [],
         'agents_tidak_paid' => [],
         'agent_details' => [],
@@ -2276,7 +2253,7 @@ function proses_data(array $o): array
 
     $namaBln = NAMA_BULAN_TAMPIL[$bulanIni] ?? 'Nov';
     return [
-        'calc_engine_version' => 4,
+        'calc_engine_version' => 5,
         'periode_label' => $hari . '-' . $namaBln . '-' . $tahun,
         'hari_berjalan' => $hari,
         'total_hari' => $totalHari,

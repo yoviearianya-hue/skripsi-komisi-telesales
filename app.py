@@ -1089,19 +1089,6 @@ def hitung_rekap_harian_blm_produktif_py(
         if "Status Payment" in df_p.columns
         else pd.Series(True, index=df_p.index)
     )
-    st_pay_up = (
-        df_p["Status Payment"].fillna("").astype(str).str.strip().str.upper()
-        if "Status Payment" in df_p.columns
-        else pd.Series("", index=df_p.index)
-    )
-    st_wo_up = (
-        df_p["Status"].fillna("").astype(str).str.strip().str.upper()
-        if "Status" in df_p.columns
-        else pd.Series("", index=df_p.index)
-    )
-    gp_status = (st_pay_up == "GENERATE PAYMENT") | (st_wo_up == "GENERATE PAYMENT")
-    gp_mask = so_mask & gp_status
-    unpaid_so_mask = so_mask & (~paid_status)
     paid_mask = valid_ag_mask & (
         paid_status & (df_p["Payment Date"].dt.date == tgl_cek)
         if "Payment Date" in df_p.columns
@@ -1114,19 +1101,14 @@ def hitung_rekap_harian_blm_produktif_py(
     )
 
     df_so = df_p[so_mask]
-    df_gp = df_p[gp_mask]
-    df_unpaid_so = df_p[unpaid_so_mask]
     df_paid = df_p[paid_mask]
     df_sa = df_p[sa_mask]
 
     so_ldr = df_so[df_so["_ldr"] != ""].groupby("_ldr").size().to_dict()
-    gp_ldr = df_gp[df_gp["_ldr"] != ""].groupby("_ldr").size().to_dict()
     paid_ldr = df_paid[df_paid["_ldr"] != ""].groupby("_ldr").size().to_dict()
     sa_ldr = df_sa[df_sa["_ldr"] != ""].groupby("_ldr").size().to_dict()
 
     so_ag_cnt = df_so.groupby("_ag_key").size().to_dict()
-    gp_ag_cnt = df_gp.groupby("_ag_key").size().to_dict()
-    unpaid_so_ag_cnt = df_unpaid_so.groupby("_ag_key").size().to_dict()
     paid_ag_cnt = df_paid.groupby("_ag_key").size().to_dict()
     sa_ag_cnt = df_sa.groupby("_ag_key").size().to_dict()
 
@@ -1140,7 +1122,7 @@ def hitung_rekap_harian_blm_produktif_py(
                 agen_per_ldr.setdefault(ldr, []).append((ak, nm))
 
     semua_ldr = set(agen_per_ldr.keys())
-    for mp in (so_ldr, gp_ldr, paid_ldr, sa_ldr):
+    for mp in (so_ldr, paid_ldr, sa_ldr):
         semua_ldr.update(k for k, v in mp.items() if v > 0)
 
     if leader_filter != "Semua Leader":
@@ -1153,52 +1135,43 @@ def hitung_rekap_harian_blm_produktif_py(
         blm_paid_nm: list[str] = []
         blm_sa_nm: list[str] = []
         paid_items: list[tuple[int, str]] = []
-        gp_items: list[tuple[int, str]] = []
+        sudah_gp_items: list[tuple[int, str]] = []
+        gp_blm_paid_items: list[tuple[int, str]] = []
         tidak_paid_nm: list[str] = []
         agent_details: list[dict] = []
 
         for ak, nm in ag_list:
             is_vac = ak.startswith("VACANT__")
             ag_so = int(so_ag_cnt.get(ak, 0))
-            ag_gp = int(gp_ag_cnt.get(ak, 0))
             ag_paid = int(paid_ag_cnt.get(ak, 0))
-            ag_unp = int(unpaid_so_ag_cnt.get(ak, 0))
-            ag_other_unp = max(0, ag_unp - ag_gp)
             ag_sa = int(sa_ag_cnt.get(ak, 0))
 
             if ag_so == 0:
                 blm_so_nm.append(nm)
+            else:
+                sudah_gp_items.append((ag_so, f"{nm} ({ag_so})"))
             if ag_paid == 0:
                 blm_paid_nm.append(nm)
                 if is_vac:
                     tidak_paid_nm.append(nm)
-                elif ag_gp > 0 and ag_other_unp > 0:
-                    tidak_paid_nm.append(f"{nm} ({ag_gp} GP, {ag_other_unp} NEW/Blm Paid)")
-                elif ag_gp > 0:
-                    tidak_paid_nm.append(f"{nm} ({ag_gp} GP — Blm PAID)")
-                elif ag_unp > 0:
-                    tidak_paid_nm.append(f"{nm} ({ag_unp} SO Blm PAID)")
+                elif ag_so > 0:
+                    gp_blm_paid_items.append((ag_so, f"{nm} ({ag_so} GP/SO)"))
+                    tidak_paid_nm.append(f"{nm} ({ag_so} GP/SO — Blm PAID)")
                 else:
-                    tidak_paid_nm.append(f"{nm} (0 SO)")
+                    tidak_paid_nm.append(f"{nm} (0 SO/GP)")
             else:
                 paid_items.append((ag_paid, f"{nm} ({ag_paid})"))
-            if ag_gp > 0:
-                gp_items.append((ag_gp, f"{nm} ({ag_gp} GP)"))
             if ag_sa == 0:
                 blm_sa_nm.append(nm)
 
             if is_vac:
                 st_harian = "⬜ Slot Vacant"
-            elif ag_paid > 0 and ag_unp > 0:
-                st_harian = "✅ Sudah PAID + 💳 Ada GP" if ag_gp > 0 else "✅ Sudah PAID + ⏳ Pending SO"
             elif ag_paid > 0:
                 st_harian = "✅ Sudah PAID"
-            elif ag_gp > 0:
-                st_harian = "💳 Sudah GP (Tidak PAID)"
-            elif ag_unp > 0:
-                st_harian = "⏳ Baru SO/NEW (Tidak PAID)"
+            elif ag_so > 0:
+                st_harian = "💳 Sudah GP / SO (Blm PAID)"
             else:
-                st_harian = "❌ Tidak PAID (0 SO)"
+                st_harian = "❌ Tidak PAID (0 SO/GP)"
 
             agent_details.append(
                 {
@@ -1206,47 +1179,47 @@ def hitung_rekap_harian_blm_produktif_py(
                     "name": nm,
                     "is_vacant": is_vac,
                     "so": ag_so,
-                    "gp": ag_gp,
                     "paid": ag_paid,
-                    "tidak_paid_so": ag_unp,
                     "sa": ag_sa,
                     "status_harian": st_harian,
                 }
             )
 
         paid_items.sort(key=lambda x: (-x[0], x[1]))
-        gp_items.sort(key=lambda x: (-x[0], x[1]))
+        sudah_gp_items.sort(key=lambda x: (-x[0], x[1]))
+        gp_blm_paid_items.sort(key=lambda x: (-x[0], x[1]))
         agent_details.sort(
             key=lambda x: (
                 1 if x["is_vacant"] else 0,
                 -x["paid"],
-                -x["gp"],
                 -x["so"],
                 -x["sa"],
                 x["name"],
             )
         )
         agents_paid_str = [lbl for _, lbl in paid_items]
-        agents_gp_str = [lbl for _, lbl in gp_items]
+        agents_sudah_gp_str = [lbl for _, lbl in sudah_gp_items]
+        agents_gp_blm_paid_str = [lbl for _, lbl in gp_blm_paid_items]
 
         rows.append(
             {
                 "leader": ldr,
                 "so": int(so_ldr.get(ldr, 0)),
-                "gp": int(gp_ldr.get(ldr, 0)),
                 "paid": int(paid_ldr.get(ldr, 0)),
                 "sa": int(sa_ldr.get(ldr, 0)),
                 "blm_so": len(blm_so_nm),
                 "blm_paid": len(blm_paid_nm),
                 "blm_sa": len(blm_sa_nm),
                 "sudah_paid_agents": len(agents_paid_str),
-                "sudah_gp_agents": len(agents_gp_str),
+                "sudah_gp_agents": len(agents_sudah_gp_str),
+                "gp_blm_paid_agents": len(agents_gp_blm_paid_str),
                 "total_agents": len(ag_list),
                 "agents_blm_so": blm_so_nm,
                 "agents_blm_paid": blm_paid_nm,
                 "agents_blm_sa": blm_sa_nm,
                 "agents_paid": agents_paid_str,
-                "agents_gp": agents_gp_str,
+                "agents_sudah_gp": agents_sudah_gp_str,
+                "agents_gp": agents_gp_blm_paid_str,
                 "agents_tidak_paid": tidak_paid_nm,
                 "agent_details": agent_details,
                 "is_grand_total": False,
@@ -1259,7 +1232,6 @@ def hitung_rekap_harian_blm_produktif_py(
             {
                 "leader": "Grand Total",
                 "so": sum(r["so"] for r in rows),
-                "gp": sum(r["gp"] for r in rows),
                 "paid": sum(r["paid"] for r in rows),
                 "sa": sum(r["sa"] for r in rows),
                 "blm_so": sum(r["blm_so"] for r in rows),
@@ -1267,11 +1239,13 @@ def hitung_rekap_harian_blm_produktif_py(
                 "blm_sa": sum(r["blm_sa"] for r in rows),
                 "sudah_paid_agents": sum(r["sudah_paid_agents"] for r in rows),
                 "sudah_gp_agents": sum(r["sudah_gp_agents"] for r in rows),
+                "gp_blm_paid_agents": sum(r["gp_blm_paid_agents"] for r in rows),
                 "total_agents": sum(r["total_agents"] for r in rows),
                 "agents_blm_so": [],
                 "agents_blm_paid": [],
                 "agents_blm_sa": [],
                 "agents_paid": [],
+                "agents_sudah_gp": [],
                 "agents_gp": [],
                 "agents_tidak_paid": [],
                 "agent_details": [],
@@ -2975,11 +2949,10 @@ with tab_utama:
             [
                 {
                     "Sales Leader": r["leader"],
-                    f"{daily_prod_date_label} SO": r["so"],
-                    f"{daily_prod_date_label} GP": r.get("gp", 0),
+                    f"{daily_prod_date_label} SO / GP": r["so"],
                     f"{daily_prod_date_label} PAID": r["paid"],
                     f"{daily_prod_date_label} SA": r["sa"],
-                    "Blm Produktif SO": r["blm_so"],
+                    "Blm Produktif SO/GP": r["blm_so"],
                     "Blm Produktif PAID": r["blm_paid"],
                     "Blm Produktif SA": r["blm_sa"],
                 }
@@ -2992,10 +2965,8 @@ with tab_utama:
                     "Tanggal": daily_prod_date_label,
                     "Sales Leader": ag["leader"],
                     "Salesname": ag["name"],
-                    "SO": ag["so"],
-                    "GP": ag["gp"],
+                    "SO / GP": ag["so"],
                     "PAID": ag["paid"],
-                    "Belum Paid (SO)": ag["tidak_paid_so"],
                     "SA": ag["sa"],
                     "Status Harian": ag["status_harian"],
                 }
@@ -3009,13 +2980,11 @@ with tab_utama:
             tr_html_dp = []
             for r in daily_prod_rows:
                 is_gt = bool(r.get("is_grand_total"))
-                gp_val = int(r.get("gp", 0))
                 if is_gt:
                     tr_html_dp.append(
                         f"<tr style='font-weight:800; background:#ffffff; border-top:2px solid #0f172a;'>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:left;'>{escape_html_tg(r['leader'])}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['so']}</td>"
-                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center; color:#92400e;'>{gp_val}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['paid']}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['sa']}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center; background:#fce4d6;'>{r['blm_so']}</td>"
@@ -3028,7 +2997,6 @@ with tab_utama:
                         f"<tr>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:left;'>{escape_html_tg(r['leader'])}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['so']}</td>"
-                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center; color:#92400e; font-weight:700;'>{gp_val}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['paid']}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['sa']}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['blm_so']}</td>"
@@ -3039,19 +3007,18 @@ with tab_utama:
 
             tabel_dp_html = (
                 "<div style='overflow-x:auto; margin-bottom:14px;'>"
-                "<table style='width:100%; max-width:920px; border-collapse:collapse; font-size:0.88rem; background:#fff; color:#0f172a;'>"
+                "<table style='width:100%; max-width:860px; border-collapse:collapse; font-size:0.88rem; background:#fff; color:#0f172a;'>"
                 "<thead>"
                 "<tr>"
                 "<th rowspan='2' style='background:#002060; color:#fff; padding:8px 12px; border:1px solid #475569; text-align:center;'>Sales Leader</th>"
-                f"<th colspan='4' style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>{escape_html_tg(daily_prod_date_label)}</th>"
+                f"<th colspan='3' style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>{escape_html_tg(daily_prod_date_label)}</th>"
                 "<th colspan='3' style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>Jumlah Agent Blm Produktif</th>"
                 "</tr>"
                 "<tr>"
-                "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>SO</th>"
-                "<th style='background:#002060; color:#fde68a; padding:6px 10px; border:1px solid #475569; text-align:center;'>GP</th>"
+                "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>SO / GP</th>"
                 "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>PAID</th>"
                 "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>SA</th>"
-                "<th style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>SO</th>"
+                "<th style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>SO / GP</th>"
                 "<th style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>PAID</th>"
                 "<th style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>SA</th>"
                 "</tr>"
@@ -3061,30 +3028,30 @@ with tab_utama:
             )
             st.markdown(tabel_dp_html, unsafe_allow_html=True)
 
-            st.markdown(f"#### 👥 Rincian Per Agent ({escape_html_tg(daily_prod_date_label)}): Sudah PAID, Sudah GP &amp; Tidak PAID")
+            st.markdown(f"#### 👥 Rincian Per Agent ({escape_html_tg(daily_prod_date_label)}): Sudah PAID, Sudah GP/SO &amp; Tidak PAID (SO = GP)")
             for r in daily_prod_rows:
                 if r.get("is_grand_total"):
                     continue
                 st.markdown(
                     f"**{escape_html_tg(r['leader'])}** ({r['total_agents']} slot tim | "
-                    f"SO: `{r['so']}` | GP: `{r.get('gp', 0)}` | PAID: `{r['paid']}` | SA: `{r['sa']}`)\n"
+                    f"SO/GP: `{r['so']}` | PAID: `{r['paid']}` | SA: `{r['sa']}`)\n"
                     f"- ✅ **Sudah PAID ({r.get('sudah_paid_agents', 0)})**: {', '.join(r.get('agents_paid', [])) or '-'}\n"
-                    f"- 💳 **Sudah GP ({r.get('sudah_gp_agents', 0)})**: {', '.join(r.get('agents_gp', [])) or '-'}\n"
+                    f"- 💳 **Sudah GP / SO — Blm PAID ({r.get('gp_blm_paid_agents', 0)})**: {', '.join(r.get('agents_gp', [])) or '-'}\n"
                     f"- ❌ **Tidak PAID ({r['blm_paid']})**: {', '.join(r.get('agents_tidak_paid', [])) or 'Semua PAID'}"
                 )
 
             if not df_daily_agent_export.empty:
                 filter_st_1b = st.radio(
                     f"Filter Tabel Rincian Agent Harian ({daily_prod_date_label}):",
-                    ["Semua Agent", "Sudah PAID", "Sudah GP", "Tidak PAID"],
+                    ["Semua Agent", "Sudah PAID", "Sudah GP / SO", "Tidak PAID"],
                     horizontal=True,
                     key="filter_1b_agent_status",
                 )
                 df_1b_show = df_daily_agent_export.copy()
                 if filter_st_1b == "Sudah PAID":
                     df_1b_show = df_1b_show[df_1b_show["PAID"] > 0]
-                elif filter_st_1b == "Sudah GP":
-                    df_1b_show = df_1b_show[df_1b_show["GP"] > 0]
+                elif filter_st_1b == "Sudah GP / SO":
+                    df_1b_show = df_1b_show[df_1b_show["SO / GP"] > 0]
                 elif filter_st_1b == "Tidak PAID":
                     df_1b_show = df_1b_show[df_1b_show["PAID"] == 0]
                 st.dataframe(df_1b_show, width="stretch", hide_index=True)
@@ -3670,8 +3637,8 @@ with tab_utama:
                     f"{int(df_agent['SA NOV'].sum()):,} SA".replace(",", "."),
                 )
 
-            if role_akses != "Agen" and not df_leader_komisi_view.empty:
-                st.markdown("#### 🏆 Rekap Komisi Resmi Sales Leader (Excl. PPn 11%)")
+            if role_akses in ("Leader", "Admin", "Finance") and not df_leader_komisi_view.empty:
+                st.markdown("#### 🏆 Rekap Komisi Resmi Sales Leader (Excl. PPn 11% — Khusus Leader, Tidak Dikirim ke Telegram)")
                 st.caption(
                     "Rumus resmi Leader: Min 140 SA Tim & Rev FP >= Rp 35jt (Tier 1: 4%, Tier 2 >= 37,5jt: 5%, Tier 3 >= 45jt: 6%, Tier 4 >= 55jt: 8%). "
                     "Agent: Min 15 SA & Rev FP >= Rp 3,75jt (Tier 1: 25%, Tier 2 >= 4,5jt: 30%, Tier 3 >= 5,5jt: 35%) + Rp 200rb/Yearly."

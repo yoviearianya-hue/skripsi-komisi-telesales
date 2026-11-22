@@ -560,20 +560,19 @@ def buat_gambar_harian_blm_produktif(
     rows_harian: list[dict],
     date_label: str,
 ) -> bytes:
-    """Membuat gambar tabel Performa Harian (SO, GP, PAID, SA) & Jumlah Agent Blm Produktif."""
+    """Membuat gambar tabel Performa Harian (SO/GP, PAID, SA) & Jumlah Agent Blm Produktif."""
     kolom = [
         "Sales Leader",
-        "SO",
-        "GP",
+        "SO / GP",
         "PAID",
         "SA",
-        "SO",
+        "SO / GP",
         "PAID",
         "SA",
     ]
     grup_header = [
-        (date_label, 1, 4, WARNA_NAVY),
-        ("Jumlah Agent Blm Produktif", 5, 7, "#d90000"),
+        (date_label, 1, 3, WARNA_NAVY),
+        ("Jumlah Agent Blm Produktif", 4, 6, "#d90000"),
     ]
     baris: list[list[str]] = []
     gaya: list[dict | None] = []
@@ -586,7 +585,6 @@ def buat_gambar_harian_blm_produktif(
             [
                 str(r.get("leader", "")),
                 _fmt_angka(r.get("so", 0)),
-                _fmt_angka(r.get("gp", 0)),
                 _fmt_angka(r.get("paid", 0)),
                 _fmt_angka(r.get("sa", 0)),
                 _fmt_angka(r.get("blm_so", 0)),
@@ -597,22 +595,22 @@ def buat_gambar_harian_blm_produktif(
         gaya.append({"bg": "white", "bold": True} if is_gt else None)
 
     def gaya_sel(i: int, c: int, _teks: str) -> dict | None:
-        if i == idx_grand and c in (5, 6, 7):
+        if i == idx_grand and c in (4, 5, 6):
             return {"bg": "#fce4d6", "bold": True}
         return None
 
     waktu = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
     return render_tabel_png(
         judul=f"REKAP HARIAN ({date_label}) & AGENT BELUM PRODUKTIF",
-        sub_judul="Realisasi SO, GP (Generate Payment), PAID, SA vs Jumlah Agent Aktif Belum Produktif",
+        sub_judul="Realisasi SO/GP (Sales Order = Generate Payment), PAID, SA vs Jumlah Agent Belum Produktif",
         kolom=kolom,
         baris=baris,
-        rata=["l", "c", "c", "c", "c", "c", "c", "c"],
+        rata=["l", "c", "c", "c", "c", "c", "c"],
         gaya_baris=gaya,
         gaya_sel=gaya_sel,
         grup_header=grup_header,
         catatan=[
-            f"Kolom {date_label}: SO (Created Date), GP (Generate Payment blm Paid), PAID (Payment Date PAID), SA (Active Date) tgl {date_label}.",
+            f"Kolom {date_label}: SO/GP (Sales Order / Generate Payment pada {date_label}), PAID (Payment Date PAID), SA (Active Date).",
             f"Kolom Merah (Jumlah Agent Blm Produktif): Banyaknya agen aktif non-Vacant dengan nilai 0 pada {date_label}. Dibuat otomatis: {waktu}",
         ],
     )
@@ -623,50 +621,42 @@ def buat_gambar_rincian_harian_agent(
     agent_details: list[dict],
     date_label: str,
 ) -> bytes:
-    """Membuat gambar rincian harian per agent (siapa Sudah PAID, Sudah GP, Tidak PAID) untuk 1 Tim Leader."""
+    """Membuat gambar rincian harian per agent (Sudah PAID, Sudah GP/SO Blm PAID, Tidak PAID) untuk 1 Tim Leader."""
     kolom = [
         "Salesname",
-        "SO",
-        "GP",
+        "SO / GP",
         "PAID",
-        "Belum Paid\n(SO)",
         "SA",
         "Status Harian",
     ]
     baris: list[list[str]] = []
     gaya: list[dict | None] = []
-    sum_so = sum_gp = sum_paid = sum_unp = sum_sa = 0
-    cnt_paid_ag = cnt_gp_ag = cnt_unpaid_ag = 0
+    sum_so = sum_paid = sum_sa = 0
+    cnt_paid_ag = cnt_gp_blm_ag = cnt_tdk_paid_ag = 0
 
     for ad in agent_details:
         is_vac = bool(ad.get("is_vacant"))
         so_v = int(ad.get("so", 0))
-        gp_v = int(ad.get("gp", 0))
         paid_v = int(ad.get("paid", 0))
-        unp_v = int(ad.get("tidak_paid_so", 0))
         sa_v = int(ad.get("sa", 0))
         st_lbl = str(ad.get("status_harian", ""))
 
         sum_so += so_v
-        sum_gp += gp_v
         sum_paid += paid_v
-        sum_unp += unp_v
         sum_sa += sa_v
         if not is_vac:
             if paid_v > 0:
                 cnt_paid_ag += 1
             else:
-                cnt_unpaid_ag += 1
-            if gp_v > 0:
-                cnt_gp_ag += 1
+                cnt_tdk_paid_ag += 1
+                if so_v > 0:
+                    cnt_gp_blm_ag += 1
 
         baris.append(
             [
                 str(ad.get("name", "")),
                 _fmt_angka(so_v),
-                _fmt_angka(gp_v),
                 _fmt_angka(paid_v),
-                _fmt_angka(unp_v),
                 _fmt_angka(sa_v),
                 st_lbl,
             ]
@@ -677,38 +667,35 @@ def buat_gambar_rincian_harian_agent(
         [
             f"TOTAL TIM ({len(agent_details)} slot)",
             _fmt_angka(sum_so),
-            _fmt_angka(sum_gp),
             _fmt_angka(sum_paid),
-            _fmt_angka(sum_unp),
             _fmt_angka(sum_sa),
-            f"Paid: {cnt_paid_ag} | GP: {cnt_gp_ag} | Tdk Paid: {cnt_unpaid_ag}",
+            f"PAID: {cnt_paid_ag} | GP(Blm PAID): {cnt_gp_blm_ag} | Tdk PAID: {cnt_tdk_paid_ag}",
         ]
     )
     gaya.append({"bg": WARNA_TOTAL_MTD, "bold": True})
     idx_tot = len(baris) - 1
 
     def gaya_sel(i: int, c: int, teks: str) -> dict | None:
-        if i == idx_tot:
+        if i == idx_tot or c != 4:
             return None
-        if c == 6:
-            if "Sudah PAID" in teks:
-                return {"bg": WARNA_HIJAU_BG, "fg": WARNA_HIJAU_TX, "bold": True}
-            if "Sudah GP" in teks or "Baru SO" in teks:
-                return {"bg": WARNA_KUOTA_BG, "fg": WARNA_KUOTA_TX, "bold": True}
-            if "Tidak PAID" in teks:
-                return {"bg": WARNA_MERAH_BG, "fg": WARNA_MERAH_TX, "bold": True}
+        if "Sudah PAID" in teks:
+            return {"bg": WARNA_HIJAU_BG, "fg": WARNA_HIJAU_TX, "bold": True}
+        if "Sudah GP" in teks:
+            return {"bg": WARNA_KUOTA_BG, "fg": WARNA_KUOTA_TX, "bold": True}
+        if "Tidak PAID" in teks:
+            return {"bg": WARNA_MERAH_BG, "fg": WARNA_MERAH_TX, "bold": True}
         return None
 
     return render_tabel_png(
         judul=f"RINCIAN HARIAN PER AGENT — TIM {str(leader_name).upper()} ({date_label})",
-        sub_judul=f"Siapa Sudah PAID ({cnt_paid_ag}), Sudah GP ({cnt_gp_ag}), & Tidak PAID ({cnt_unpaid_ag})",
+        sub_judul=f"Sudah PAID: {cnt_paid_ag} | Baru GP/SO (Blm PAID): {cnt_gp_blm_ag} | Total Tidak PAID: {cnt_tdk_paid_ag}",
         kolom=kolom,
         baris=baris,
-        rata=["l", "c", "c", "c", "c", "c", "l"],
+        rata=["l", "c", "c", "c", "l"],
         gaya_baris=gaya,
         gaya_sel=gaya_sel,
         catatan=[
-            "Hijau = Sudah PAID hari tersebut | Kuning = Sudah GP / pending SO (belum PAID) | Merah = Tidak PAID (0 SO).",
+            "Catatan: SO = GP (Sales Order / Generate Payment). Hijau = Sudah PAID | Kuning = Sudah GP/SO (Blm PAID) | Merah = Tidak PAID (0 SO/GP).",
         ],
     )
 
@@ -1101,7 +1088,7 @@ def buat_semua_gambar_laporan(
                     f"01B2_Rincian_Agent_Harian_{safe_dp}_{lbl_dl}.png",
                     png_ag_dp,
                     f"👥 <b>Rincian Harian Agent — Tim {_escape_html(ldr_dp)} ({_escape_html(lbl_dl)})</b> | "
-                    f"Paid: {int(dp_r.get('sudah_paid_agents', 0))} | GP: {int(dp_r.get('sudah_gp_agents', 0))} | Tidak Paid: {int(dp_r.get('blm_paid', 0))}",
+                    f"PAID: {int(dp_r.get('sudah_paid_agents', 0))} | GP/SO (Blm PAID): {int(dp_r.get('gp_blm_paid_agents', 0))} | Tdk PAID: {int(dp_r.get('blm_paid', 0))}",
                 )
             )
 

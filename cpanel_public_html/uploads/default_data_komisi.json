@@ -1,5 +1,5 @@
 {
-    "calc_engine_version": 4,
+    "calc_engine_version": 5,
     "periode_label": "22-Nov-2026",
     "hari_berjalan": 22,
     "total_hari": 30,
@@ -16,14 +16,14 @@
         {
             "leader": "Yudha Irawan",
             "so": 10,
-            "gp": 5,
             "paid": 3,
             "sa": 2,
             "blm_so": 8,
             "blm_paid": 12,
             "blm_sa": 13,
             "sudah_paid_agents": 3,
-            "sudah_gp_agents": 4,
+            "sudah_gp_agents": 7,
+            "gp_blm_paid_agents": 4,
             "total_agents": 15,
             "agents_blm_so": [
                 "Rachman Hadi Sabarian",
@@ -69,57 +69,60 @@
                 "Rafli Aditya (1)",
                 "Said Djandan Mufti (1)"
             ],
+            "agents_sudah_gp": [
+                "Elang Tri Mulia Arya Kusuma (2)",
+                "Martini (2)",
+                "Rafli Aditya (2)",
+                "Pungkas Mugo Praksoso (1)",
+                "Rani Febriyanti (1)",
+                "Said Djandan Mufti (1)",
+                "Suci Apriwulan (1)"
+            ],
             "agents_gp": [
-                "Martini (2 GP)",
-                "Pungkas Mugo Praksoso (1 GP)",
-                "Rafli Aditya (1 GP)",
-                "Suci Apriwulan (1 GP)"
+                "Martini (2 GP\/SO)",
+                "Pungkas Mugo Praksoso (1 GP\/SO)",
+                "Rani Febriyanti (1 GP\/SO)",
+                "Suci Apriwulan (1 GP\/SO)"
             ],
             "agents_tidak_paid": [
-                "Martini (2 GP — Blm PAID)",
-                "Pungkas Mugo Praksoso (1 GP — Blm PAID)",
-                "Rani Febriyanti (1 SO Blm PAID)",
-                "Rachman Hadi Sabarian (0 SO)",
-                "Suci Apriwulan (1 GP — Blm PAID)",
-                "Fauzan Budiman (0 SO)",
-                "Mohamad Fikri (0 SO)",
+                "Martini (2 GP\/SO — Blm PAID)",
+                "Pungkas Mugo Praksoso (1 GP\/SO — Blm PAID)",
+                "Rani Febriyanti (1 GP\/SO — Blm PAID)",
+                "Rachman Hadi Sabarian (0 SO\/GP)",
+                "Suci Apriwulan (1 GP\/SO — Blm PAID)",
+                "Fauzan Budiman (0 SO\/GP)",
+                "Mohamad Fikri (0 SO\/GP)",
                 "Vacant",
-                "Habib Kamal (0 SO)",
-                "Dewi Ratanasari (0 SO)",
-                "Ariska Pratiwi (0 SO)",
-                "Ahmad Maulana (0 SO)"
+                "Habib Kamal (0 SO\/GP)",
+                "Dewi Ratanasari (0 SO\/GP)",
+                "Ariska Pratiwi (0 SO\/GP)",
+                "Ahmad Maulana (0 SO\/GP)"
             ],
             "agent_details": [
-                {
-                    "leader": "Yudha Irawan",
-                    "name": "Rafli Aditya",
-                    "is_vacant": false,
-                    "so": 2,
-                    "gp": 1,
-                    "paid": 1,
-                    "tidak_paid_so": 1,
-                    "sa": 0,
-                    "status_harian": "✅ Sudah PAID + 💳 Ada GP"
-                },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Elang Tri Mulia Arya Kusuma",
                     "is_vacant": false,
                     "so": 2,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "✅ Sudah PAID + ⏳ Pending SO"
+                    "status_harian": "✅ Sudah PAID"
+                },
+                {
+                    "leader": "Yudha Irawan",
+                    "name": "Rafli Aditya",
+                    "is_vacant": false,
+                    "so": 2,
+                    "paid": 1,
+                    "sa": 0,
+                    "status_harian": "✅ Sudah PAID"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Said Djandan Mufti",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -128,130 +131,106 @@
                     "name": "Martini",
                     "is_vacant": false,
                     "so": 2,
-                    "gp": 2,
                     "paid": 0,
-                    "tidak_paid_so": 2,
                     "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Pungkas Mugo Praksoso",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
-                },
-                {
-                    "leader": "Yudha Irawan",
-                    "name": "Suci Apriwulan",
-                    "is_vacant": false,
-                    "so": 1,
-                    "gp": 1,
-                    "paid": 0,
-                    "tidak_paid_so": 1,
-                    "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Rani Febriyanti",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "⏳ Baru SO\/NEW (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
+                },
+                {
+                    "leader": "Yudha Irawan",
+                    "name": "Suci Apriwulan",
+                    "is_vacant": false,
+                    "so": 1,
+                    "paid": 0,
+                    "sa": 0,
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Ariska Pratiwi",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Fauzan Budiman",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Ahmad Maulana",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Dewi Ratanasari",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Habib Kamal",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Mohamad Fikri",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Rachman Hadi Sabarian",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yudha Irawan",
                     "name": "Vacant",
                     "is_vacant": true,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "⬜ Slot Vacant"
                 }
@@ -261,14 +240,14 @@
         {
             "leader": "Firliansyah",
             "so": 6,
-            "gp": 3,
             "paid": 6,
             "sa": 3,
             "blm_so": 11,
             "blm_paid": 10,
             "blm_sa": 12,
             "sudah_paid_agents": 5,
-            "sudah_gp_agents": 2,
+            "sudah_gp_agents": 4,
+            "gp_blm_paid_agents": 1,
             "total_agents": 15,
             "agents_blm_so": [
                 "Rizki Dwi Puji Astuti",
@@ -316,21 +295,26 @@
                 "Fitra Jaya (1)",
                 "Muhammad Indra Pratama (1)"
             ],
+            "agents_sudah_gp": [
+                "Fatma Sofia Salim (3)",
+                "Azimata Firusdi (1)",
+                "Erik Suryadana (1)",
+                "Yuni Erlina Wati Latuliu (1)"
+            ],
             "agents_gp": [
-                "Fatma Sofia Salim (2 GP)",
-                "Erik Suryadana (1 GP)"
+                "Erik Suryadana (1 GP\/SO)"
             ],
             "agents_tidak_paid": [
-                "Rizki Dwi Puji Astuti (0 SO)",
-                "Erik Suryadana (1 GP — Blm PAID)",
-                "Serli Juwita (0 SO)",
-                "Yusuf Nugraha (0 SO)",
-                "Rico Sampe Toding (0 SO)",
+                "Rizki Dwi Puji Astuti (0 SO\/GP)",
+                "Erik Suryadana (1 GP\/SO — Blm PAID)",
+                "Serli Juwita (0 SO\/GP)",
+                "Yusuf Nugraha (0 SO\/GP)",
+                "Rico Sampe Toding (0 SO\/GP)",
                 "Vacant",
-                "Audina Gusliani (0 SO)",
-                "Riki Ardiansyah (0 SO)",
-                "Aulia Rachmayani (0 SO)",
-                "Noor Hayati (0 SO)"
+                "Audina Gusliani (0 SO\/GP)",
+                "Riki Ardiansyah (0 SO\/GP)",
+                "Aulia Rachmayani (0 SO\/GP)",
+                "Noor Hayati (0 SO\/GP)"
             ],
             "agent_details": [
                 {
@@ -338,9 +322,7 @@
                     "name": "Yuni Erlina Wati Latuliu",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 0,
                     "paid": 2,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -349,20 +331,16 @@
                     "name": "Fatma Sofia Salim",
                     "is_vacant": false,
                     "so": 3,
-                    "gp": 2,
                     "paid": 1,
-                    "tidak_paid_so": 2,
                     "sa": 0,
-                    "status_harian": "✅ Sudah PAID + 💳 Ada GP"
+                    "status_harian": "✅ Sudah PAID"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Azimata Firusdi",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -371,9 +349,7 @@
                     "name": "Fitra Jaya",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 1,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -382,9 +358,7 @@
                     "name": "Muhammad Indra Pratama",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -393,108 +367,88 @@
                     "name": "Erik Suryadana",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 1,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Yusuf Nugraha",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Audina Gusliani",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Aulia Rachmayani",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Noor Hayati",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Rico Sampe Toding",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Riki Ardiansyah",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Rizki Dwi Puji Astuti",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Serli Juwita",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Firliansyah",
                     "name": "Vacant",
                     "is_vacant": true,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "⬜ Slot Vacant"
                 }
@@ -504,14 +458,14 @@
         {
             "leader": "Yovi Arian",
             "so": 6,
-            "gp": 3,
             "paid": 4,
             "sa": 1,
             "blm_so": 5,
             "blm_paid": 6,
             "blm_sa": 9,
             "sudah_paid_agents": 4,
-            "sudah_gp_agents": 3,
+            "sudah_gp_agents": 5,
+            "gp_blm_paid_agents": 2,
             "total_agents": 10,
             "agents_blm_so": [
                 "Askih Milli Priyanto",
@@ -545,18 +499,24 @@
                 "Sisca Permata Sucy (1)",
                 "Yayang Ardi Purnama (1)"
             ],
+            "agents_sudah_gp": [
+                "Yayang Ardi Purnama (2)",
+                "Ali Yusup Ramadhan (1)",
+                "Andri Darmawan (1)",
+                "Dwi Afriyani (1)",
+                "Nafa Destiana Putri (1)"
+            ],
             "agents_gp": [
-                "Andri Darmawan (1 GP)",
-                "Nafa Destiana Putri (1 GP)",
-                "Yayang Ardi Purnama (1 GP)"
+                "Andri Darmawan (1 GP\/SO)",
+                "Nafa Destiana Putri (1 GP\/SO)"
             ],
             "agents_tidak_paid": [
-                "Askih Milli Priyanto (0 SO)",
-                "Sandra Monica (0 SO)",
-                "Diana Yasmin (0 SO)",
-                "Andri Darmawan (1 GP — Blm PAID)",
-                "Anisa Rahmawati (0 SO)",
-                "Nafa Destiana Putri (1 GP — Blm PAID)"
+                "Askih Milli Priyanto (0 SO\/GP)",
+                "Sandra Monica (0 SO\/GP)",
+                "Diana Yasmin (0 SO\/GP)",
+                "Andri Darmawan (1 GP\/SO — Blm PAID)",
+                "Anisa Rahmawati (0 SO\/GP)",
+                "Nafa Destiana Putri (1 GP\/SO — Blm PAID)"
             ],
             "agent_details": [
                 {
@@ -564,20 +524,16 @@
                     "name": "Yayang Ardi Purnama",
                     "is_vacant": false,
                     "so": 2,
-                    "gp": 1,
                     "paid": 1,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "✅ Sudah PAID + 💳 Ada GP"
+                    "status_harian": "✅ Sudah PAID"
                 },
                 {
                     "leader": "Yovi Arian",
                     "name": "Ali Yusup Ramadhan",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -586,9 +542,7 @@
                     "name": "Dwi Afriyani",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -597,9 +551,7 @@
                     "name": "Sisca Permata Sucy",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -608,66 +560,54 @@
                     "name": "Nafa Destiana Putri",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 1,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Yovi Arian",
                     "name": "Andri Darmawan",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Yovi Arian",
                     "name": "Anisa Rahmawati",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yovi Arian",
                     "name": "Askih Milli Priyanto",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yovi Arian",
                     "name": "Diana Yasmin",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Yovi Arian",
                     "name": "Sandra Monica",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 }
             ],
             "is_grand_total": false
@@ -675,14 +615,14 @@
         {
             "leader": "Jarot Arie Sasmita",
             "so": 6,
-            "gp": 3,
             "paid": 4,
             "sa": 0,
             "blm_so": 5,
             "blm_paid": 7,
             "blm_sa": 10,
             "sudah_paid_agents": 3,
-            "sudah_gp_agents": 3,
+            "sudah_gp_agents": 5,
+            "gp_blm_paid_agents": 3,
             "total_agents": 10,
             "agents_blm_so": [
                 "Cindy Pertiwi Nasution",
@@ -717,19 +657,26 @@
                 "Deby Karlina (1)",
                 "Naila Apriliani (1)"
             ],
+            "agents_sudah_gp": [
+                "Endang Septiansyah (2)",
+                "Astuti Pratiwisari (1)",
+                "Deby Karlina (1)",
+                "Irpan Dio Sanjaya (1)",
+                "Yohanes Steven S (1)"
+            ],
             "agents_gp": [
-                "Astuti Pratiwisari (1 GP)",
-                "Irpan Dio Sanjaya (1 GP)",
-                "Yohanes Steven S (1 GP)"
+                "Astuti Pratiwisari (1 GP\/SO)",
+                "Irpan Dio Sanjaya (1 GP\/SO)",
+                "Yohanes Steven S (1 GP\/SO)"
             ],
             "agents_tidak_paid": [
-                "Cindy Pertiwi Nasution (0 SO)",
-                "Tri Danar Sugiarto (0 SO)",
-                "Yohanes Steven S (1 GP — Blm PAID)",
-                "Dendi Dimas Permana (0 SO)",
-                "Muhammad Syahru Ramdoni (0 SO)",
-                "Astuti Pratiwisari (1 GP — Blm PAID)",
-                "Irpan Dio Sanjaya (1 GP — Blm PAID)"
+                "Cindy Pertiwi Nasution (0 SO\/GP)",
+                "Tri Danar Sugiarto (0 SO\/GP)",
+                "Yohanes Steven S (1 GP\/SO — Blm PAID)",
+                "Dendi Dimas Permana (0 SO\/GP)",
+                "Muhammad Syahru Ramdoni (0 SO\/GP)",
+                "Astuti Pratiwisari (1 GP\/SO — Blm PAID)",
+                "Irpan Dio Sanjaya (1 GP\/SO — Blm PAID)"
             ],
             "agent_details": [
                 {
@@ -737,9 +684,7 @@
                     "name": "Endang Septiansyah",
                     "is_vacant": false,
                     "so": 2,
-                    "gp": 0,
                     "paid": 2,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -748,9 +693,7 @@
                     "name": "Deby Karlina",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -759,9 +702,7 @@
                     "name": "Naila Apriliani",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -770,77 +711,63 @@
                     "name": "Astuti Pratiwisari",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Jarot Arie Sasmita",
                     "name": "Irpan Dio Sanjaya",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Jarot Arie Sasmita",
                     "name": "Yohanes Steven S",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Jarot Arie Sasmita",
                     "name": "Cindy Pertiwi Nasution",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Jarot Arie Sasmita",
                     "name": "Dendi Dimas Permana",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Jarot Arie Sasmita",
                     "name": "Muhammad Syahru Ramdoni",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Jarot Arie Sasmita",
                     "name": "Tri Danar Sugiarto",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 }
             ],
             "is_grand_total": false
@@ -848,14 +775,14 @@
         {
             "leader": "Tiara Muna Dayuningtyas",
             "so": 6,
-            "gp": 3,
             "paid": 3,
             "sa": 0,
             "blm_so": 6,
             "blm_paid": 7,
             "blm_sa": 10,
             "sudah_paid_agents": 3,
-            "sudah_gp_agents": 2,
+            "sudah_gp_agents": 4,
+            "gp_blm_paid_agents": 1,
             "total_agents": 10,
             "agents_blm_so": [
                 "Kuncoro Gali Nugroho",
@@ -891,17 +818,22 @@
                 "Dina Damayanti (1)",
                 "Tuti Handayani (1)"
             ],
+            "agents_sudah_gp": [
+                "Tuti Handayani (2)",
+                "Yunianti (2)",
+                "Diah Pertiwi (1)",
+                "Dina Damayanti (1)"
+            ],
             "agents_gp": [
-                "Yunianti (2 GP)",
-                "Tuti Handayani (1 GP)"
+                "Yunianti (2 GP\/SO)"
             ],
             "agents_tidak_paid": [
-                "Kuncoro Gali Nugroho (0 SO)",
-                "Muhammad Ikhsan Nulhakim (0 SO)",
-                "Putri Wulan (0 SO)",
-                "Fahmi Zakki (0 SO)",
-                "Yunianti (2 GP — Blm PAID)",
-                "Suandi (0 SO)",
+                "Kuncoro Gali Nugroho (0 SO\/GP)",
+                "Muhammad Ikhsan Nulhakim (0 SO\/GP)",
+                "Putri Wulan (0 SO\/GP)",
+                "Fahmi Zakki (0 SO\/GP)",
+                "Yunianti (2 GP\/SO — Blm PAID)",
+                "Suandi (0 SO\/GP)",
                 "Vacant"
             ],
             "agent_details": [
@@ -910,20 +842,16 @@
                     "name": "Tuti Handayani",
                     "is_vacant": false,
                     "so": 2,
-                    "gp": 1,
                     "paid": 1,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "✅ Sudah PAID + 💳 Ada GP"
+                    "status_harian": "✅ Sudah PAID"
                 },
                 {
                     "leader": "Tiara Muna Dayuningtyas",
                     "name": "Diah Pertiwi",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -932,9 +860,7 @@
                     "name": "Dina Damayanti",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -943,75 +869,61 @@
                     "name": "Yunianti",
                     "is_vacant": false,
                     "so": 2,
-                    "gp": 2,
                     "paid": 0,
-                    "tidak_paid_so": 2,
                     "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Tiara Muna Dayuningtyas",
                     "name": "Fahmi Zakki",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tiara Muna Dayuningtyas",
                     "name": "Kuncoro Gali Nugroho",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tiara Muna Dayuningtyas",
                     "name": "Muhammad Ikhsan Nulhakim",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tiara Muna Dayuningtyas",
                     "name": "Putri Wulan",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tiara Muna Dayuningtyas",
                     "name": "Suandi",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tiara Muna Dayuningtyas",
                     "name": "Vacant",
                     "is_vacant": true,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "⬜ Slot Vacant"
                 }
@@ -1021,14 +933,14 @@
         {
             "leader": "Anis Anggraini",
             "so": 3,
-            "gp": 1,
             "paid": 3,
             "sa": 1,
             "blm_so": 8,
             "blm_paid": 9,
             "blm_sa": 9,
             "sudah_paid_agents": 1,
-            "sudah_gp_agents": 1,
+            "sudah_gp_agents": 2,
+            "gp_blm_paid_agents": 1,
             "total_agents": 10,
             "agents_blm_so": [
                 "Dyah Desy Puspaningrum",
@@ -1065,19 +977,23 @@
             "agents_paid": [
                 "Hermansyah (3)"
             ],
+            "agents_sudah_gp": [
+                "Hermansyah (2)",
+                "Putry Cristallianieka Sudirman (1)"
+            ],
             "agents_gp": [
-                "Putry Cristallianieka Sudirman (1 GP)"
+                "Putry Cristallianieka Sudirman (1 GP\/SO)"
             ],
             "agents_tidak_paid": [
-                "Dyah Desy Puspaningrum (0 SO)",
-                "Putry Cristallianieka Sudirman (1 GP — Blm PAID)",
-                "Siti Soleha (0 SO)",
-                "Rohmi Amelia (0 SO)",
-                "Rexy Ronald Wowiling (0 SO)",
-                "Siti Muslipah (0 SO)",
-                "Putri Zakiah (0 SO)",
-                "Ryan Aryoseno (0 SO)",
-                "Esa Reya Syahdeni (0 SO)"
+                "Dyah Desy Puspaningrum (0 SO\/GP)",
+                "Putry Cristallianieka Sudirman (1 GP\/SO — Blm PAID)",
+                "Siti Soleha (0 SO\/GP)",
+                "Rohmi Amelia (0 SO\/GP)",
+                "Rexy Ronald Wowiling (0 SO\/GP)",
+                "Siti Muslipah (0 SO\/GP)",
+                "Putri Zakiah (0 SO\/GP)",
+                "Ryan Aryoseno (0 SO\/GP)",
+                "Esa Reya Syahdeni (0 SO\/GP)"
             ],
             "agent_details": [
                 {
@@ -1085,9 +1001,7 @@
                     "name": "Hermansyah",
                     "is_vacant": false,
                     "so": 2,
-                    "gp": 0,
                     "paid": 3,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -1096,99 +1010,81 @@
                     "name": "Putry Cristallianieka Sudirman",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Anis Anggraini",
                     "name": "Siti Soleha",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Anis Anggraini",
                     "name": "Dyah Desy Puspaningrum",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Anis Anggraini",
                     "name": "Esa Reya Syahdeni",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Anis Anggraini",
                     "name": "Putri Zakiah",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Anis Anggraini",
                     "name": "Rexy Ronald Wowiling",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Anis Anggraini",
                     "name": "Rohmi Amelia",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Anis Anggraini",
                     "name": "Ryan Aryoseno",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Anis Anggraini",
                     "name": "Siti Muslipah",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 }
             ],
             "is_grand_total": false
@@ -1196,7 +1092,6 @@
         {
             "leader": "Eka Hardiansyah",
             "so": 3,
-            "gp": 2,
             "paid": 1,
             "sa": 1,
             "blm_so": 8,
@@ -1204,6 +1099,7 @@
             "blm_sa": 9,
             "sudah_paid_agents": 1,
             "sudah_gp_agents": 2,
+            "gp_blm_paid_agents": 1,
             "total_agents": 10,
             "agents_blm_so": [
                 "Sri Wahyuningsih",
@@ -1240,18 +1136,21 @@
             "agents_paid": [
                 "Andaru Nanda Setiyawan (1)"
             ],
+            "agents_sudah_gp": [
+                "Andaru Nanda Setiyawan (2)",
+                "Andi Achmad Zaky (1)"
+            ],
             "agents_gp": [
-                "Andaru Nanda Setiyawan (1 GP)",
-                "Andi Achmad Zaky (1 GP)"
+                "Andi Achmad Zaky (1 GP\/SO)"
             ],
             "agents_tidak_paid": [
-                "Sri Wahyuningsih (0 SO)",
-                "Khairanny (0 SO)",
-                "Luki Defiana (0 SO)",
-                "Jonathan Saragih (0 SO)",
-                "Nurhikmah Handayani (0 SO)",
-                "Muhamad Rifki Ramadhan (0 SO)",
-                "Andi Achmad Zaky (1 GP — Blm PAID)",
+                "Sri Wahyuningsih (0 SO\/GP)",
+                "Khairanny (0 SO\/GP)",
+                "Luki Defiana (0 SO\/GP)",
+                "Jonathan Saragih (0 SO\/GP)",
+                "Nurhikmah Handayani (0 SO\/GP)",
+                "Muhamad Rifki Ramadhan (0 SO\/GP)",
+                "Andi Achmad Zaky (1 GP\/SO — Blm PAID)",
                 "Vacant",
                 "Vacant"
             ],
@@ -1261,97 +1160,79 @@
                     "name": "Andaru Nanda Setiyawan",
                     "is_vacant": false,
                     "so": 2,
-                    "gp": 1,
                     "paid": 1,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "✅ Sudah PAID + 💳 Ada GP"
+                    "status_harian": "✅ Sudah PAID"
                 },
                 {
                     "leader": "Eka Hardiansyah",
                     "name": "Andi Achmad Zaky",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 1,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Eka Hardiansyah",
                     "name": "Jonathan Saragih",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Eka Hardiansyah",
                     "name": "Khairanny",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Eka Hardiansyah",
                     "name": "Luki Defiana",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Eka Hardiansyah",
                     "name": "Muhamad Rifki Ramadhan",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Eka Hardiansyah",
                     "name": "Nurhikmah Handayani",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Eka Hardiansyah",
                     "name": "Sri Wahyuningsih",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Eka Hardiansyah",
                     "name": "Vacant",
                     "is_vacant": true,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "⬜ Slot Vacant"
                 },
@@ -1360,9 +1241,7 @@
                     "name": "Vacant",
                     "is_vacant": true,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "⬜ Slot Vacant"
                 }
@@ -1372,7 +1251,6 @@
         {
             "leader": "Tika Saraswati",
             "so": 1,
-            "gp": 1,
             "paid": 1,
             "sa": 2,
             "blm_so": 9,
@@ -1380,6 +1258,7 @@
             "blm_sa": 8,
             "sudah_paid_agents": 1,
             "sudah_gp_agents": 1,
+            "gp_blm_paid_agents": 0,
             "total_agents": 10,
             "agents_blm_so": [
                 "Abimanyu Kusuma",
@@ -1416,19 +1295,20 @@
             "agents_paid": [
                 "Kuntum Kharisma Dewi (1)"
             ],
-            "agents_gp": [
-                "Kuntum Kharisma Dewi (1 GP)"
+            "agents_sudah_gp": [
+                "Kuntum Kharisma Dewi (1)"
             ],
+            "agents_gp": [],
             "agents_tidak_paid": [
-                "Abimanyu Kusuma (0 SO)",
-                "Adryan Deva Maulana (0 SO)",
-                "Deny R Hidayat (0 SO)",
-                "Risda Trisdawanti (0 SO)",
-                "Rafly Kurniawan (0 SO)",
-                "Hastarina (0 SO)",
-                "Denson Manalu (0 SO)",
-                "Al Alif Andriansyah (0 SO)",
-                "Nurpi Apriansyah (0 SO)"
+                "Abimanyu Kusuma (0 SO\/GP)",
+                "Adryan Deva Maulana (0 SO\/GP)",
+                "Deny R Hidayat (0 SO\/GP)",
+                "Risda Trisdawanti (0 SO\/GP)",
+                "Rafly Kurniawan (0 SO\/GP)",
+                "Hastarina (0 SO\/GP)",
+                "Denson Manalu (0 SO\/GP)",
+                "Al Alif Andriansyah (0 SO\/GP)",
+                "Nurpi Apriansyah (0 SO\/GP)"
             ],
             "agent_details": [
                 {
@@ -1436,110 +1316,90 @@
                     "name": "Kuntum Kharisma Dewi",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 1,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "✅ Sudah PAID + 💳 Ada GP"
+                    "status_harian": "✅ Sudah PAID"
                 },
                 {
                     "leader": "Tika Saraswati",
                     "name": "Denson Manalu",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tika Saraswati",
                     "name": "Hastarina",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tika Saraswati",
                     "name": "Abimanyu Kusuma",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tika Saraswati",
                     "name": "Adryan Deva Maulana",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tika Saraswati",
                     "name": "Al Alif Andriansyah",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tika Saraswati",
                     "name": "Deny R Hidayat",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tika Saraswati",
                     "name": "Nurpi Apriansyah",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tika Saraswati",
                     "name": "Rafly Kurniawan",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Tika Saraswati",
                     "name": "Risda Trisdawanti",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 }
             ],
             "is_grand_total": false
@@ -1547,7 +1407,6 @@
         {
             "leader": "Alfian Bagus Setiawan",
             "so": 1,
-            "gp": 1,
             "paid": 0,
             "sa": 3,
             "blm_so": 9,
@@ -1555,6 +1414,7 @@
             "blm_sa": 7,
             "sudah_paid_agents": 0,
             "sudah_gp_agents": 1,
+            "gp_blm_paid_agents": 1,
             "total_agents": 10,
             "agents_blm_so": [
                 "Reinaldi Pandama Rahmat",
@@ -1589,20 +1449,23 @@
                 "Durrotul Fadiilah"
             ],
             "agents_paid": [],
+            "agents_sudah_gp": [
+                "Ruly Pangestu (1)"
+            ],
             "agents_gp": [
-                "Ruly Pangestu (1 GP)"
+                "Ruly Pangestu (1 GP\/SO)"
             ],
             "agents_tidak_paid": [
-                "Reinaldi Pandama Rahmat (0 SO)",
-                "Ari Harnanto Nugroho (0 SO)",
-                "Asa Zahra Kencana (0 SO)",
-                "Fauzan Seftiady (0 SO)",
-                "Rita Fitriani (0 SO)",
-                "Ruly Pangestu (1 GP — Blm PAID)",
-                "Saffa Agatha Faradilla (0 SO)",
-                "Sinarsih Febrianti Dakhi (0 SO)",
-                "Gilang Nur Fauzan (0 SO)",
-                "Durrotul Fadiilah (0 SO)"
+                "Reinaldi Pandama Rahmat (0 SO\/GP)",
+                "Ari Harnanto Nugroho (0 SO\/GP)",
+                "Asa Zahra Kencana (0 SO\/GP)",
+                "Fauzan Seftiady (0 SO\/GP)",
+                "Rita Fitriani (0 SO\/GP)",
+                "Ruly Pangestu (1 GP\/SO — Blm PAID)",
+                "Saffa Agatha Faradilla (0 SO\/GP)",
+                "Sinarsih Febrianti Dakhi (0 SO\/GP)",
+                "Gilang Nur Fauzan (0 SO\/GP)",
+                "Durrotul Fadiilah (0 SO\/GP)"
             ],
             "agent_details": [
                 {
@@ -1610,110 +1473,90 @@
                     "name": "Ruly Pangestu",
                     "is_vacant": false,
                     "so": 1,
-                    "gp": 1,
                     "paid": 0,
-                    "tidak_paid_so": 1,
                     "sa": 0,
-                    "status_harian": "💳 Sudah GP (Tidak PAID)"
+                    "status_harian": "💳 Sudah GP \/ SO (Blm PAID)"
                 },
                 {
                     "leader": "Alfian Bagus Setiawan",
                     "name": "Fauzan Seftiady",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Alfian Bagus Setiawan",
                     "name": "Reinaldi Pandama Rahmat",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Alfian Bagus Setiawan",
                     "name": "Saffa Agatha Faradilla",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Alfian Bagus Setiawan",
                     "name": "Ari Harnanto Nugroho",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Alfian Bagus Setiawan",
                     "name": "Asa Zahra Kencana",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Alfian Bagus Setiawan",
                     "name": "Durrotul Fadiilah",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Alfian Bagus Setiawan",
                     "name": "Gilang Nur Fauzan",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Alfian Bagus Setiawan",
                     "name": "Rita Fitriani",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Alfian Bagus Setiawan",
                     "name": "Sinarsih Febrianti Dakhi",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 }
             ],
             "is_grand_total": false
@@ -1721,7 +1564,6 @@
         {
             "leader": "Fahrul Amrin",
             "so": 0,
-            "gp": 0,
             "paid": 1,
             "sa": 1,
             "blm_so": 10,
@@ -1729,6 +1571,7 @@
             "blm_sa": 9,
             "sudah_paid_agents": 1,
             "sudah_gp_agents": 0,
+            "gp_blm_paid_agents": 0,
             "total_agents": 10,
             "agents_blm_so": [
                 "Natalia Bakara",
@@ -1767,17 +1610,18 @@
             "agents_paid": [
                 "Didid Novianto (1)"
             ],
+            "agents_sudah_gp": [],
             "agents_gp": [],
             "agents_tidak_paid": [
-                "Natalia Bakara (0 SO)",
-                "Eko Wahyudi (0 SO)",
-                "Zahra Nadiyah Khaerunnisa (0 SO)",
-                "Putri Mayasari (0 SO)",
-                "Khoirul Esti Wulandari (0 SO)",
-                "Shera Rega Vilanty (0 SO)",
-                "Jody Kresno Tamtomo (0 SO)",
-                "Tommy Prasetyo (0 SO)",
-                "Fitriyani Soraya (0 SO)"
+                "Natalia Bakara (0 SO\/GP)",
+                "Eko Wahyudi (0 SO\/GP)",
+                "Zahra Nadiyah Khaerunnisa (0 SO\/GP)",
+                "Putri Mayasari (0 SO\/GP)",
+                "Khoirul Esti Wulandari (0 SO\/GP)",
+                "Shera Rega Vilanty (0 SO\/GP)",
+                "Jody Kresno Tamtomo (0 SO\/GP)",
+                "Tommy Prasetyo (0 SO\/GP)",
+                "Fitriyani Soraya (0 SO\/GP)"
             ],
             "agent_details": [
                 {
@@ -1785,9 +1629,7 @@
                     "name": "Didid Novianto",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -1796,99 +1638,81 @@
                     "name": "Zahra Nadiyah Khaerunnisa",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Fahrul Amrin",
                     "name": "Eko Wahyudi",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Fahrul Amrin",
                     "name": "Fitriyani Soraya",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Fahrul Amrin",
                     "name": "Jody Kresno Tamtomo",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Fahrul Amrin",
                     "name": "Khoirul Esti Wulandari",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Fahrul Amrin",
                     "name": "Natalia Bakara",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Fahrul Amrin",
                     "name": "Putri Mayasari",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Fahrul Amrin",
                     "name": "Shera Rega Vilanty",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Fahrul Amrin",
                     "name": "Tommy Prasetyo",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 }
             ],
             "is_grand_total": false
@@ -1896,7 +1720,6 @@
         {
             "leader": "Muhammad Rezky Jaladara",
             "so": 0,
-            "gp": 0,
             "paid": 1,
             "sa": 1,
             "blm_so": 10,
@@ -1904,6 +1727,7 @@
             "blm_sa": 9,
             "sudah_paid_agents": 1,
             "sudah_gp_agents": 0,
+            "gp_blm_paid_agents": 0,
             "total_agents": 10,
             "agents_blm_so": [
                 "Muhamad Chandra Andika Rifky",
@@ -1942,17 +1766,18 @@
             "agents_paid": [
                 "Shalsadilah (1)"
             ],
+            "agents_sudah_gp": [],
             "agents_gp": [],
             "agents_tidak_paid": [
-                "Muhamad Chandra Andika Rifky (0 SO)",
-                "Rifki Maulana (0 SO)",
-                "Ikhsan Fajri (0 SO)",
-                "Defa Delvianty (0 SO)",
-                "Dairi Tumanggor (0 SO)",
-                "Agung Dwi Jayanto (0 SO)",
-                "Nisa Yuanita (0 SO)",
-                "Irina Andriani (0 SO)",
-                "Domminique Jennifer Regita Wattimena (0 SO)"
+                "Muhamad Chandra Andika Rifky (0 SO\/GP)",
+                "Rifki Maulana (0 SO\/GP)",
+                "Ikhsan Fajri (0 SO\/GP)",
+                "Defa Delvianty (0 SO\/GP)",
+                "Dairi Tumanggor (0 SO\/GP)",
+                "Agung Dwi Jayanto (0 SO\/GP)",
+                "Nisa Yuanita (0 SO\/GP)",
+                "Irina Andriani (0 SO\/GP)",
+                "Domminique Jennifer Regita Wattimena (0 SO\/GP)"
             ],
             "agent_details": [
                 {
@@ -1960,9 +1785,7 @@
                     "name": "Shalsadilah",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 1,
-                    "tidak_paid_so": 0,
                     "sa": 0,
                     "status_harian": "✅ Sudah PAID"
                 },
@@ -1971,99 +1794,81 @@
                     "name": "Dairi Tumanggor",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 1,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Muhammad Rezky Jaladara",
                     "name": "Agung Dwi Jayanto",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Muhammad Rezky Jaladara",
                     "name": "Defa Delvianty",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Muhammad Rezky Jaladara",
                     "name": "Domminique Jennifer Regita Wattimena",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Muhammad Rezky Jaladara",
                     "name": "Ikhsan Fajri",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Muhammad Rezky Jaladara",
                     "name": "Irina Andriani",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Muhammad Rezky Jaladara",
                     "name": "Muhamad Chandra Andika Rifky",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Muhammad Rezky Jaladara",
                     "name": "Nisa Yuanita",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 },
                 {
                     "leader": "Muhammad Rezky Jaladara",
                     "name": "Rifki Maulana",
                     "is_vacant": false,
                     "so": 0,
-                    "gp": 0,
                     "paid": 0,
-                    "tidak_paid_so": 0,
                     "sa": 0,
-                    "status_harian": "❌ Tidak PAID (0 SO)"
+                    "status_harian": "❌ Tidak PAID (0 SO\/GP)"
                 }
             ],
             "is_grand_total": false
@@ -2071,19 +1876,20 @@
         {
             "leader": "Grand Total",
             "so": 42,
-            "gp": 22,
             "paid": 27,
             "sa": 15,
             "blm_so": 89,
             "blm_paid": 97,
             "blm_sa": 105,
             "sudah_paid_agents": 23,
-            "sudah_gp_agents": 19,
+            "sudah_gp_agents": 31,
+            "gp_blm_paid_agents": 14,
             "total_agents": 120,
             "agents_blm_so": [],
             "agents_blm_paid": [],
             "agents_blm_sa": [],
             "agents_paid": [],
+            "agents_sudah_gp": [],
             "agents_gp": [],
             "agents_tidak_paid": [],
             "agent_details": [],
@@ -6295,7 +6101,7 @@
             }
         ],
         "total_baris_prospect": 16568,
-        "updated_at": "2026-11-22 04:34:01",
+        "updated_at": "2026-11-22 04:59:04",
         "updated_by": "Paket Server Terbaru"
     },
     "mtd_rows": [

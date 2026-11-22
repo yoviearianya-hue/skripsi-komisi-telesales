@@ -152,15 +152,14 @@ def generate_sql_files() -> None:
         lines.extend(
             [
                 "-- ----------------------------------------------------------------------------",
-                "-- 2B. TABEL: rekap_harian_blm_produktif (SO/PAID/SA Harian & Agent Blm Produktif)",
+                "-- 2B. TABEL: rekap_harian_blm_produktif (SO/GP, PAID, SA Harian & Agent Blm Produktif)",
                 "-- ----------------------------------------------------------------------------",
                 "DROP TABLE IF EXISTS `rekap_harian_blm_produktif`;",
                 "CREATE TABLE `rekap_harian_blm_produktif` (",
                 "  `id` int(11) NOT NULL AUTO_INCREMENT,",
                 "  `tanggal_label` varchar(30) NOT NULL,",
                 "  `sales_leader` varchar(120) NOT NULL,",
-                "  `harian_so` int(11) NOT NULL DEFAULT 0,",
-                "  `harian_gp` int(11) NOT NULL DEFAULT 0,",
+                "  `harian_so_gp` int(11) NOT NULL DEFAULT 0,",
                 "  `harian_paid` int(11) NOT NULL DEFAULT 0,",
                 "  `harian_sa` int(11) NOT NULL DEFAULT 0,",
                 "  `blm_produktif_so` int(11) NOT NULL DEFAULT 0,",
@@ -169,11 +168,11 @@ def generate_sql_files() -> None:
                 "  PRIMARY KEY (`id`)",
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
                 "",
-                "INSERT INTO `rekap_harian_blm_produktif` (`tanggal_label`, `sales_leader`, `harian_so`, `harian_gp`, `harian_paid`, `harian_sa`, `blm_produktif_so`, `blm_produktif_paid`, `blm_produktif_sa`) VALUES",
+                "INSERT INTO `rekap_harian_blm_produktif` (`tanggal_label`, `sales_leader`, `harian_so_gp`, `harian_paid`, `harian_sa`, `blm_produktif_so`, `blm_produktif_paid`, `blm_produktif_sa`) VALUES",
             ]
         )
         val_dp = [
-            f"({sql_str(daily_prod_label)}, {sql_str(r['leader'])}, {sql_num(r['so'])}, {sql_num(r.get('gp', 0))}, {sql_num(r['paid'])}, {sql_num(r['sa'])}, {sql_num(r['blm_so'])}, {sql_num(r['blm_paid'])}, {sql_num(r['blm_sa'])})"
+            f"({sql_str(daily_prod_label)}, {sql_str(r['leader'])}, {sql_num(r['so'])}, {sql_num(r['paid'])}, {sql_num(r['sa'])}, {sql_num(r['blm_so'])}, {sql_num(r['blm_paid'])}, {sql_num(r['blm_sa'])})"
             for r in daily_prod_rows
         ]
         lines.append(",\n".join(val_dp) + ";\n")

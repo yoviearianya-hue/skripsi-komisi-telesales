@@ -185,15 +185,14 @@ INSERT INTO `rekap_mtd_sa_leader` (`sales_leader`, `periode_mtd`, `sa_oct_mtd`, 
 ('Total', '1-22 Nov 2026', 3344, 3158, -186);
 
 -- ----------------------------------------------------------------------------
--- 2B. TABEL: rekap_harian_blm_produktif (SO/PAID/SA Harian & Agent Blm Produktif)
+-- 2B. TABEL: rekap_harian_blm_produktif (SO/GP, PAID, SA Harian & Agent Blm Produktif)
 -- ----------------------------------------------------------------------------
 DROP TABLE IF EXISTS `rekap_harian_blm_produktif`;
 CREATE TABLE `rekap_harian_blm_produktif` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `tanggal_label` varchar(30) NOT NULL,
   `sales_leader` varchar(120) NOT NULL,
-  `harian_so` int(11) NOT NULL DEFAULT 0,
-  `harian_gp` int(11) NOT NULL DEFAULT 0,
+  `harian_so_gp` int(11) NOT NULL DEFAULT 0,
   `harian_paid` int(11) NOT NULL DEFAULT 0,
   `harian_sa` int(11) NOT NULL DEFAULT 0,
   `blm_produktif_so` int(11) NOT NULL DEFAULT 0,
@@ -202,19 +201,19 @@ CREATE TABLE `rekap_harian_blm_produktif` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `rekap_harian_blm_produktif` (`tanggal_label`, `sales_leader`, `harian_so`, `harian_gp`, `harian_paid`, `harian_sa`, `blm_produktif_so`, `blm_produktif_paid`, `blm_produktif_sa`) VALUES
-('22-Nov-26', 'Yudha Irawan', 10, 5, 3, 2, 8, 12, 13),
-('22-Nov-26', 'Firliansyah', 6, 3, 6, 3, 11, 10, 12),
-('22-Nov-26', 'Yovi Arian', 6, 3, 4, 1, 5, 6, 9),
-('22-Nov-26', 'Jarot Arie Sasmita', 6, 3, 4, 0, 5, 7, 10),
-('22-Nov-26', 'Tiara Muna Dayuningtyas', 6, 3, 3, 0, 6, 7, 10),
-('22-Nov-26', 'Anis Anggraini', 3, 1, 3, 1, 8, 9, 9),
-('22-Nov-26', 'Eka Hardiansyah', 3, 2, 1, 1, 8, 9, 9),
-('22-Nov-26', 'Tika Saraswati', 1, 1, 1, 2, 9, 9, 8),
-('22-Nov-26', 'Alfian Bagus Setiawan', 1, 1, 0, 3, 9, 10, 7),
-('22-Nov-26', 'Fahrul Amrin', 0, 0, 1, 1, 10, 9, 9),
-('22-Nov-26', 'Muhammad Rezky Jaladara', 0, 0, 1, 1, 10, 9, 9),
-('22-Nov-26', 'Grand Total', 42, 22, 27, 15, 89, 97, 105);
+INSERT INTO `rekap_harian_blm_produktif` (`tanggal_label`, `sales_leader`, `harian_so_gp`, `harian_paid`, `harian_sa`, `blm_produktif_so`, `blm_produktif_paid`, `blm_produktif_sa`) VALUES
+('22-Nov-26', 'Yudha Irawan', 10, 3, 2, 8, 12, 13),
+('22-Nov-26', 'Firliansyah', 6, 6, 3, 11, 10, 12),
+('22-Nov-26', 'Yovi Arian', 6, 4, 1, 5, 6, 9),
+('22-Nov-26', 'Jarot Arie Sasmita', 6, 4, 0, 5, 7, 10),
+('22-Nov-26', 'Tiara Muna Dayuningtyas', 6, 3, 0, 6, 7, 10),
+('22-Nov-26', 'Anis Anggraini', 3, 3, 1, 8, 9, 9),
+('22-Nov-26', 'Eka Hardiansyah', 3, 1, 1, 8, 9, 9),
+('22-Nov-26', 'Tika Saraswati', 1, 1, 2, 9, 9, 8),
+('22-Nov-26', 'Alfian Bagus Setiawan', 1, 0, 3, 9, 10, 7),
+('22-Nov-26', 'Fahrul Amrin', 0, 1, 1, 10, 9, 9),
+('22-Nov-26', 'Muhammad Rezky Jaladara', 0, 1, 1, 10, 9, 9),
+('22-Nov-26', 'Grand Total', 42, 27, 15, 89, 97, 105);
 
 -- ----------------------------------------------------------------------------
 -- 2C. TABEL: rekap_wo_monitoring (WO TODAY | WAITING WO | WO BESOK)
