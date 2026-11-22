@@ -465,14 +465,21 @@ function build_tg_visual_payload(array $appData, string $scopeSend, bool $includ
         $isGt = !empty($dr['is_grand_total']) || strcasecmp((string)$dr['leader'], 'Grand Total') === 0;
         if (($isGt && $scopeSend === 'Semua Leader') || (!$isGt && ($scopeSend === 'Semua Leader' || $dr['leader'] === $scopeSend))) {
             $dailyFiltered[] = [
-                'leader'   => (string)$dr['leader'],
-                'so'       => (int)$dr['so'],
-                'paid'     => (int)$dr['paid'],
-                'sa'       => (int)$dr['sa'],
-                'blm_so'   => (int)$dr['blm_so'],
-                'blm_paid' => (int)$dr['blm_paid'],
-                'blm_sa'   => (int)$dr['blm_sa'],
-                'is_gt'    => $isGt,
+                'leader'            => (string)$dr['leader'],
+                'so'                => (int)$dr['so'],
+                'gp'                => (int)($dr['gp'] ?? 0),
+                'paid'              => (int)$dr['paid'],
+                'sa'                => (int)$dr['sa'],
+                'blm_so'            => (int)$dr['blm_so'],
+                'blm_paid'          => (int)$dr['blm_paid'],
+                'blm_sa'            => (int)$dr['blm_sa'],
+                'sudah_paid_agents' => (int)($dr['sudah_paid_agents'] ?? 0),
+                'sudah_gp_agents'   => (int)($dr['sudah_gp_agents'] ?? 0),
+                'agents_paid'       => array_values($dr['agents_paid'] ?? []),
+                'agents_gp'         => array_values($dr['agents_gp'] ?? []),
+                'agents_tidak_paid' => array_values($dr['agents_tidak_paid'] ?? []),
+                'agent_details'     => array_values($dr['agent_details'] ?? []),
+                'is_gt'             => $isGt,
             ];
         }
     }
@@ -482,21 +489,26 @@ function build_tg_visual_payload(array $appData, string $scopeSend, bool $includ
     foreach ($agentRowsTg as $ag) {
         if ($scopeSend !== 'Semua Leader' && $ag['leader'] !== $scopeSend) continue;
         $agentsSafe[] = [
-            'leader'        => (string)$ag['leader'],
-            'name'          => (string)$ag['name'],
-            'level'         => (string)$ag['level'],
-            'target_all'    => (int)$ag['target_all'],
-            'sa_nov'        => (int)$ag['sa_nov'],
-            'paid_nov'      => (int)$ag['paid_nov'],
-            'gap_sa'        => (int)$ag['gap_sa'],
-            'persen'        => (int)$ag['persen'],
-            'runrate_30'    => (int)$ag['runrate_30'],
-            'p_m'           => (int)$ag['p_m'],
-            'p_3m'          => (int)$ag['p_3m'],
-            'p_sem'         => (int)$ag['p_sem'],
-            'p_yr'          => (int)$ag['p_yr'],
-            'harus_paid_hr' => (int)$ag['harus_paid_hr'],
-            'harus_sa_hr'   => (int)$ag['harus_sa_hr'],
+            'leader'          => (string)$ag['leader'],
+            'name'            => (string)$ag['name'],
+            'level'           => (string)$ag['level'],
+            'target_all'      => (int)$ag['target_all'],
+            'sa_nov'          => (int)$ag['sa_nov'],
+            'paid_nov'        => (int)$ag['paid_nov'],
+            'gap_sa'          => (int)$ag['gap_sa'],
+            'persen'          => (int)$ag['persen'],
+            'runrate_30'      => (int)$ag['runrate_30'],
+            'p_m'             => (int)$ag['p_m'],
+            'p_3m'            => (int)$ag['p_3m'],
+            'p_sem'           => (int)$ag['p_sem'],
+            'p_yr'            => (int)$ag['p_yr'],
+            'harus_paid_hr'   => (int)$ag['harus_paid_hr'],
+            'harus_sa_hr'     => (int)$ag['harus_sa_hr'],
+            'tier_komisi'     => (string)($ag['tier_komisi'] ?? 'Tier 0 (0%)'),
+            'rev_fp'          => (float)($ag['rev_fp'] ?? ($ag['rev_netto'] ?? 0)),
+            'insentif_fp'     => (float)($ag['insentif_fp'] ?? 0),
+            'insentif_yearly' => (float)($ag['insentif_yearly'] ?? 0),
+            'est_komisi'      => (float)($ag['est_komisi'] ?? 0),
         ];
     }
 
@@ -549,10 +561,10 @@ function build_tg_visual_payload(array $appData, string $scopeSend, bool $includ
     return [
         'scope'        => $scopeSend,
         'periode'      => (string)($appData['periode_label'] ?? ''),
-        'target_mtd'   => (int)($appData['target_persen_mtd'] ?? 50),
-        'hari'         => (int)($appData['hari_berjalan'] ?? 15),
+        'target_mtd'   => (int)($appData['target_persen_mtd'] ?? 73),
+        'hari'         => (int)($appData['hari_berjalan'] ?? 22),
         'total_hari'   => (int)($appData['total_hari'] ?? 30),
-        'sisa_hari'    => (int)($appData['sisa_hari'] ?? 15),
+        'sisa_hari'    => (int)($appData['sisa_hari'] ?? 8),
         'bln_lalu'     => (string)($appData['label_bulan_lalu'] ?? 'OCT'),
         'bln_ini'      => (string)($appData['label_bulan_ini'] ?? 'NOV'),
         'tahun'        => (int)($appData['params']['tahun'] ?? 2026),
@@ -570,7 +582,7 @@ function rp($angka): string {
 }
 
 function ensure_wo_summary_v2(array &$appData, string $poolActiveFile, string $poolDefaultFile, string $dataFile, string $targetActiveFile = '', string $targetDefaultFile = ''): void {
-    $needsRecalc = (int)($appData['calc_engine_version'] ?? 0) < 3;
+    $needsRecalc = (int)($appData['calc_engine_version'] ?? 0) < 4;
     $needsWoV2   = (int)($appData['wo_summary']['calc_version'] ?? 0) < 2;
     if (empty($appData['params']) || (!$needsRecalc && !$needsWoV2)) {
         return;
@@ -585,7 +597,7 @@ function ensure_wo_summary_v2(array &$appData, string $poolActiveFile, string $p
         $bIniA  = (int)($pAuto['bulan_ini'] ?? 11);
         $thnA   = (int)($pAuto['tahun'] ?? 2026);
         $tHariA = (int)($pAuto['total_hari'] ?? 30);
-        $hJlnA  = (int)($pAuto['hari_berjalan'] ?? ($appData['hari_berjalan'] ?? 17));
+        $hJlnA  = (int)($pAuto['hari_berjalan'] ?? ($appData['hari_berjalan'] ?? 22));
         $hHarA  = (int)($pAuto['hari_harian'] ?? ($appData['daily_prod_day'] ?? $hJlnA));
         $hWoA   = (int)($appData['wo_summary']['day'] ?? ($pAuto['hari_wo'] ?? $hHarA));
         $rasioA = (float)($pAuto['rasio_paid'] ?? 1.25);
@@ -621,7 +633,7 @@ function ensure_wo_summary_v2(array &$appData, string $poolActiveFile, string $p
                 $recalc['sumber']['prospect'] = $oldSumber['prospect'];
             }
             $recalc['sumber']['updated_at'] = $oldSumber['updated_at'] ?? date('Y-m-d H:i:s');
-            $recalc['sumber']['updated_by'] = $oldSumber['updated_by'] ?? 'Auto-Clean Engine v3';
+            $recalc['sumber']['updated_by'] = $oldSumber['updated_by'] ?? 'Auto-Clean Engine v4';
             $recalc['bot_token_default'] = $oldBot;
             $recalc['docker_tunnel_url'] = $oldTunnel;
             $appData = $recalc;
@@ -631,7 +643,7 @@ function ensure_wo_summary_v2(array &$appData, string $poolActiveFile, string $p
             }
             $appData['wo_summary'] = hitung_wo_laporan($cleanPool, $bIniA, $thnA, $hWoA);
             $appData['params']['hari_wo'] = $appData['wo_summary']['day'];
-            $appData['calc_engine_version'] = 3;
+            $appData['calc_engine_version'] = 4;
         }
         @file_put_contents($dataFile, json_encode($appData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
     } catch (Throwable $e) {
@@ -830,12 +842,12 @@ if (isset($_GET['download']) && !empty($_SESSION['auth_user'])) {
         fwrite($out, "\xEF\xBB\xBF");
         $hdr = ['SALES LEADER', 'SALES NAME', 'MASA KERJA', 'LEVEL', 'TARGET ALL'];
         if ($dlAdmin) { $hdr[] = 'Reguler'; $hdr[] = 'Yearly'; }
-        array_push($hdr, 'SA', 'PAID', 'SO', 'GAP SA', 'PERSENTASE', 'STATUS MTD', 'Harus Paid / Hari', 'Harus SA / Hari', 'RUNRATE', '3 Monthly', 'Monthly', 'Semesterly', 'Yearly', 'Estimasi Komisi');
+        array_push($hdr, 'SA', 'PAID', 'SO', 'GAP SA', 'PERSENTASE', 'STATUS MTD', 'Harus Paid / Hari', 'Harus SA / Hari', 'RUNRATE', '3 Monthly', 'Monthly', 'Semesterly', 'Yearly', 'Tier Komisi', 'Rev. FP (Excl. PPn)', 'Insentif FP', 'Ins. Yearly', 'Estimasi Komisi');
         fputcsv($out, $hdr);
         foreach ($dlAgents as $r) {
             $row = [$r['leader'], $r['name'], $r['masa_kerja'], $r['level'], $r['target_all']];
             if ($dlAdmin) { $row[] = $r['target_reguler']; $row[] = $r['target_yearly']; }
-            array_push($row, $r['sa_nov'], $r['paid_nov'], $r['so_nov'], $r['gap_sa'], $r['persen'] . '%', $r['status_mtd'], $r['harus_paid_hr'], $r['harus_sa_hr'], $r['runrate_30'], $r['p_3m'], $r['p_m'], $r['p_sem'], $r['p_yr'], $r['est_komisi']);
+            array_push($row, $r['sa_nov'], $r['paid_nov'], $r['so_nov'], $r['gap_sa'], $r['persen'] . '%', $r['status_mtd'], $r['harus_paid_hr'], $r['harus_sa_hr'], $r['runrate_30'], $r['p_3m'], $r['p_m'], $r['p_sem'], $r['p_yr'], ($r['tier_komisi'] ?? 'Tier 0 (0%)'), round((float)($r['rev_fp'] ?? ($r['rev_netto'] ?? 0)), 0), (float)($r['insentif_fp'] ?? 0), (float)($r['insentif_yearly'] ?? 0), $r['est_komisi']);
             fputcsv($out, $row);
         }
         fclose($out);
@@ -845,11 +857,20 @@ if (isset($_GET['download']) && !empty($_SESSION['auth_user'])) {
         header('Content-Type: application/vnd.ms-excel; charset=utf-8');
         header("Content-Disposition: attachment; filename=\"Laporan_Lengkap_Telesales_{$safeName}_{$lblP}.xls\"");
         echo '<html><meta charset="UTF-8"><body>';
-        echo '<h3>1. REKAP HARIAN (' . htmlspecialchars($appData['daily_prod_date_label'] ?? '') . ') & JUMLAH AGENT BLM PRODUKTIF</h3><table border="1"><tr><th>Sales Leader</th><th>SO</th><th>PAID</th><th>SA</th><th>Blm Produktif SO</th><th>Blm Produktif PAID</th><th>Blm Produktif SA</th></tr>';
+        echo '<h3>1. REKAP HARIAN (' . htmlspecialchars($appData['daily_prod_date_label'] ?? '') . ') &amp; JUMLAH AGENT BLM PRODUKTIF</h3><table border="1"><tr><th>Sales Leader</th><th>SO</th><th>GP</th><th>PAID</th><th>SA</th><th>Blm Produktif SO</th><th>Blm Produktif PAID</th><th>Blm Produktif SA</th></tr>';
         foreach (($appData['daily_prod_rows'] ?? []) as $dr) {
             if (!empty($dr['is_grand_total']) && $dlScope !== 'Semua Leader') continue;
             if (empty($dr['is_grand_total']) && $dlScope !== 'Semua Leader' && $dr['leader'] !== $dlScope) continue;
-            echo '<tr><td>' . htmlspecialchars($dr['leader']) . "</td><td>{$dr['so']}</td><td>{$dr['paid']}</td><td>{$dr['sa']}</td><td>{$dr['blm_so']}</td><td>{$dr['blm_paid']}</td><td>{$dr['blm_sa']}</td></tr>";
+            $dpGp = (int)($dr['gp'] ?? 0);
+            echo '<tr><td>' . htmlspecialchars($dr['leader']) . "</td><td>{$dr['so']}</td><td>{$dpGp}</td><td>{$dr['paid']}</td><td>{$dr['sa']}</td><td>{$dr['blm_so']}</td><td>{$dr['blm_paid']}</td><td>{$dr['blm_sa']}</td></tr>";
+        }
+        echo '</table><br><h3>1B2. RINCIAN HARIAN PER AGENT (' . htmlspecialchars($appData['daily_prod_date_label'] ?? '') . ' — SUDAH PAID / SUDAH GP / TIDAK PAID)</h3><table border="1"><tr><th>Sales Leader</th><th>Salesname</th><th>SO</th><th>GP</th><th>PAID</th><th>Belum Paid (SO)</th><th>SA</th><th>Status Harian</th></tr>';
+        foreach (($appData['daily_prod_rows'] ?? []) as $dr) {
+            if (!empty($dr['is_grand_total'])) continue;
+            if ($dlScope !== 'Semua Leader' && $dr['leader'] !== $dlScope) continue;
+            foreach (($dr['agent_details'] ?? []) as $ad) {
+                echo '<tr><td>' . htmlspecialchars((string)$ad['leader']) . '</td><td>' . htmlspecialchars((string)$ad['name']) . "</td><td>{$ad['so']}</td><td>{$ad['gp']}</td><td>{$ad['paid']}</td><td>{$ad['tidak_paid_so']}</td><td>{$ad['sa']}</td><td>" . htmlspecialchars((string)$ad['status_harian']) . '</td></tr>';
+            }
         }
         $dlWoSum = $appData['wo_summary'] ?? [];
         if (!empty($dlWoSum['leader_summary'])) {
@@ -869,13 +890,27 @@ if (isset($_GET['download']) && !empty($_SESSION['auth_user'])) {
                 echo '<tr><td>' . htmlspecialchars((string)$wr['leader']) . "</td><td>{$sTot}</td><td>{$sSa}</td><td>{$sOn}</td><td>{$sRes}</td><td>{$sWt}</td><td>{$sOth}</td><td>{$sBsk}</td><td>{$sWwo}</td></tr>";
             }
         }
-        echo '</table><br><h3>2. DETAIL TARGET & KOMISI AGENT</h3><table border="1"><tr><th>SALES LEADER</th><th>SALES NAME</th><th>MASA KERJA</th><th>LEVEL</th><th>TARGET ALL</th>';
+        $dlLdrKom = $appData['leader_komisi_rows'] ?? [];
+        if (!empty($dlLdrKom) && $authU['role'] !== 'Agen') {
+            echo '</table><br><h3>2A. REKAP KOMISI RESMI SALES LEADER (EXCL. PPN 11%)</h3><table border="1"><tr><th>Sales Leader</th><th>SA Tim</th><th>Rev. FP Tim (Excl. PPn)</th><th>Yearly Tim</th><th>Tier Leader</th><th>Insentif Leader</th><th>Total Komisi Agent</th><th>Total Komisi Tim</th></tr>';
+            foreach ($dlLdrKom as $lk) {
+                if (!empty($lk['is_total']) && $dlScope !== 'Semua Leader') continue;
+                if (empty($lk['is_total']) && $dlScope !== 'Semua Leader' && $lk['leader'] !== $dlScope) continue;
+                $lkRev = round((float)($lk['rev_fp_tim'] ?? 0), 0);
+                echo '<tr><td>' . htmlspecialchars((string)$lk['leader']) . "</td><td>{$lk['sa_tim']}</td><td>{$lkRev}</td><td>{$lk['p_yr_tim']}</td><td>" . htmlspecialchars((string)$lk['tier_komisi']) . "</td><td>{$lk['insentif_leader']}</td><td>{$lk['total_komisi_agen']}</td><td>{$lk['total_komisi_tim']}</td></tr>";
+            }
+        }
+        echo '</table><br><h3>2. DETAIL TARGET &amp; KOMISI AGENT</h3><table border="1"><tr><th>SALES LEADER</th><th>SALES NAME</th><th>MASA KERJA</th><th>LEVEL</th><th>TARGET ALL</th>';
         if ($dlAdmin) echo '<th>Reguler</th><th>Yearly</th>';
-        echo '<th>SA</th><th>PAID</th><th>GAP SA</th><th>PERSENTASE</th><th>STATUS MTD</th><th>Harus Paid/Hr</th><th>Harus SA/Hr</th><th>RUNRATE</th><th>3 Monthly</th><th>Monthly</th><th>Semesterly</th><th>Yearly</th><th>Estimasi Komisi</th></tr>';
+        echo '<th>SA</th><th>PAID</th><th>GAP SA</th><th>PERSENTASE</th><th>STATUS MTD</th><th>Harus Paid/Hr</th><th>Harus SA/Hr</th><th>RUNRATE</th><th>3 Monthly</th><th>Monthly</th><th>Semesterly</th><th>Yearly</th><th>Tier Komisi</th><th>Rev. FP (Excl. PPn)</th><th>Insentif FP</th><th>Ins. Yearly</th><th>Estimasi Komisi</th></tr>';
         foreach ($dlAgents as $r) {
+            $rRev = round((float)($r['rev_fp'] ?? ($r['rev_netto'] ?? 0)), 0);
+            $rTier = htmlspecialchars((string)($r['tier_komisi'] ?? 'Tier 0 (0%)'));
+            $rInsFp = (float)($r['insentif_fp'] ?? 0);
+            $rInsYr = (float)($r['insentif_yearly'] ?? 0);
             echo '<tr><td>' . htmlspecialchars($r['leader']) . '</td><td>' . htmlspecialchars($r['name']) . '</td><td>' . htmlspecialchars($r['masa_kerja']) . '</td><td>' . htmlspecialchars($r['level']) . "</td><td>{$r['target_all']}</td>";
             if ($dlAdmin) echo "<td>{$r['target_reguler']}</td><td>{$r['target_yearly']}</td>";
-            echo "<td>{$r['sa_nov']}</td><td>{$r['paid_nov']}</td><td>{$r['gap_sa']}</td><td>{$r['persen']}%</td><td>" . htmlspecialchars($r['status_mtd']) . "</td><td>{$r['harus_paid_hr']}</td><td>{$r['harus_sa_hr']}</td><td>{$r['runrate_30']}</td><td>{$r['p_3m']}</td><td>{$r['p_m']}</td><td>{$r['p_sem']}</td><td>{$r['p_yr']}</td><td>{$r['est_komisi']}</td></tr>";
+            echo "<td>{$r['sa_nov']}</td><td>{$r['paid_nov']}</td><td>{$r['gap_sa']}</td><td>{$r['persen']}%</td><td>" . htmlspecialchars($r['status_mtd']) . "</td><td>{$r['harus_paid_hr']}</td><td>{$r['harus_sa_hr']}</td><td>{$r['runrate_30']}</td><td>{$r['p_3m']}</td><td>{$r['p_m']}</td><td>{$r['p_sem']}</td><td>{$r['p_yr']}</td><td>{$rTier}</td><td>{$rRev}</td><td>{$rInsFp}</td><td>{$rInsYr}</td><td>{$r['est_komisi']}</td></tr>";
         }
         echo '</table></body></html>';
         exit;
@@ -961,12 +996,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             try {
                 ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile, $targetActiveFile, $targetDefaultFile);
-                $hariCekIn = max(1, min(31, (int)($_POST['hari_harian_cek'] ?? 17)));
+                $hariCekIn = max(1, min(31, (int)($_POST['hari_harian_cek'] ?? 22)));
                 if (!file_exists($targetActiveFile) && file_exists($targetDefaultFile)) {
                     @copy($targetDefaultFile, $targetActiveFile);
                 }
                 $poolNow = load_prospect_pool($poolActiveFile, $poolDefaultFile);
-                $pCur = $appData['params'] ?? ['sheet' => "NOVEMBER'26", 'bulan_lalu' => 10, 'bulan_ini' => 11, 'tahun' => 2026, 'total_hari' => 30, 'hari_berjalan' => 15, 'rasio_paid' => 1.25];
+                $pCur = $appData['params'] ?? ['sheet' => "NOVEMBER'26", 'bulan_lalu' => 10, 'bulan_ini' => 11, 'tahun' => 2026, 'total_hari' => 30, 'hari_berjalan' => 22, 'rasio_paid' => 1.25];
                 $hDlmBln = cal_days_in_month_aman((int)$pCur['bulan_ini'], (int)$pCur['tahun']);
                 $tglTargetObj = new DateTimeImmutable(sprintf('%04d-%02d-%02d', (int)$pCur['tahun'], (int)$pCur['bulan_ini'], min((int)$pCur['hari_berjalan'], $hDlmBln)));
                 $targetRows = baca_data_target($targetActiveFile, (string)$pCur['sheet'], $tglTargetObj);
@@ -991,7 +1026,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             try {
                 ensure_wo_summary_v2($appData, $poolActiveFile, $poolDefaultFile, $dataFile, $targetActiveFile, $targetDefaultFile);
-                $hariWoCek = max(1, min(31, (int)($_POST['hari_wo_cek'] ?? ($appData['wo_summary']['day'] ?? ($appData['daily_prod_day'] ?? 17)))));
+                $hariWoCek = max(1, min(31, (int)($_POST['hari_wo_cek'] ?? ($appData['wo_summary']['day'] ?? ($appData['daily_prod_day'] ?? 22)))));
                 $poolNow = load_prospect_pool($poolActiveFile, $poolDefaultFile);
                 $pCur = $appData['params'] ?? ['bulan_ini' => 11, 'tahun' => 2026];
                 $woRes = hitung_wo_laporan($poolNow, (int)($pCur['bulan_ini'] ?? 11), (int)($pCur['tahun'] ?? 2026), $hariWoCek);
@@ -1019,7 +1054,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $bulanIniIn   = max(1, min(12, (int)($_POST['bulan_ini'] ?? 11)));
                 $tahunIn      = max(2020, min(2035, (int)($_POST['tahun'] ?? 2026)));
                 $totalHariIn  = max(1, min(31, (int)($_POST['total_hari'] ?? 30)));
-                $hariJalanIn  = max(1, min($totalHariIn, (int)($_POST['hari_berjalan'] ?? 15)));
+                $hariJalanIn  = max(1, min($totalHariIn, (int)($_POST['hari_berjalan'] ?? 22)));
                 $hariHarianIn = max(1, min(31, (int)($_POST['hari_harian'] ?? $hariJalanIn)));
                 $hariWoIn     = max(1, min(31, (int)($_POST['hari_wo'] ?? $hariHarianIn)));
                 $rasioPaidIn  = max(0.5, min(5.0, (float)($_POST['rasio_paid'] ?? 1.25)));
@@ -1259,13 +1294,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         . "━━━━━━━━━━━━━━━━━━━━━━\n";
 
                     if (!empty($dailyRowsTg)) {
-                        $dpLines = ["📅 <b>REKAP HARIAN (" . $escTg($dailyLblTg) . ") &amp; AGENT BLM PRODUKTIF</b>"];
+                        $blocks[] = "📅 <b>REKAP HARIAN (" . $escTg($dailyLblTg) . ") &amp; AGENT BLM PRODUKTIF</b>";
                         foreach ($dailyRowsTg as $dr) {
                             $isGt = !empty($dr['is_grand_total']);
                             if (!$isGt && $scopeSend !== 'Semua Leader' && $dr['leader'] !== $scopeSend) continue;
-                            $dpLines[] = ($isGt ? "🏆 <b>" : "• <b>") . $escTg($dr['leader']) . "</b>: SO=<b>{$dr['so']}</b> PAID=<b>{$dr['paid']}</b> SA=<b>{$dr['sa']}</b> | Blm Prod: SO=<b>{$dr['blm_so']}</b> PAID=<b>{$dr['blm_paid']}</b> SA=<b>{$dr['blm_sa']}</b>";
+                            $dpGp = (int)($dr['gp'] ?? 0);
+                            $lineDp = ($isGt ? "🏆 <b>" : "• <b>") . $escTg($dr['leader']) . "</b>: SO=<b>{$dr['so']}</b> GP=<b>{$dpGp}</b> PAID=<b>{$dr['paid']}</b> SA=<b>{$dr['sa']}</b> | Blm Prod: SO=<b>{$dr['blm_so']}</b> PAID=<b>{$dr['blm_paid']}</b> SA=<b>{$dr['blm_sa']}</b>";
+                            if (!$isGt) {
+                                $sPaid = implode(', ', $dr['agents_paid'] ?? []) ?: '-';
+                                $sGp   = implode(', ', $dr['agents_gp'] ?? []) ?: '-';
+                                $sTdk  = implode(', ', $dr['agents_tidak_paid'] ?? []) ?: 'Semua PAID';
+                                $lineDp .= "\n   ✅ Sudah PAID (" . (int)($dr['sudah_paid_agents'] ?? 0) . "): " . $escTg($sPaid)
+                                         . "\n   💳 Sudah GP (" . (int)($dr['sudah_gp_agents'] ?? 0) . "): " . $escTg($sGp)
+                                         . "\n   ❌ Tidak PAID ({$dr['blm_paid']}): " . $escTg($sTdk);
+                            }
+                            $blocks[] = $lineDp;
                         }
-                        $blocks[] = implode("\n", $dpLines) . "\n━━━━━━━━━━━━━━━━━━━━━━\n";
+                        $blocks[] = "━━━━━━━━━━━━━━━━━━━━━━\n";
                     }
 
                     $woSumTg = $appData['wo_summary'] ?? [];
@@ -1299,16 +1344,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $totPaid += (int)$ag['paid_nov'];
                         $totKom += (float)$ag['est_komisi'];
                         $komStr = 'Rp ' . number_format((float)$ag['est_komisi'], 0, ',', '.');
+                        $tierAgTg = (string)($ag['tier_komisi'] ?? 'Tier 0 (0%)');
                         $blocks[] = "<b>{$no}. 👤 " . $escTg($ag['name']) . "</b> (" . $escTg($ag['level']) . ")\n"
                             . "├ 📌 Status MTD : <b>" . $escTg($ag['status_mtd']) . "</b> ({$ag['persen']}%)\n"
                             . "├ ✅ Realisasi : <b>{$ag['sa_nov']} SA</b> | <b>{$ag['paid_nov']} Paid</b> | Gap: {$ag['gap_sa']}\n"
                             . "├ ⚡ Wajib Harian : <b>{$ag['harus_paid_hr']} Paid/hr</b> &amp; <b>{$ag['harus_sa_hr']} SA/hr</b>\n"
-                            . "└ 🎯 Target Total : <b>{$ag['target_all']} SA</b> | 💰 <b>{$komStr}</b>\n";
+                            . "└ 🎯 Target Total : <b>{$ag['target_all']} SA</b> | 💰 <b>{$komStr}</b> (" . $escTg($tierAgTg) . ")\n";
                         $no++;
                     }
                     $pctTim = $totT > 0 ? round(($totSa / $totT) * 100) : 0;
                     $totKomStr = 'Rp ' . number_format($totKom, 0, ',', '.');
-                    $blocks[] = "━━━━━━━━━━━━━━━━━━━━━━\n🏆 <b>TOTAL TIM: {$totSa} SA / Target {$totT} SA ({$pctTim}%) | {$totKomStr}</b>";
+                    $ldrKomExtra = '';
+                    foreach (($appData['leader_komisi_rows'] ?? []) as $lkRow) {
+                        if ($scopeSend === 'Semua Leader' && !empty($lkRow['is_total'])) {
+                            $ldrKomExtra = ' | 👑 Ins. Leaders: Rp ' . number_format((float)$lkRow['insentif_leader'], 0, ',', '.');
+                            break;
+                        }
+                        if ($scopeSend !== 'Semua Leader' && empty($lkRow['is_total']) && $lkRow['leader'] === $scopeSend) {
+                            $ldrKomExtra = ' | 👑 Ins. Leader (' . (string)$lkRow['tier_komisi'] . '): Rp ' . number_format((float)$lkRow['insentif_leader'], 0, ',', '.');
+                            break;
+                        }
+                    }
+                    $blocks[] = "━━━━━━━━━━━━━━━━━━━━━━\n🏆 <b>TOTAL TIM: {$totSa} SA / Target {$totT} SA ({$pctTim}%) | Agent: {$totKomStr}{$ldrKomExtra}</b>";
 
                     $curMsg = $hdrTg;
                     foreach ($blocks as $b) {
@@ -1381,18 +1438,19 @@ if (!empty($_SESSION['auth_user'])) {
 }
 $mtdRows      = $appData['mtd_rows'] ?? [];
 $agentRows    = $appData['agent_rows'] ?? [];
+$leaderKomRows = $appData['leader_komisi_rows'] ?? [];
 $dailyRows    = $appData['daily_prod_rows'] ?? [];
-$dailyLbl     = (string)($appData['daily_prod_date_label'] ?? '17-Nov-26');
-$dailyDay     = (int)($appData['daily_prod_day'] ?? 17);
-$tglTersedia  = $appData['tanggal_tersedia'] ?? range(1, 17);
+$dailyLbl     = (string)($appData['daily_prod_date_label'] ?? '22-Nov-26');
+$dailyDay     = (int)($appData['daily_prod_day'] ?? 22);
+$tglTersedia  = $appData['tanggal_tersedia'] ?? range(1, 22);
 $woSummary    = $appData['wo_summary'] ?? [];
 $woDay        = (int)($woSummary['day'] ?? $dailyDay);
 $woAvailDays  = $woSummary['available_days'] ?? $tglTersedia;
-$targetMtd    = (int)($appData['target_persen_mtd'] ?? 57);
-$periodeLabel = $appData['periode_label'] ?? '17-Nov-2026';
-$hariBerjalan = (int)($appData['hari_berjalan'] ?? 17);
+$targetMtd    = (int)($appData['target_persen_mtd'] ?? 73);
+$periodeLabel = $appData['periode_label'] ?? '22-Nov-2026';
+$hariBerjalan = (int)($appData['hari_berjalan'] ?? 22);
 $totalHari    = (int)($appData['total_hari'] ?? 30);
-$sisaHari     = (int)($appData['sisa_hari'] ?? 13);
+$sisaHari     = (int)($appData['sisa_hari'] ?? 8);
 $kolOct       = $appData['kol_oct'] ?? ('SA OCT 1-' . $hariBerjalan);
 $kolNov       = $appData['kol_nov'] ?? ('SA NOV 1-' . $hariBerjalan);
 $lblBlnIni    = $appData['label_bulan_ini'] ?? 'NOV';
@@ -1403,8 +1461,8 @@ $paramsCur    = $appData['params'] ?? [
     'bulan_ini' => 11,
     'tahun' => 2026,
     'total_hari' => 30,
-    'hari_berjalan' => 15,
-    'hari_harian' => 15,
+    'hari_berjalan' => 22,
+    'hari_harian' => 22,
     'rasio_paid' => 1.25,
 ];
 $sumberCur    = $appData['sumber'] ?? [];
@@ -1595,6 +1653,14 @@ $authUser = $_SESSION['auth_user'] ?? null;
     }
 
     $filteredAgents = array_values(array_filter($agentRows, fn($r) => $selectedScope === 'Semua Leader' || $r['leader'] === $selectedScope));
+    $filteredLeaderKomisi = array_values(array_filter($leaderKomRows, function ($lr) use ($selectedScope) {
+        if (!empty($lr['is_total'])) return $selectedScope === 'Semua Leader';
+        return $selectedScope === 'Semua Leader' || $lr['leader'] === $selectedScope;
+    }));
+    $sumInsLeaderScope = 0.0;
+    foreach ($filteredLeaderKomisi as $lr) {
+        if (empty($lr['is_total'])) $sumInsLeaderScope += (float)($lr['insentif_leader'] ?? 0);
+    }
 
     $sumTargetAll = 0; $sumSaNov = 0; $sumPaidNov = 0; $sumKomisi = 0; $sumRevNetto = 0; $kurangCount = 0;
     foreach ($filteredAgents as $r) {
@@ -1602,7 +1668,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
         $sumSaNov += $r['sa_nov'];
         $sumPaidNov += $r['paid_nov'];
         $sumKomisi += $r['est_komisi'];
-        $sumRevNetto += $r['rev_netto'];
+        $sumRevNetto += (float)($r['rev_fp'] ?? $r['rev_netto']);
         if (strtoupper($r['name']) !== 'VACANT' && $r['persen'] < $targetMtd) {
             $kurangCount++;
         }
@@ -1871,7 +1937,8 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 Target Total Bulanan: <b><?= $ag['target_all'] ?> SA</b> |
                 Realisasi: <b><?= $ag['sa_nov'] ?> SA</b> (<?= $ag['persen'] ?>% | Gap: <?= $ag['gap_sa'] ?>) |
                 ⚡ <b>Wajib Kejar Harian: <?= $ag['harus_paid_hr'] ?> Paid/hari &amp; <?= $ag['harus_sa_hr'] ?> SA/hari</b> |
-                💰 Estimasi Komisi: <b><?= rp($ag['est_komisi']) ?></b>
+                💰 Estimasi Komisi (<?= htmlspecialchars((string)($ag['tier_komisi'] ?? 'Tier 0 (0%)')) ?>): <b><?= rp($ag['est_komisi']) ?></b>
+                (FP: <?= rp($ag['insentif_fp'] ?? 0) ?> + Yearly: <?= rp($ag['insentif_yearly'] ?? 0) ?>)
             </p>
             <?php
             $agWoMine = null;
@@ -1915,9 +1982,9 @@ $authUser = $_SESSION['auth_user'] ?? null;
             <div class="metric-sub" style="color:#dc2626;">Wajib kejar kuota Paid/hari &amp; SA/hari</div>
         </div>
         <div class="metric-box">
-            <div class="metric-label">💰 Total Estimasi Komisi</div>
+            <div class="metric-label">💰 Total Estimasi Komisi Agent</div>
             <div class="metric-val"><?= rp($sumKomisi) ?></div>
-            <div class="metric-sub">Rev Netto (PPN 11%): <?= rp($sumRevNetto) ?></div>
+            <div class="metric-sub">Rev. FP (Excl. PPn 11%): <?= rp($sumRevNetto) ?><?= $role !== 'Agen' ? ' | Ins. Leader: ' . rp($sumInsLeaderScope) : '' ?></div>
         </div>
     </div>
 
@@ -1989,11 +2056,12 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     <thead>
                         <tr>
                             <th rowspan="2" class="navy-hdr">Sales Leader</th>
-                            <th colspan="3" class="navy-hdr"><?= htmlspecialchars($dailyLbl) ?></th>
+                            <th colspan="4" class="navy-hdr"><?= htmlspecialchars($dailyLbl) ?></th>
                             <th colspan="3" class="red-hdr">Jumlah Agent Blm Produktif</th>
                         </tr>
                         <tr>
                             <th class="navy-hdr">SO</th>
+                            <th class="navy-hdr" style="color:#fde68a;">GP</th>
                             <th class="navy-hdr">PAID</th>
                             <th class="navy-hdr">SA</th>
                             <th class="red-hdr">SO</th>
@@ -2006,10 +2074,12 @@ $authUser = $_SESSION['auth_user'] ?? null;
                             $isGt = !empty($dr['is_grand_total']) || strcasecmp($dr['leader'], 'Grand Total') === 0;
                             if ($isGt && $selectedScope !== 'Semua Leader') continue;
                             if (!$isGt && $selectedScope !== 'Semua Leader' && $dr['leader'] !== $selectedScope) continue;
+                            $gpCnt = (int)($dr['gp'] ?? 0);
                         ?>
                             <tr class="<?= $isGt ? 'row-grand' : '' ?>">
                                 <td class="left"><?= htmlspecialchars($dr['leader']) ?></td>
                                 <td><?= number_format((int)$dr['so'], 0, ',', '.') ?></td>
+                                <td style="color:#92400e; font-weight:700;"><?= number_format($gpCnt, 0, ',', '.') ?></td>
                                 <td><?= number_format((int)$dr['paid'], 0, ',', '.') ?></td>
                                 <td><?= number_format((int)$dr['sa'], 0, ',', '.') ?></td>
                                 <td class="<?= $isGt ? 'peach-cell' : '' ?>"><?= (int)$dr['blm_so'] ?></td>
@@ -2021,24 +2091,89 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 </table>
             </div>
 
-            <details style="margin-top:10px; background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #cbd5e1;">
-                <summary style="cursor:pointer; font-weight:700; font-size:0.85rem; color:#991b1b;">
-                    🔎 Lihat Nama Agen Belum Produktif pada <?= htmlspecialchars($dailyLbl) ?> (0 SO / 0 PAID / 0 SA)
-                </summary>
-                <div style="margin-top:8px; font-size:0.8rem; line-height:1.5;">
-                    <?php foreach ($dailyRows as $dr):
+            <div style="margin-top:12px; background:#f8fafc; padding:12px 14px; border-radius:10px; border:1px solid #cbd5e1;">
+                <div style="font-weight:800; font-size:0.88rem; color:#0f172a; margin-bottom:8px;">
+                    👥 Rincian Per Agent pada <?= htmlspecialchars($dailyLbl) ?> (Siapa Sudah PAID, Sudah GP &amp; Tidak PAID)
+                </div>
+                <div style="font-size:0.8rem; line-height:1.55; margin-bottom:10px;">
+                    <?php
+                    $allDailyAgDetails = [];
+                    foreach ($dailyRows as $dr):
                         if (!empty($dr['is_grand_total'])) continue;
                         if ($selectedScope !== 'Semua Leader' && $dr['leader'] !== $selectedScope) continue;
+                        foreach (($dr['agent_details'] ?? []) as $adItem) {
+                            $allDailyAgDetails[] = $adItem;
+                        }
                     ?>
-                        <div style="margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed #cbd5e1;">
-                            <b><?= htmlspecialchars($dr['leader']) ?></b> (<?= (int)$dr['total_agents'] ?> slot tim):<br>
-                            • <b>0 SO (<?= (int)$dr['blm_so'] ?>)</b>: <?= htmlspecialchars(implode(', ', $dr['agents_blm_so'] ?? []) ?: 'Semua Produktif') ?><br>
-                            • <b>0 PAID (<?= (int)$dr['blm_paid'] ?>)</b>: <?= htmlspecialchars(implode(', ', $dr['agents_blm_paid'] ?? []) ?: 'Semua Produktif') ?><br>
-                            • <b>0 SA (<?= (int)$dr['blm_sa'] ?>)</b>: <?= htmlspecialchars(implode(', ', $dr['agents_blm_sa'] ?? []) ?: 'Semua Produktif') ?>
+                        <div style="margin-bottom:8px; padding:8px 10px; background:#ffffff; border-radius:8px; border:1px solid #e2e8f0;">
+                            <b><?= htmlspecialchars($dr['leader']) ?></b> (<?= (int)$dr['total_agents'] ?> slot tim | SO: <?= (int)$dr['so'] ?>, GP: <?= (int)($dr['gp'] ?? 0) ?>, PAID: <?= (int)$dr['paid'] ?>, SA: <?= (int)$dr['sa'] ?>)<br>
+                            <span style="color:#166534;">✅ <b>Sudah PAID (<?= (int)($dr['sudah_paid_agents'] ?? 0) ?>)</b></span>: <?= htmlspecialchars(implode(', ', $dr['agents_paid'] ?? []) ?: '-') ?><br>
+                            <span style="color:#b45309;">💳 <b>Sudah GP (<?= (int)($dr['sudah_gp_agents'] ?? 0) ?>)</b></span>: <?= htmlspecialchars(implode(', ', $dr['agents_gp'] ?? []) ?: '-') ?><br>
+                            <span style="color:#991b1b;">❌ <b>Tidak PAID (<?= (int)$dr['blm_paid'] ?>)</b></span>: <?= htmlspecialchars(implode(', ', $dr['agents_tidak_paid'] ?? []) ?: 'Semua PAID') ?><br>
+                            <span style="color:#475569; font-size:0.76rem;">• <b>0 SO (<?= (int)$dr['blm_so'] ?>)</b>: <?= htmlspecialchars(implode(', ', $dr['agents_blm_so'] ?? []) ?: 'Semua Produktif') ?> | <b>0 SA (<?= (int)$dr['blm_sa'] ?>)</b>: <?= htmlspecialchars(implode(', ', $dr['agents_blm_sa'] ?? []) ?: 'Semua Produktif') ?></span>
                         </div>
                     <?php endforeach; ?>
                 </div>
-            </details>
+
+                <?php if (!empty($allDailyAgDetails)): ?>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;" id="dpAgentFilterBar">
+                    <button type="button" class="btn" style="padding:5px 10px; font-size:0.76rem; background:#0f172a; color:#fff;" onclick="filterDailyAgents('all', this)">Semua Agent (<?= count($allDailyAgDetails) ?>)</button>
+                    <button type="button" class="btn" style="padding:5px 10px; font-size:0.76rem; background:#dcfce7; color:#166534;" onclick="filterDailyAgents('paid', this)">✅ Sudah PAID</button>
+                    <button type="button" class="btn" style="padding:5px 10px; font-size:0.76rem; background:#fef3c7; color:#92400e;" onclick="filterDailyAgents('gp', this)">💳 Sudah GP</button>
+                    <button type="button" class="btn" style="padding:5px 10px; font-size:0.76rem; background:#fee2e2; color:#991b1b;" onclick="filterDailyAgents('tidak_paid', this)">❌ Tidak PAID</button>
+                </div>
+                <div class="table-wrap" style="max-height:360px; overflow-y:auto;">
+                    <table id="tblDailyAgentDetail">
+                        <thead>
+                            <tr>
+                                <th>Sales Leader</th>
+                                <th>Salesname</th>
+                                <th>SO</th>
+                                <th>GP</th>
+                                <th>PAID</th>
+                                <th>Blm Paid (SO)</th>
+                                <th>SA</th>
+                                <th>Status Harian (<?= htmlspecialchars($dailyLbl) ?>)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($allDailyAgDetails as $ad):
+                                $rowStCls = ((int)$ad['paid'] > 0) ? 'status-aman' : (((int)$ad['gp'] > 0 || (int)$ad['tidak_paid_so'] > 0) ? 'badge' : 'status-kurang');
+                                $rowBgSty = !empty($ad['is_vacant']) ? ' class="row-vacant"' : '';
+                            ?>
+                            <tr<?= $rowBgSty ?> data-paid="<?= (int)$ad['paid'] ?>" data-gp="<?= (int)$ad['gp'] ?>">
+                                <td class="left"><?= htmlspecialchars((string)$ad['leader']) ?></td>
+                                <td class="left"><b><?= htmlspecialchars((string)$ad['name']) ?></b></td>
+                                <td><?= (int)$ad['so'] ?></td>
+                                <td style="color:#92400e; font-weight:700;"><?= (int)$ad['gp'] ?></td>
+                                <td style="color:#166534; font-weight:700;"><?= (int)$ad['paid'] ?></td>
+                                <td style="color:#991b1b;"><?= (int)$ad['tidak_paid_so'] ?></td>
+                                <td><?= (int)$ad['sa'] ?></td>
+                                <td class="left"><span class="<?= $rowStCls ?>" style="padding:2px 7px; border-radius:99px; font-size:0.74rem; <?= ($rowStCls === 'badge' ? 'background:#fef3c7;color:#92400e;font-weight:700;' : '') ?>"><?= htmlspecialchars((string)$ad['status_harian']) ?></span></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <script>
+                function filterDailyAgents(mode, btnEl) {
+                    var tbl = document.getElementById('tblDailyAgentDetail');
+                    if (!tbl) return;
+                    var rows = tbl.querySelectorAll('tbody tr');
+                    for (var i = 0; i < rows.length; i++) {
+                        var tr = rows[i];
+                        var p = parseInt(tr.getAttribute('data-paid') || '0', 10);
+                        var g = parseInt(tr.getAttribute('data-gp') || '0', 10);
+                        var show = true;
+                        if (mode === 'paid') show = p > 0;
+                        else if (mode === 'gp') show = g > 0;
+                        else if (mode === 'tidak_paid') show = p === 0;
+                        tr.style.display = show ? '' : 'none';
+                    }
+                }
+                </script>
+                <?php endif; ?>
+            </div>
         </div>
         <?php endif; ?>
     </div>
@@ -2303,6 +2438,49 @@ $authUser = $_SESSION['auth_user'] ?? null;
     </div>
     <?php endif; ?>
 
+    <?php if ($role !== 'Agen' && !empty($filteredLeaderKomisi)): ?>
+    <!-- DASHBOARD 2A: REKAP KOMISI RESMI SALES LEADER -->
+    <div class="card">
+        <h3 style="margin-top:0;">🏆 2A. REKAP KOMISI RESMI SALES LEADER (EXCL. PPN 11% — <code>Hitung Insentif FP</code>)</h3>
+        <p style="font-size:0.82rem; color:#475569; margin-top:-4px; margin-bottom:10px;">
+            <b>Leader:</b> Min 140 SA Tim &amp; Rev FP &ge; Rp 35jt (Tier 1: 4% | Tier 2 &ge; 37,5jt: 5% | Tier 3 &ge; 45jt: 6% | Tier 4 &ge; 55jt: 8%).
+            <b>Agent:</b> Min 15 SA &amp; Rev FP &ge; Rp 3,75jt (Tier 1: 25% | Tier 2 &ge; 4,5jt: 30% | Tier 3 &ge; 5,5jt: 35%) + Bonus Yearly Rp 200.000/subs.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sales Leader</th>
+                        <th>SA Tim</th>
+                        <th>Rev. FP Tim (Excl. PPn)</th>
+                        <th>Yearly Tim</th>
+                        <th>Tier Leader</th>
+                        <th>Insentif Leader</th>
+                        <th>Total Komisi Agent</th>
+                        <th>Total Komisi Tim</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($filteredLeaderKomisi as $lk):
+                        $isTotLk = !empty($lk['is_total']);
+                    ?>
+                    <tr class="<?= $isTotLk ? 'row-total' : '' ?>">
+                        <td class="left"><b><?= htmlspecialchars((string)$lk['leader']) ?></b></td>
+                        <td class="col-sa"><?= number_format((int)$lk['sa_tim'], 0, ',', '.') ?></td>
+                        <td class="left"><?= rp($lk['rev_fp_tim']) ?></td>
+                        <td><?= (int)$lk['p_yr_tim'] ?></td>
+                        <td><span class="badge" style="<?= ((int)$lk['pct_insentif'] > 0) ? 'background:#dcfce7;color:#166534;font-weight:700;' : 'background:#f1f5f9;color:#475569;' ?>"><?= htmlspecialchars((string)$lk['tier_komisi']) ?></span></td>
+                        <td class="left"><b><?= rp($lk['insentif_leader']) ?></b></td>
+                        <td class="left"><?= rp($lk['total_komisi_agen']) ?></td>
+                        <td class="left"><b><?= rp($lk['total_komisi_tim']) ?></b></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- DASHBOARD 2: DETAIL AGENT -->
     <div class="card">
         <h3 style="margin-top:0;">📋 2. TABEL DETAIL AGENT, KUOTA HARIAN PAID/SA &amp; ESTIMASI KOMISI (<?= htmlspecialchars($selectedScope) ?>)</h3>
@@ -2338,6 +2516,10 @@ $authUser = $_SESSION['auth_user'] ?? null;
                         <th>Monthly</th>
                         <th>Semesterly</th>
                         <th>Yearly (Breakdown)</th>
+                        <th>Tier Komisi</th>
+                        <th>Rev. FP (Excl. PPn)</th>
+                        <th>Insentif FP</th>
+                        <th>Ins. Yearly</th>
                         <th>Estimasi Komisi</th>
                     </tr>
                 </thead>
@@ -2349,9 +2531,13 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     }
                     foreach ($byLeader as $ldrName => $rowsLdr):
                         $subT = 0; $subReg = 0; $subYrT = 0; $subSa = 0; $subPaid = 0; $subGap = 0;
-                        $subPaidHr = 0; $subSaHr = 0; $sub3m = 0; $subM = 0; $subSem = 0; $subYrB = 0; $subKom = 0;
+                        $subPaidHr = 0; $subSaHr = 0; $sub3m = 0; $subM = 0; $subSem = 0; $subYrB = 0;
+                        $subRevFp = 0; $subInsFp = 0; $subInsYr = 0; $subKom = 0;
                         foreach ($rowsLdr as $r):
                             $isVacant = strtoupper($r['name']) === 'VACANT';
+                            $rRevFp = (float)($r['rev_fp'] ?? $r['rev_netto']);
+                            $rInsFp = (float)($r['insentif_fp'] ?? 0);
+                            $rInsYr = (float)($r['insentif_yearly'] ?? 0);
                             $subT += $r['target_all'];
                             $subReg += $r['target_reguler'];
                             $subYrT += $r['target_yearly'];
@@ -2364,6 +2550,9 @@ $authUser = $_SESSION['auth_user'] ?? null;
                             $subM += $r['p_m'];
                             $subSem += $r['p_sem'];
                             $subYrB += $r['p_yr'];
+                            $subRevFp += $rRevFp;
+                            $subInsFp += $rInsFp;
+                            $subInsYr += $rInsYr;
                             $subKom += $r['est_komisi'];
                             $kurang = $r['persen'] < $targetMtd;
                     ?>
@@ -2389,6 +2578,10 @@ $authUser = $_SESSION['auth_user'] ?? null;
                             <td><?= $r['p_m'] ?></td>
                             <td><?= $r['p_sem'] ?></td>
                             <td><?= $r['p_yr'] ?></td>
+                            <td><?= htmlspecialchars((string)($r['tier_komisi'] ?? 'Tier 0 (0%)')) ?></td>
+                            <td class="left"><?= rp($rRevFp) ?></td>
+                            <td class="left"><?= rp($rInsFp) ?></td>
+                            <td class="left"><?= rp($rInsYr) ?></td>
                             <td class="left"><b><?= rp($r['est_komisi']) ?></b></td>
                         </tr>
                     <?php endforeach;
@@ -2418,6 +2611,10 @@ $authUser = $_SESSION['auth_user'] ?? null;
                             <td><?= $subM ?></td>
                             <td><?= $subSem ?></td>
                             <td><?= $subYrB ?></td>
+                            <td>-</td>
+                            <td class="left"><?= rp($subRevFp) ?></td>
+                            <td class="left"><?= rp($subInsFp) ?></td>
+                            <td class="left"><?= rp($subInsYr) ?></td>
                             <td class="left"><?= rp($subKom) ?></td>
                         </tr>
                     <?php endforeach; ?>
@@ -2439,7 +2636,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     <tr>
                         <th>SALES LEADER</th><th>SALES NAME</th><th>LEVEL</th><th>TARGET ALL</th>
                         <th>SA</th><th>PAID</th><th>% SAAT INI</th><th>KURANG KE MTD</th>
-                        <th>HARUS PAID / HARI</th><th>HARUS SA / HARI</th><th>EST. KOMISI</th>
+                        <th>HARUS PAID / HARI</th><th>HARUS SA / HARI</th><th>TIER KOMISI</th><th>EST. KOMISI</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -2455,6 +2652,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                             <td><span class="status-kurang">-<?= ($targetMtd - $kr['persen']) ?>% (Kurang <?= (int)$kr['kurang_sa_mtd'] ?> SA)</span></td>
                             <td><b><?= $kr['harus_paid_hr'] ?> Paid/hr</b></td>
                             <td><b><?= $kr['harus_sa_hr'] ?> SA/hr</b> (<?= number_format($kr['harus_sa_des'], 1) ?>)</td>
+                            <td><?= htmlspecialchars((string)($kr['tier_komisi'] ?? 'Tier 0 (0%)')) ?></td>
                             <td class="left"><?= rp($kr['est_komisi']) ?></td>
                         </tr>
                     <?php endforeach; ?>
@@ -2885,22 +3083,22 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     } else {
                         dStyles.push(null);
                     }
-                    dRows.push([dr.leader, fmtInt(dr.so), fmtInt(dr.paid), fmtInt(dr.sa), fmtInt(dr.blm_so), fmtInt(dr.blm_paid), fmtInt(dr.blm_sa)]);
+                    dRows.push([dr.leader, fmtInt(dr.so), fmtInt(dr.gp || 0), fmtInt(dr.paid), fmtInt(dr.sa), fmtInt(dr.blm_so), fmtInt(dr.blm_paid), fmtInt(dr.blm_sa)]);
                 }
                 const imgDp = await renderTablePng({
                     title: `REKAP HARIAN (${data.daily_label}) & AGENT BELUM PRODUKTIF`,
-                    subtitle: `SO / PAID / SA tanggal ${data.daily_label} vs Jumlah Agent Aktif yang Belum Produktif`,
-                    columns: ['Sales Leader', 'SO', 'PAID', 'SA', 'SO', 'PAID', 'SA'],
+                    subtitle: `SO / GP (Generate Payment) / PAID / SA tanggal ${data.daily_label} vs Jumlah Agent Aktif Belum Produktif`,
+                    columns: ['Sales Leader', 'SO', 'GP', 'PAID', 'SA', 'SO', 'PAID', 'SA'],
                     groupHeaders: [
-                        { label: data.daily_label, start: 1, end: 3, bg: '#002060' },
-                        { label: 'Jumlah Agent Blm Produktif', start: 4, end: 6, bg: '#dc0000' },
+                        { label: data.daily_label, start: 1, end: 4, bg: '#002060' },
+                        { label: 'Jumlah Agent Blm Produktif', start: 5, end: 7, bg: '#dc0000' },
                     ],
                     headBg: '#002060',
                     rows: dRows,
-                    align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'],
+                    align: ['l', 'c', 'c', 'c', 'c', 'c', 'c', 'c'],
                     rowStyles: dStyles,
-                    cellStyle: (i, c) => (i === idxGt && c >= 4) ? { bg: '#fce4d6', fg: '#9a3412', bold: true } : null,
-                    notes: [`Kolom Merah: Banyaknya agen aktif non-Vacant dengan hasil 0 tepat pada tanggal ${data.daily_label}.`],
+                    cellStyle: (i, c) => (i === idxGt && c >= 5) ? { bg: '#fce4d6', fg: '#9a3412', bold: true } : null,
+                    notes: [`GP = Generate Payment belum Paid | Kolom Merah: Agen aktif non-Vacant dengan hasil 0 tepat pada ${data.daily_label}.`],
                 });
                 out.push({
                     fileName: `01B_Rekap_Harian_Blm_Produktif_${data.daily_label}.png`,
@@ -2908,6 +3106,50 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     blob: imgDp.blob,
                     dataUrl: imgDp.dataUrl,
                 });
+
+                for (const dr of data.daily_rows) {
+                    if (dr.is_gt || !Array.isArray(dr.agent_details) || !dr.agent_details.length) continue;
+                    const agRows = [];
+                    const agStyles = [];
+                    let sumSo = 0, sumGp = 0, sumPaid = 0, sumUnp = 0, sumSa = 0, cPaid = 0, cGp = 0, cTdk = 0;
+                    for (const ad of dr.agent_details) {
+                        const isVac = !!ad.is_vacant;
+                        sumSo += (ad.so || 0); sumGp += (ad.gp || 0); sumPaid += (ad.paid || 0); sumUnp += (ad.tidak_paid_so || 0); sumSa += (ad.sa || 0);
+                        if (!isVac) {
+                            if ((ad.paid || 0) > 0) cPaid++; else cTdk++;
+                            if ((ad.gp || 0) > 0) cGp++;
+                        }
+                        agRows.push([ad.name, fmtInt(ad.so), fmtInt(ad.gp), fmtInt(ad.paid), fmtInt(ad.tidak_paid_so), fmtInt(ad.sa), ad.status_harian || '']);
+                        agStyles.push(isVac ? { bg: '#ffff00', bold: true } : null);
+                    }
+                    const idxTotAg = agRows.length;
+                    agRows.push([`TOTAL TIM (${dr.agent_details.length} slot)`, fmtInt(sumSo), fmtInt(sumGp), fmtInt(sumPaid), fmtInt(sumUnp), fmtInt(sumSa), `Paid: ${cPaid} | GP: ${cGp} | Tdk Paid: ${cTdk}`]);
+                    agStyles.push({ bg: '#c9daf8', bold: true });
+                    const imgAgDp = await renderTablePng({
+                        title: `RINCIAN HARIAN PER AGENT — TIM ${String(dr.leader).toUpperCase()} (${data.daily_label})`,
+                        subtitle: `Siapa Sudah PAID (${cPaid}), Sudah GP (${cGp}), & Tidak PAID (${cTdk})`,
+                        columns: ['Salesname', 'SO', 'GP', 'PAID', 'Belum Paid\n(SO)', 'SA', 'Status Harian'],
+                        rows: agRows,
+                        align: ['l', 'c', 'c', 'c', 'c', 'c', 'l'],
+                        rowStyles: agStyles,
+                        cellStyle: (i, c, txt) => {
+                            if (i === idxTotAg || c !== 6) return null;
+                            if (String(txt).includes('Sudah PAID')) return { bg: '#d9ead3', fg: '#134f5c', bold: true };
+                            if (String(txt).includes('Sudah GP') || String(txt).includes('Baru SO')) return { bg: '#fff2cc', fg: '#7f4f00', bold: true };
+                            if (String(txt).includes('Tidak PAID')) return { bg: '#f4cccc', fg: '#990000', bold: true };
+                            return null;
+                        },
+                        notes: ['Hijau = Sudah PAID | Kuning = Sudah GP / pending SO (belum PAID) | Merah = Tidak PAID (0 SO).'],
+                    });
+                    const safeD = String(dr.leader).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+                    const escD = String(dr.leader).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    out.push({
+                        fileName: `01B2_Rincian_Agent_Harian_${safeD}_${data.daily_label}.png`,
+                        caption: `👥 <b>Rincian Harian Agent — Tim ${escD} (${data.daily_label})</b> | Paid: ${cPaid} | GP: ${cGp} | Tdk Paid: ${cTdk}`,
+                        blob: imgAgDp.blob,
+                        dataUrl: imgAgDp.dataUrl,
+                    });
+                }
             }
 
             // 1C. MONITORING WORK ORDER (RINGKASAN + PIVOT 1/2/3 + FOTO TIM PER LEADER + KARTU AGENT)

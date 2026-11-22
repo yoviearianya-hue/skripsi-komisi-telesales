@@ -971,6 +971,7 @@ function baca_file_prospect(string $path, string $namaTampil): array
     $iSls = $peta['salesname'];
     $iTipe = $peta['tipe paket'] ?? null;
     $iHarga = $peta['service price'] ?? null;
+    $iAmount = $peta['amount'] ?? null;
     $iCreated = $peta['created date'] ?? null;
     $iInst = $peta['instalasi date'] ?? null;
     $iActive = $peta['active date'];
@@ -993,6 +994,7 @@ function baca_file_prospect(string $path, string $namaTampil): array
         $instalasi = $iInst === null ? null : tanggal_ke_int($get($iInst));
         $statusWo = $iStatWo === null ? '' : trim((string)($get($iStatWo) ?? ''));
         $harga = ke_angka($get($iHarga));
+        $amount = ke_angka($get($iAmount));
 
         $pnoVal = trim((string)($get($iPno) ?? ''));
         $cnoVal = trim((string)($get($iCno) ?? ''));
@@ -1018,6 +1020,7 @@ function baca_file_prospect(string $path, string $namaTampil): array
             $instalasi,
             $statusWo,
             $hasCust,
+            $amount ?? 0.0,
         ];
     }
     return ['rows' => $hasil, 'ada_payment' => $iPay !== null, 'ada_created' => $iCreated !== null, 'ada_status' => $iStatus !== null];
@@ -1118,6 +1121,116 @@ const P_STATUS = 7;
 const P_INSTALASI = 9;
 const P_STATUS_WO = 10;
 const P_HAS_CUST = 11;
+const P_AMOUNT = 12;
+
+/**
+ * Menormalkan Revenue First Payment bulanan (sebelum PPn 11%) sesuai WS Insentif FP:
+ * - Monthly    : Service Price (atau Amount / 1.11)
+ * - 3 Monthly  : Service Price / 3 (atau (Amount / 1.11) / 3)
+ * - Semesterly : Service Price / 6 (atau (Amount / 1.11) / 6)
+ * - Yearly     : Service Price bulanan jika tersedia (<= 50% Amount), selain itu (Amount / 1.11) / 12
+ */
+function normalisasi_rev_fp_row(string $tipePaket, float $servicePrice, float $amount = 0.0): float
+{
+    $tp = u_upper(trim($tipePaket));
+    if ($tp === '3 MONTHLY' || $tp === '3MONTHLY') {
+        if ($servicePrice > 0.0) {
+            return $servicePrice / 3.0;
+        }
+        return $amount > 0.0 ? ($amount / 1.11) / 3.0 : 0.0;
+    }
+    if ($tp === 'SEMESTERLY') {
+        if ($servicePrice > 0.0) {
+            return $servicePrice / 6.0;
+        }
+        return $amount > 0.0 ? ($amount / 1.11) / 6.0 : 0.0;
+    }
+    if ($tp === 'YEARLY') {
+        if ($servicePrice > 0.0 && ($amount <= 0.0 || $servicePrice <= $amount * 0.5)) {
+            return $servicePrice;
+        }
+        if ($amount > 0.0) {
+            return ($amount / 1.11) / 12.0;
+        }
+        return $servicePrice > 0.0 ? $servicePrice / 12.0 : 0.0;
+    }
+    if ($servicePrice > 0.0) {
+        return $servicePrice;
+    }
+    return $amount > 0.0 ? ($amount / 1.11) : 0.0;
+}
+
+/**
+ * Menghitung komisi resmi Agent Telesales sesuai sheet `Hitung Insentif FP - Okt 2026TL`:
+ * - Minimal >= 15 New Subs DAN Revenue FP >= Rp 3.750.000 (di bawah itu Tier 0 / 0%)
+ * - Tier 1 (>= 3,75 jt): 25% | Tier 2 (>= 4,5 jt): 30% | Tier 3 (>= 5,5 jt): 35%
+ * - Bonus Yearly tetap: Rp 200.000 per subs Yearly + Insentif FP
+ * @return array{tier:string,pct:float,pct_int:int,tier_komisi:string,insentif_fp:float,insentif_yearly:float,est_komisi:float}
+ */
+function hitung_komisi_agen_resmi(int $sa, float $revFp, int $jmlYearly): array
+{
+    $revFp = round($revFp, 2);
+    if ($sa < 15 || $revFp < 3750000.0) {
+        $tier = 'Tier 0';
+        $pct = 0.0;
+    } elseif ($revFp < 4500000.0) {
+        $tier = 'Tier 1';
+        $pct = 0.25;
+    } elseif ($revFp < 5500000.0) {
+        $tier = 'Tier 2';
+        $pct = 0.30;
+    } else {
+        $tier = 'Tier 3';
+        $pct = 0.35;
+    }
+    $pctInt = (int)round($pct * 100);
+    $insFp = $revFp * $pct;
+    $insYr = (float)$jmlYearly * 200000.0;
+    return [
+        'tier' => $tier,
+        'pct' => $pct,
+        'pct_int' => $pctInt,
+        'tier_komisi' => sprintf('%s (%d%%)', $tier, $pctInt),
+        'insentif_fp' => round($insFp, 0),
+        'insentif_yearly' => round($insYr, 0),
+        'est_komisi' => round($insFp + $insYr, 0),
+    ];
+}
+
+/**
+ * Menghitung komisi resmi Sales Leader Telesales sesuai `Hitung Insentif FP - Okt 2026TL` (R8:R12):
+ * - Minimal >= 140 Subs Tim DAN Revenue FP Tim >= Rp 35.000.000 (di bawah itu Tier 0 / 0%)
+ * - Tier 1 (>= 35 jt): 4% | Tier 2 (>= 37,5 jt): 5% | Tier 3 (>= 45 jt): 6% | Tier 4 (>= 55 jt): 8%
+ * @return array{tier:string,pct:float,pct_int:int,tier_komisi:string,insentif_leader:float}
+ */
+function hitung_komisi_leader_resmi(int $saTim, float $revFpTim): array
+{
+    $revFpTim = round($revFpTim, 2);
+    if ($saTim < 140 || $revFpTim < 35000000.0) {
+        $tier = 'Tier 0';
+        $pct = 0.0;
+    } elseif ($revFpTim < 37500000.0) {
+        $tier = 'Tier 1';
+        $pct = 0.04;
+    } elseif ($revFpTim < 45000000.0) {
+        $tier = 'Tier 2';
+        $pct = 0.05;
+    } elseif ($revFpTim < 55000000.0) {
+        $tier = 'Tier 3';
+        $pct = 0.06;
+    } else {
+        $tier = 'Tier 4';
+        $pct = 0.08;
+    }
+    $pctInt = (int)round($pct * 100);
+    return [
+        'tier' => $tier,
+        'pct' => $pct,
+        'pct_int' => $pctInt,
+        'tier_komisi' => sprintf('%s (%d%%)', $tier, $pctInt),
+        'insentif_leader' => round($revFpTim * $pct, 0),
+    ];
+}
 
 /**
  * @param list<array> $rows
@@ -1187,9 +1300,12 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
     $dateLabel = sprintf('%d-%s-%02d', $hariValid, $namaBln, $tahun % 100);
 
     $soLdr = [];
+    $gpLdr = [];
     $paidLdr = [];
     $saLdr = [];
     $soAgen = [];
+    $gpAgen = [];
+    $unpaidSoAgen = [];
     $paidAgen = [];
     $saAgen = [];
 
@@ -1201,14 +1317,27 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
             continue;
         }
 
+        $stPay = u_upper(trim((string)($r[P_STATUS] ?? '')));
+        $stWo = u_upper(trim((string)($r[P_STATUS_WO] ?? '')));
+        $isPaid = $stPay === 'PAID';
+        $isGp = $stPay === 'GENERATE PAYMENT' || $stWo === 'GENERATE PAYMENT';
+
         if (($r[P_CREATED] ?? null) === $tglInt) {
             if ($ldr !== '') {
                 $soLdr[$ldr] = ($soLdr[$ldr] ?? 0) + 1;
+                if ($isGp) {
+                    $gpLdr[$ldr] = ($gpLdr[$ldr] ?? 0) + 1;
+                }
             }
             $soAgen[$agKey] = ($soAgen[$agKey] ?? 0) + 1;
+            if ($isGp) {
+                $gpAgen[$agKey] = ($gpAgen[$agKey] ?? 0) + 1;
+            }
+            if (!$isPaid) {
+                $unpaidSoAgen[$agKey] = ($unpaidSoAgen[$agKey] ?? 0) + 1;
+            }
         }
 
-        $isPaid = u_upper(trim((string)($r[P_STATUS] ?? ''))) === 'PAID';
         if ($isPaid && ($r[P_PAYMENT] ?? null) === $tglInt) {
             if ($ldr !== '') {
                 $paidLdr[$ldr] = ($paidLdr[$ldr] ?? 0) + 1;
@@ -1245,7 +1374,7 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
     foreach (array_keys($agenPerLdr) as $l) {
         $semuaLdrSet[$l] = true;
     }
-    foreach ([$soLdr, $paidLdr, $saLdr] as $mapL) {
+    foreach ([$soLdr, $gpLdr, $paidLdr, $saLdr] as $mapL) {
         foreach ($mapL as $l => $v) {
             if ($v > 0) {
                 $semuaLdrSet[$l] = true;
@@ -1256,6 +1385,7 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
     $rows = [];
     foreach (array_keys($semuaLdrSet) as $ldr) {
         $soVal = (int)($soLdr[$ldr] ?? 0);
+        $gpVal = (int)($gpLdr[$ldr] ?? 0);
         $paidVal = (int)($paidLdr[$ldr] ?? 0);
         $saVal = (int)($saLdr[$ldr] ?? 0);
 
@@ -1263,31 +1393,106 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
         $listBlmSo = [];
         $listBlmPaid = [];
         $listBlmSa = [];
+        $paidItems = [];
+        $gpItems = [];
+        $listTidakPaid = [];
+        $agentDetails = [];
+
         foreach ($daftarAg as $ag) {
             $ak = $ag['key'];
-            if ((int)($soAgen[$ak] ?? 0) === 0) {
-                $listBlmSo[] = $ag['name'];
+            $nm = $ag['name'];
+            $isVac = str_starts_with($ak, 'VACANT__');
+            $agSo = (int)($soAgen[$ak] ?? 0);
+            $agGp = (int)($gpAgen[$ak] ?? 0);
+            $agPaid = (int)($paidAgen[$ak] ?? 0);
+            $agUnpaidSo = (int)($unpaidSoAgen[$ak] ?? 0);
+            $agOtherUnpaid = max(0, $agUnpaidSo - $agGp);
+            $agSa = (int)($saAgen[$ak] ?? 0);
+
+            if ($agSo === 0) {
+                $listBlmSo[] = $nm;
             }
-            if ((int)($paidAgen[$ak] ?? 0) === 0) {
-                $listBlmPaid[] = $ag['name'];
+            if ($agPaid === 0) {
+                $listBlmPaid[] = $nm;
+                if ($isVac) {
+                    $listTidakPaid[] = $nm;
+                } elseif ($agGp > 0 && $agOtherUnpaid > 0) {
+                    $listTidakPaid[] = "{$nm} ({$agGp} GP, {$agOtherUnpaid} NEW/Blm Paid)";
+                } elseif ($agGp > 0) {
+                    $listTidakPaid[] = "{$nm} ({$agGp} GP — Blm PAID)";
+                } elseif ($agUnpaidSo > 0) {
+                    $listTidakPaid[] = "{$nm} ({$agUnpaidSo} SO Blm PAID)";
+                } else {
+                    $listTidakPaid[] = "{$nm} (0 SO)";
+                }
+            } else {
+                $paidItems[] = ['cnt' => $agPaid, 'label' => "{$nm} ({$agPaid})"];
             }
-            if ((int)($saAgen[$ak] ?? 0) === 0) {
-                $listBlmSa[] = $ag['name'];
+            if ($agGp > 0) {
+                $gpItems[] = ['cnt' => $agGp, 'label' => "{$nm} ({$agGp} GP)"];
             }
+            if ($agSa === 0) {
+                $listBlmSa[] = $nm;
+            }
+
+            if ($isVac) {
+                $stHarian = '⬜ Slot Vacant';
+            } elseif ($agPaid > 0 && $agUnpaidSo > 0) {
+                $stHarian = $agGp > 0 ? '✅ Sudah PAID + 💳 Ada GP' : '✅ Sudah PAID + ⏳ Pending SO';
+            } elseif ($agPaid > 0) {
+                $stHarian = '✅ Sudah PAID';
+            } elseif ($agGp > 0) {
+                $stHarian = '💳 Sudah GP (Tidak PAID)';
+            } elseif ($agUnpaidSo > 0) {
+                $stHarian = '⏳ Baru SO/NEW (Tidak PAID)';
+            } else {
+                $stHarian = '❌ Tidak PAID (0 SO)';
+            }
+
+            $agentDetails[] = [
+                'leader' => $ldr,
+                'name' => $nm,
+                'is_vacant' => $isVac,
+                'so' => $agSo,
+                'gp' => $agGp,
+                'paid' => $agPaid,
+                'tidak_paid_so' => $agUnpaidSo,
+                'sa' => $agSa,
+                'status_harian' => $stHarian,
+            ];
         }
+
+        usort($paidItems, fn($a, $b) => [$b['cnt'], $a['label']] <=> [$a['cnt'], $b['label']]);
+        usort($gpItems, fn($a, $b) => [$b['cnt'], $a['label']] <=> [$a['cnt'], $b['label']]);
+        usort($agentDetails, function ($a, $b) {
+            $va = $a['is_vacant'] ? 1 : 0;
+            $vb = $b['is_vacant'] ? 1 : 0;
+            return [$va, $b['paid'], $b['gp'], $b['so'], $b['sa'], $a['name']]
+                <=> [$vb, $a['paid'], $a['gp'], $a['so'], $a['sa'], $b['name']];
+        });
+
+        $listPaidStr = array_column($paidItems, 'label');
+        $listGpStr = array_column($gpItems, 'label');
 
         $rows[] = [
             'leader' => $ldr,
             'so' => $soVal,
+            'gp' => $gpVal,
             'paid' => $paidVal,
             'sa' => $saVal,
             'blm_so' => count($listBlmSo),
             'blm_paid' => count($listBlmPaid),
             'blm_sa' => count($listBlmSa),
+            'sudah_paid_agents' => count($listPaidStr),
+            'sudah_gp_agents' => count($listGpStr),
             'total_agents' => count($daftarAg),
             'agents_blm_so' => $listBlmSo,
             'agents_blm_paid' => $listBlmPaid,
             'agents_blm_sa' => $listBlmSa,
+            'agents_paid' => $listPaidStr,
+            'agents_gp' => $listGpStr,
+            'agents_tidak_paid' => $listTidakPaid,
+            'agent_details' => $agentDetails,
             'is_grand_total' => false,
         ];
     }
@@ -1301,15 +1506,22 @@ function hitung_rekap_harian_blm_produktif(array $prospect, array $target, int $
     $rows[] = [
         'leader' => 'Grand Total',
         'so' => array_sum(array_column($rows, 'so')),
+        'gp' => array_sum(array_column($rows, 'gp')),
         'paid' => array_sum(array_column($rows, 'paid')),
         'sa' => array_sum(array_column($rows, 'sa')),
         'blm_so' => array_sum(array_column($rows, 'blm_so')),
         'blm_paid' => array_sum(array_column($rows, 'blm_paid')),
         'blm_sa' => array_sum(array_column($rows, 'blm_sa')),
+        'sudah_paid_agents' => array_sum(array_column($rows, 'sudah_paid_agents')),
+        'sudah_gp_agents' => array_sum(array_column($rows, 'sudah_gp_agents')),
         'total_agents' => array_sum(array_column($rows, 'total_agents')),
         'agents_blm_so' => [],
         'agents_blm_paid' => [],
         'agents_blm_sa' => [],
+        'agents_paid' => [],
+        'agents_gp' => [],
+        'agents_tidak_paid' => [],
+        'agent_details' => [],
         'is_grand_total' => true,
     ];
 
@@ -1870,14 +2082,22 @@ function proses_data(array $o): array
     $soPerAgen = $agg($mtdSo);
     $paidPerAgen = $agg($mtdPaid);
     $saPerAgen = [];
+    $saPerLdr = [];
     foreach ($mtdIni as $r) {
         $k = normalisasi_nama_agen($r[P_SLS]);
+        $ldrRow = trim((string)($r[P_LDR] ?? ''));
+        $revFpRow = normalisasi_rev_fp_row(
+            (string)($r[P_TIPE] ?? ''),
+            (float)($r[P_HARGA] ?? 0.0),
+            (float)($r[P_AMOUNT] ?? 0.0)
+        );
+        $tp = u_upper(trim((string)$r[P_TIPE]));
+
         if (!isset($saPerAgen[$k])) {
             $saPerAgen[$k] = ['sa' => 0, '3m' => 0, 'm' => 0, 'sem' => 0, 'yr' => 0, 'rev' => 0.0];
         }
-        $tp = u_upper(trim((string)$r[P_TIPE]));
         $saPerAgen[$k]['sa']++;
-        $saPerAgen[$k]['rev'] += (float)$r[P_HARGA];
+        $saPerAgen[$k]['rev'] += $revFpRow;
         if ($tp === '3 MONTHLY' || $tp === '3MONTHLY') {
             $saPerAgen[$k]['3m']++;
         } elseif ($tp === 'MONTHLY') {
@@ -1886,6 +2106,17 @@ function proses_data(array $o): array
             $saPerAgen[$k]['sem']++;
         } elseif ($tp === 'YEARLY') {
             $saPerAgen[$k]['yr']++;
+        }
+
+        if ($ldrRow !== '') {
+            if (!isset($saPerLdr[$ldrRow])) {
+                $saPerLdr[$ldrRow] = ['sa' => 0, 'rev_fp' => 0.0, 'yr' => 0];
+            }
+            $saPerLdr[$ldrRow]['sa']++;
+            $saPerLdr[$ldrRow]['rev_fp'] += $revFpRow;
+            if ($tp === 'YEARLY') {
+                $saPerLdr[$ldrRow]['yr']++;
+            }
         }
     }
 
@@ -1897,6 +2128,7 @@ function proses_data(array $o): array
         $paid = (int)($paidPerAgen[$key] ?? 0);
         $so = (int)($soPerAgen[$key] ?? 0);
         $rev = (float)($saPerAgen[$key]['rev'] ?? 0.0);
+        $pYr = (int)($saPerAgen[$key]['yr'] ?? 0);
         $tAll = (int)$t['TARGET ALL'];
 
         $gap = $sa - $tAll;
@@ -1911,8 +2143,10 @@ function proses_data(array $o): array
         $harusSo = (int)ceil($harusPaid * 1.25);
         $saMgg = (int)ceil($sisaSa / (float)$sisaMinggu);
         $paidMgg = (int)ceil($saMgg * $rasio);
-        $revNetto = $rev * 0.89;
-        $komisi = ($tAll > 0 && $sa >= $tAll) ? $revNetto * 0.35 : $revNetto * 0.20;
+
+        // Rumus resmi sesuai Hitung Insentif FP - Okt 2026TL
+        $komisiAgen = hitung_komisi_agen_resmi($sa, $rev, $pYr);
+        $revNetto = $rev;
 
         $nama = isset($peta[$key]) ? trim((string)$peta[$key]) : trim((string)$t['Nama_Tampil']);
 
@@ -1945,11 +2179,73 @@ function proses_data(array $o): array
             'p_3m' => (int)($saPerAgen[$key]['3m'] ?? 0),
             'p_m' => (int)($saPerAgen[$key]['m'] ?? 0),
             'p_sem' => (int)($saPerAgen[$key]['sem'] ?? 0),
-            'p_yr' => (int)($saPerAgen[$key]['yr'] ?? 0),
-            'rev_kotor' => round($rev, 0),
+            'p_yr' => $pYr,
+            'rev_kotor' => round($rev * 1.11, 0),
             'rev_netto' => round($revNetto, 0),
-            'tier_komisi' => ($tAll > 0 && $sa >= $tAll) ? '35% (Capai Target)' : '20% (Belum Capai)',
-            'est_komisi' => round($komisi, 0),
+            'rev_fp' => round($revNetto, 2),
+            'tier_label' => $komisiAgen['tier'],
+            'pct_insentif' => $komisiAgen['pct_int'],
+            'tier_komisi' => $komisiAgen['tier_komisi'],
+            'insentif_fp' => $komisiAgen['insentif_fp'],
+            'insentif_yearly' => $komisiAgen['insentif_yearly'],
+            'est_komisi' => $komisiAgen['est_komisi'],
+        ];
+    }
+
+    // 6B. Rekap Komisi Resmi Sales Leader (Hitung Insentif FP - Okt 2026TL R8:R12 & R126:R138)
+    $komAgenPerLdr = [];
+    foreach ($agen as $a) {
+        $komAgenPerLdr[$a['leader']] = ($komAgenPerLdr[$a['leader']] ?? 0.0) + (float)$a['est_komisi'];
+    }
+    $ldrSetKom = [];
+    foreach (array_keys($komAgenPerLdr) as $l) {
+        $ldrSetKom[$l] = true;
+    }
+    foreach ($saPerLdr as $l => $v) {
+        if (($v['sa'] ?? 0) > 0) {
+            $ldrSetKom[$l] = true;
+        }
+    }
+    $leaderKomisiRows = [];
+    foreach (array_keys($ldrSetKom) as $ldrName) {
+        $saTim = (int)($saPerLdr[$ldrName]['sa'] ?? 0);
+        $revFpTim = (float)($saPerLdr[$ldrName]['rev_fp'] ?? 0.0);
+        $pYrTim = (int)($saPerLdr[$ldrName]['yr'] ?? 0);
+        $komLdr = hitung_komisi_leader_resmi($saTim, $revFpTim);
+        $sumKomAg = round((float)($komAgenPerLdr[$ldrName] ?? 0.0), 0);
+        $leaderKomisiRows[] = [
+            'leader' => $ldrName,
+            'sa_tim' => $saTim,
+            'rev_fp_tim' => round($revFpTim, 2),
+            'rev_ppn_tim' => round($revFpTim * 1.11, 0),
+            'p_yr_tim' => $pYrTim,
+            'tier' => $komLdr['tier'],
+            'pct_insentif' => $komLdr['pct_int'],
+            'tier_komisi' => $komLdr['tier_komisi'],
+            'insentif_leader' => $komLdr['insentif_leader'],
+            'total_komisi_agen' => $sumKomAg,
+            'total_komisi_tim' => round($komLdr['insentif_leader'] + $sumKomAg, 0),
+            'is_total' => false,
+        ];
+    }
+    usort($leaderKomisiRows, function ($x, $y) {
+        return [$y['insentif_leader'], $y['rev_fp_tim'], $x['leader']]
+            <=> [$x['insentif_leader'], $x['rev_fp_tim'], $y['leader']];
+    });
+    if (!empty($leaderKomisiRows)) {
+        $leaderKomisiRows[] = [
+            'leader' => 'TOTAL',
+            'sa_tim' => array_sum(array_column($leaderKomisiRows, 'sa_tim')),
+            'rev_fp_tim' => round(array_sum(array_column($leaderKomisiRows, 'rev_fp_tim')), 2),
+            'rev_ppn_tim' => round(array_sum(array_column($leaderKomisiRows, 'rev_ppn_tim')), 0),
+            'p_yr_tim' => array_sum(array_column($leaderKomisiRows, 'p_yr_tim')),
+            'tier' => '-',
+            'pct_insentif' => 0,
+            'tier_komisi' => '-',
+            'insentif_leader' => round(array_sum(array_column($leaderKomisiRows, 'insentif_leader')), 0),
+            'total_komisi_agen' => round(array_sum(array_column($leaderKomisiRows, 'total_komisi_agen')), 0),
+            'total_komisi_tim' => round(array_sum(array_column($leaderKomisiRows, 'total_komisi_tim')), 0),
+            'is_total' => true,
         ];
     }
 
@@ -1980,7 +2276,7 @@ function proses_data(array $o): array
 
     $namaBln = NAMA_BULAN_TAMPIL[$bulanIni] ?? 'Nov';
     return [
-        'calc_engine_version' => 3,
+        'calc_engine_version' => 4,
         'periode_label' => $hari . '-' . $namaBln . '-' . $tahun,
         'hari_berjalan' => $hari,
         'total_hari' => $totalHari,
@@ -2010,6 +2306,7 @@ function proses_data(array $o): array
         'sumber' => ['target' => basename($o['target_name'] ?? $o['target_path']), 'prospect' => $infoFile, 'total_baris_prospect' => count($prospect)],
         'mtd_rows' => $mtdRows,
         'agent_rows' => $agen,
+        'leader_komisi_rows' => $leaderKomisiRows,
     ];
 }
 

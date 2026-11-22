@@ -55,9 +55,10 @@ def sql_num(val: object, is_float: bool = False) -> str:
 def generate_sql_files() -> None:
     df_mtd_final = modul_app.df_mtd_final.copy()
     df_agent = modul_app.df_agent.copy()
+    df_leader_komisi = getattr(modul_app, "df_leader_komisi", pd.DataFrame())
     df_mtd_ini = modul_app.df_mtd_ini.copy()
     daily_prod_rows = list(getattr(modul_app, "daily_prod_rows", []))
-    daily_prod_label = str(getattr(modul_app, "daily_prod_date_label", "15-Nov-26"))
+    daily_prod_label = str(getattr(modul_app, "daily_prod_date_label", "22-Nov-26"))
     wo_summary = dict(getattr(modul_app, "wo_summary", {}) or {})
     kol_oct = modul_app.kol_sa_oct
     kol_nov = modul_app.kol_sa_nov
@@ -159,6 +160,7 @@ def generate_sql_files() -> None:
                 "  `tanggal_label` varchar(30) NOT NULL,",
                 "  `sales_leader` varchar(120) NOT NULL,",
                 "  `harian_so` int(11) NOT NULL DEFAULT 0,",
+                "  `harian_gp` int(11) NOT NULL DEFAULT 0,",
                 "  `harian_paid` int(11) NOT NULL DEFAULT 0,",
                 "  `harian_sa` int(11) NOT NULL DEFAULT 0,",
                 "  `blm_produktif_so` int(11) NOT NULL DEFAULT 0,",
@@ -167,11 +169,11 @@ def generate_sql_files() -> None:
                 "  PRIMARY KEY (`id`)",
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
                 "",
-                "INSERT INTO `rekap_harian_blm_produktif` (`tanggal_label`, `sales_leader`, `harian_so`, `harian_paid`, `harian_sa`, `blm_produktif_so`, `blm_produktif_paid`, `blm_produktif_sa`) VALUES",
+                "INSERT INTO `rekap_harian_blm_produktif` (`tanggal_label`, `sales_leader`, `harian_so`, `harian_gp`, `harian_paid`, `harian_sa`, `blm_produktif_so`, `blm_produktif_paid`, `blm_produktif_sa`) VALUES",
             ]
         )
         val_dp = [
-            f"({sql_str(daily_prod_label)}, {sql_str(r['leader'])}, {sql_num(r['so'])}, {sql_num(r['paid'])}, {sql_num(r['sa'])}, {sql_num(r['blm_so'])}, {sql_num(r['blm_paid'])}, {sql_num(r['blm_sa'])})"
+            f"({sql_str(daily_prod_label)}, {sql_str(r['leader'])}, {sql_num(r['so'])}, {sql_num(r.get('gp', 0))}, {sql_num(r['paid'])}, {sql_num(r['sa'])}, {sql_num(r['blm_so'])}, {sql_num(r['blm_paid'])}, {sql_num(r['blm_sa'])})"
             for r in daily_prod_rows
         ]
         lines.append(",\n".join(val_dp) + ";\n")
@@ -261,11 +263,7 @@ def generate_sql_files() -> None:
             if pct_i < modul_app.target_persen_mtd
             else f"ON-TRACK ({pct_i}% >= {modul_app.target_persen_mtd}%)"
         )
-        tier_str = (
-            "35% (Capai Target)"
-            if (int(r["TARGET ALL"]) > 0 and int(r["SA NOV"]) >= int(r["TARGET ALL"]))
-            else "20% (Belum Capai)"
-        )
+        tier_str = str(r.get("Tier_Komisi", "Tier 0 (0%)"))
         val_agen.append(
             "("
             + ", ".join(
@@ -302,6 +300,34 @@ def generate_sql_files() -> None:
             + ")"
         )
     lines.append(",\n".join(val_agen) + ";\n")
+
+    if df_leader_komisi is not None and not df_leader_komisi.empty:
+        lines.extend(
+            [
+                "-- ----------------------------------------------------------------------------",
+                "-- 3B. TABEL: komisi_sales_leader (Insentif Resmi Sales Leader Excl. PPn 11%)",
+                "-- ----------------------------------------------------------------------------",
+                "DROP TABLE IF EXISTS `komisi_sales_leader`;",
+                "CREATE TABLE `komisi_sales_leader` (",
+                "  `id` int(11) NOT NULL AUTO_INCREMENT,",
+                "  `sales_leader` varchar(120) NOT NULL,",
+                "  `sa_tim` int(11) NOT NULL DEFAULT 0,",
+                "  `rev_fp_tim` decimal(16,2) NOT NULL DEFAULT 0.00,",
+                "  `tier_komisi` varchar(40) NOT NULL,",
+                "  `insentif_leader` decimal(16,2) NOT NULL DEFAULT 0.00,",
+                "  `total_komisi_agen` decimal(16,2) NOT NULL DEFAULT 0.00,",
+                "  `total_komisi_tim` decimal(16,2) NOT NULL DEFAULT 0.00,",
+                "  PRIMARY KEY (`id`)",
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+                "",
+                "INSERT INTO `komisi_sales_leader` (`sales_leader`, `sa_tim`, `rev_fp_tim`, `tier_komisi`, `insentif_leader`, `total_komisi_agen`, `total_komisi_tim`) VALUES",
+            ]
+        )
+        val_ldr = [
+            f"({sql_str(lr['leader'])}, {sql_num(lr['sa_tim'])}, {sql_num(lr['rev_fp_tim'], is_float=True)}, {sql_str(lr['tier_komisi'])}, {sql_num(lr['insentif_leader'], is_float=True)}, {sql_num(lr['total_komisi_agen'], is_float=True)}, {sql_num(lr['total_komisi_tim'], is_float=True)})"
+            for _, lr in df_leader_komisi.iterrows()
+        ]
+        lines.append(",\n".join(val_ldr) + ";\n")
 
     lines_cepat = list(lines) + ["COMMIT;\n"]
     with open(PATH_SQL_CEPAT, "w", encoding="utf-8") as f:

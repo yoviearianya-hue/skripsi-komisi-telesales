@@ -29,8 +29,9 @@ def sync_files_ke_server(
     bulan_ini: int = 11,
     tahun: int = 2026,
     total_hari: int = 30,
-    hari_berjalan: int = 15,
-    hari_harian: int = 15,
+    hari_berjalan: int = 22,
+    hari_harian: int = 22,
+    hari_wo: int | None = None,
     rasio_paid: float = 1.25,
     mode_prospect: str = "merge",
 ) -> dict:
@@ -46,6 +47,7 @@ def sync_files_ke_server(
         "total_hari": str(total_hari),
         "hari_berjalan": str(hari_berjalan),
         "hari_harian": str(hari_harian),
+        "hari_wo": str(hari_wo if hari_wo is not None else hari_berjalan),
         "rasio_paid": str(rasio_paid),
         "mode_prospect": mode_prospect,
     }
@@ -100,8 +102,9 @@ def main() -> None:
     parser.add_argument("--bulan-ini", type=int, default=11)
     parser.add_argument("--tahun", type=int, default=2026)
     parser.add_argument("--total-hari", type=int, default=30)
-    parser.add_argument("--hari", type=int, default=15)
-    parser.add_argument("--hari-harian", type=int, default=15)
+    parser.add_argument("--hari", type=int, default=22)
+    parser.add_argument("--hari-harian", type=int, default=22)
+    parser.add_argument("--hari-wo", type=int, default=22)
     parser.add_argument("--rasio", type=float, default=1.25)
     parser.add_argument("--mode", choices=["merge", "replace"], default="merge")
     parser.add_argument("--target", default=os.path.join(FOLDER_PROYEK, "TARGET PER MONTH.xlsx"))
@@ -126,6 +129,7 @@ def main() -> None:
         total_hari=args.total_hari,
         hari_berjalan=args.hari,
         hari_harian=args.hari_harian,
+        hari_wo=args.hari_wo,
         rasio_paid=args.rasio,
         mode_prospect=args.mode,
     )

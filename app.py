@@ -814,6 +814,203 @@ def get_mtd_so_data(
     return df_mtd_so
 
 
+def normalisasi_rev_fp_row(
+    tipe_paket: object, service_price: object, amount: object = 0.0
+) -> float:
+    """Menghitung Revenue First Payment bulanan (Excl. PPn 11%) sesuai sheet `WS Insentif FP`."""
+    tp = str(tipe_paket or "").strip().upper()
+    try:
+        sp = float(service_price) if pd.notna(service_price) else 0.0
+    except (TypeError, ValueError):
+        sp = 0.0
+    try:
+        amt = float(amount) if pd.notna(amount) else 0.0
+    except (TypeError, ValueError):
+        amt = 0.0
+
+    if tp in ("3 MONTHLY", "3MONTHLY"):
+        if sp > 0.0:
+            return sp / 3.0
+        return (amt / 1.11) / 3.0 if amt > 0.0 else 0.0
+    if tp == "SEMESTERLY":
+        if sp > 0.0:
+            return sp / 6.0
+        return (amt / 1.11) / 6.0 if amt > 0.0 else 0.0
+    if tp == "YEARLY":
+        if sp > 0.0 and (amt <= 0.0 or sp <= amt * 0.5):
+            return sp
+        if amt > 0.0:
+            return (amt / 1.11) / 12.0
+        return sp / 12.0 if sp > 0.0 else 0.0
+    if sp > 0.0:
+        return sp
+    return amt / 1.11 if amt > 0.0 else 0.0
+
+
+def hitung_komisi_agen_resmi(
+    sa: int, rev_fp: float, jml_yearly: int
+) -> dict[str, object]:
+    """Rumus resmi Agent Telesales (`Hitung Insentif FP - Okt 2026TL`):
+    Minimal >= 15 SA & RevFP >= 3.75jt | Tier 1 (25% >= 3.75jt) | Tier 2 (30% >= 4.5jt) | Tier 3 (35% >= 5.5jt)
+    + Insentif Yearly Rp 200.000/subs.
+    """
+    rev_fp_r = round(float(rev_fp), 2)
+    if int(sa) < 15 or rev_fp_r < 3750000.0:
+        tier, pct = "Tier 0", 0.0
+    elif rev_fp_r < 4500000.0:
+        tier, pct = "Tier 1", 0.25
+    elif rev_fp_r < 5500000.0:
+        tier, pct = "Tier 2", 0.30
+    else:
+        tier, pct = "Tier 3", 0.35
+
+    pct_int = int(round(pct * 100))
+    ins_fp = float(round_excel(rev_fp_r * pct))
+    ins_yr = float(int(jml_yearly) * 200000)
+    tot_kom = float(round_excel(rev_fp_r * pct + ins_yr))
+    return {
+        "tier": tier,
+        "pct": pct,
+        "pct_int": pct_int,
+        "tier_komisi": f"{tier} ({pct_int}%)",
+        "insentif_fp": ins_fp,
+        "insentif_yearly": ins_yr,
+        "est_komisi": tot_kom,
+    }
+
+
+def hitung_komisi_leader_resmi(
+    sa_tim: int, rev_fp_tim: float
+) -> dict[str, object]:
+    """Rumus resmi Sales Leader (`Hitung Insentif FP - Okt 2026TL` R8:R12):
+    Minimal >= 140 SA Tim & RevFP Tim >= 35jt | Tier 1 (4%) | Tier 2 (5% >= 37.5jt) | Tier 3 (6% >= 45jt) | Tier 4 (8% >= 55jt).
+    """
+    rev_fp_r = round(float(rev_fp_tim), 2)
+    if int(sa_tim) < 140 or rev_fp_r < 35000000.0:
+        tier, pct = "Tier 0", 0.0
+    elif rev_fp_r < 37500000.0:
+        tier, pct = "Tier 1", 0.04
+    elif rev_fp_r < 45000000.0:
+        tier, pct = "Tier 2", 0.05
+    elif rev_fp_r < 55000000.0:
+        tier, pct = "Tier 3", 0.06
+    else:
+        tier, pct = "Tier 4", 0.08
+
+    pct_int = int(round(pct * 100))
+    return {
+        "tier": tier,
+        "pct": pct,
+        "pct_int": pct_int,
+        "tier_komisi": f"{tier} ({pct_int}%)",
+        "insentif_leader": float(round_excel(rev_fp_r * pct)),
+    }
+
+
+def hitung_komisi_leader_tabel_py(
+    df_mtd_ini_all: pd.DataFrame, df_agent_all: pd.DataFrame
+) -> pd.DataFrame:
+    """Menyusun tabel resmi insentif per Sales Leader dari seluruh SA tim MTD."""
+    sa_per_ldr: dict[str, dict[str, float]] = {}
+    if df_mtd_ini_all is not None and not df_mtd_ini_all.empty:
+        df_m = df_mtd_ini_all.copy()
+        df_m["_ldr"] = (
+            df_m["Sales Leader"].fillna("").astype(str).str.strip()
+            if "Sales Leader" in df_m.columns
+            else ""
+        )
+        df_m["_sp"] = (
+            pd.to_numeric(df_m["Service Price"], errors="coerce").fillna(0.0)
+            if "Service Price" in df_m.columns
+            else 0.0
+        )
+        df_m["_amt"] = (
+            pd.to_numeric(df_m["Amount"], errors="coerce").fillna(0.0)
+            if "Amount" in df_m.columns
+            else 0.0
+        )
+        df_m["_tp"] = (
+            df_m["Tipe Paket"].fillna("").astype(str).str.strip()
+            if "Tipe Paket" in df_m.columns
+            else ""
+        )
+        df_m["_rev_fp"] = [
+            normalisasi_rev_fp_row(tp, sp, amt)
+            for tp, sp, amt in zip(df_m["_tp"], df_m["_sp"], df_m["_amt"])
+        ]
+        df_m["_is_yr"] = (df_m["_tp"].str.upper() == "YEARLY").astype(int)
+        df_valid = df_m[~df_m["_ldr"].isin(["", "NAN", "NONE", "TOTAL", "-"])]
+        for ldr_nm, grp in df_valid.groupby("_ldr"):
+            sa_per_ldr[str(ldr_nm)] = {
+                "sa": int(len(grp)),
+                "rev_fp": float(grp["_rev_fp"].sum()),
+                "yr": int(grp["_is_yr"].sum()),
+            }
+
+    kom_agen_ldr: dict[str, float] = {}
+    if df_agent_all is not None and not df_agent_all.empty:
+        for ldr_nm, grp in df_agent_all.groupby("SALES LEADER"):
+            kom_agen_ldr[str(ldr_nm)] = float(grp["Estimasi_Komisi_Num"].sum())
+
+    ldr_set = set(kom_agen_ldr.keys()) | {
+        l for l, v in sa_per_ldr.items() if v.get("sa", 0) > 0
+    }
+    rows: list[dict] = []
+    for ldr_nm in ldr_set:
+        st_l = sa_per_ldr.get(ldr_nm, {"sa": 0, "rev_fp": 0.0, "yr": 0})
+        sa_tim = int(st_l["sa"])
+        rev_fp_tim = float(st_l["rev_fp"])
+        yr_tim = int(st_l["yr"])
+        kom_l = hitung_komisi_leader_resmi(sa_tim, rev_fp_tim)
+        sum_kom_ag = float(round_excel(kom_agen_ldr.get(ldr_nm, 0.0)))
+        ins_l = float(kom_l["insentif_leader"])
+        rows.append(
+            {
+                "leader": ldr_nm,
+                "sa_tim": sa_tim,
+                "rev_fp_tim": round(rev_fp_tim, 2),
+                "rev_ppn_tim": float(round_excel(rev_fp_tim * 1.11)),
+                "p_yr_tim": yr_tim,
+                "tier": kom_l["tier"],
+                "pct_insentif": kom_l["pct_int"],
+                "tier_komisi": kom_l["tier_komisi"],
+                "insentif_leader": ins_l,
+                "total_komisi_agen": sum_kom_ag,
+                "total_komisi_tim": float(round_excel(ins_l + sum_kom_ag)),
+                "is_total": False,
+            }
+        )
+    rows.sort(
+        key=lambda x: (-x["insentif_leader"], -x["rev_fp_tim"], x["leader"])
+    )
+    if rows:
+        rows.append(
+            {
+                "leader": "TOTAL",
+                "sa_tim": sum(r["sa_tim"] for r in rows),
+                "rev_fp_tim": round(sum(r["rev_fp_tim"] for r in rows), 2),
+                "rev_ppn_tim": float(
+                    round_excel(sum(r["rev_ppn_tim"] for r in rows))
+                ),
+                "p_yr_tim": sum(r["p_yr_tim"] for r in rows),
+                "tier": "-",
+                "pct_insentif": 0,
+                "tier_komisi": "-",
+                "insentif_leader": float(
+                    round_excel(sum(r["insentif_leader"] for r in rows))
+                ),
+                "total_komisi_agen": float(
+                    round_excel(sum(r["total_komisi_agen"] for r in rows))
+                ),
+                "total_komisi_tim": float(
+                    round_excel(sum(r["total_komisi_tim"] for r in rows))
+                ),
+                "is_total": True,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def dedup_prospect_df(df: pd.DataFrame) -> pd.DataFrame:
     """Menghapus baris duplikat & menstabilkan kunci Prospect No + Customer Name."""
     if df is None or df.empty:
@@ -892,6 +1089,19 @@ def hitung_rekap_harian_blm_produktif_py(
         if "Status Payment" in df_p.columns
         else pd.Series(True, index=df_p.index)
     )
+    st_pay_up = (
+        df_p["Status Payment"].fillna("").astype(str).str.strip().str.upper()
+        if "Status Payment" in df_p.columns
+        else pd.Series("", index=df_p.index)
+    )
+    st_wo_up = (
+        df_p["Status"].fillna("").astype(str).str.strip().str.upper()
+        if "Status" in df_p.columns
+        else pd.Series("", index=df_p.index)
+    )
+    gp_status = (st_pay_up == "GENERATE PAYMENT") | (st_wo_up == "GENERATE PAYMENT")
+    gp_mask = so_mask & gp_status
+    unpaid_so_mask = so_mask & (~paid_status)
     paid_mask = valid_ag_mask & (
         paid_status & (df_p["Payment Date"].dt.date == tgl_cek)
         if "Payment Date" in df_p.columns
@@ -904,16 +1114,21 @@ def hitung_rekap_harian_blm_produktif_py(
     )
 
     df_so = df_p[so_mask]
+    df_gp = df_p[gp_mask]
+    df_unpaid_so = df_p[unpaid_so_mask]
     df_paid = df_p[paid_mask]
     df_sa = df_p[sa_mask]
 
     so_ldr = df_so[df_so["_ldr"] != ""].groupby("_ldr").size().to_dict()
+    gp_ldr = df_gp[df_gp["_ldr"] != ""].groupby("_ldr").size().to_dict()
     paid_ldr = df_paid[df_paid["_ldr"] != ""].groupby("_ldr").size().to_dict()
     sa_ldr = df_sa[df_sa["_ldr"] != ""].groupby("_ldr").size().to_dict()
 
-    so_ag = set(df_so["_ag_key"].tolist())
-    paid_ag = set(df_paid["_ag_key"].tolist())
-    sa_ag = set(df_sa["_ag_key"].tolist())
+    so_ag_cnt = df_so.groupby("_ag_key").size().to_dict()
+    gp_ag_cnt = df_gp.groupby("_ag_key").size().to_dict()
+    unpaid_so_ag_cnt = df_unpaid_so.groupby("_ag_key").size().to_dict()
+    paid_ag_cnt = df_paid.groupby("_ag_key").size().to_dict()
+    sa_ag_cnt = df_sa.groupby("_ag_key").size().to_dict()
 
     agen_per_ldr: dict[str, list[tuple[str, str]]] = {}
     if df_target is not None and not df_target.empty:
@@ -925,7 +1140,7 @@ def hitung_rekap_harian_blm_produktif_py(
                 agen_per_ldr.setdefault(ldr, []).append((ak, nm))
 
     semua_ldr = set(agen_per_ldr.keys())
-    for mp in (so_ldr, paid_ldr, sa_ldr):
+    for mp in (so_ldr, gp_ldr, paid_ldr, sa_ldr):
         semua_ldr.update(k for k, v in mp.items() if v > 0)
 
     if leader_filter != "Semua Leader":
@@ -934,22 +1149,106 @@ def hitung_rekap_harian_blm_produktif_py(
     rows: list[dict] = []
     for ldr in semua_ldr:
         ag_list = agen_per_ldr.get(ldr, [])
-        blm_so_nm = [nm for ak, nm in ag_list if ak not in so_ag]
-        blm_paid_nm = [nm for ak, nm in ag_list if ak not in paid_ag]
-        blm_sa_nm = [nm for ak, nm in ag_list if ak not in sa_ag]
+        blm_so_nm: list[str] = []
+        blm_paid_nm: list[str] = []
+        blm_sa_nm: list[str] = []
+        paid_items: list[tuple[int, str]] = []
+        gp_items: list[tuple[int, str]] = []
+        tidak_paid_nm: list[str] = []
+        agent_details: list[dict] = []
+
+        for ak, nm in ag_list:
+            is_vac = ak.startswith("VACANT__")
+            ag_so = int(so_ag_cnt.get(ak, 0))
+            ag_gp = int(gp_ag_cnt.get(ak, 0))
+            ag_paid = int(paid_ag_cnt.get(ak, 0))
+            ag_unp = int(unpaid_so_ag_cnt.get(ak, 0))
+            ag_other_unp = max(0, ag_unp - ag_gp)
+            ag_sa = int(sa_ag_cnt.get(ak, 0))
+
+            if ag_so == 0:
+                blm_so_nm.append(nm)
+            if ag_paid == 0:
+                blm_paid_nm.append(nm)
+                if is_vac:
+                    tidak_paid_nm.append(nm)
+                elif ag_gp > 0 and ag_other_unp > 0:
+                    tidak_paid_nm.append(f"{nm} ({ag_gp} GP, {ag_other_unp} NEW/Blm Paid)")
+                elif ag_gp > 0:
+                    tidak_paid_nm.append(f"{nm} ({ag_gp} GP — Blm PAID)")
+                elif ag_unp > 0:
+                    tidak_paid_nm.append(f"{nm} ({ag_unp} SO Blm PAID)")
+                else:
+                    tidak_paid_nm.append(f"{nm} (0 SO)")
+            else:
+                paid_items.append((ag_paid, f"{nm} ({ag_paid})"))
+            if ag_gp > 0:
+                gp_items.append((ag_gp, f"{nm} ({ag_gp} GP)"))
+            if ag_sa == 0:
+                blm_sa_nm.append(nm)
+
+            if is_vac:
+                st_harian = "⬜ Slot Vacant"
+            elif ag_paid > 0 and ag_unp > 0:
+                st_harian = "✅ Sudah PAID + 💳 Ada GP" if ag_gp > 0 else "✅ Sudah PAID + ⏳ Pending SO"
+            elif ag_paid > 0:
+                st_harian = "✅ Sudah PAID"
+            elif ag_gp > 0:
+                st_harian = "💳 Sudah GP (Tidak PAID)"
+            elif ag_unp > 0:
+                st_harian = "⏳ Baru SO/NEW (Tidak PAID)"
+            else:
+                st_harian = "❌ Tidak PAID (0 SO)"
+
+            agent_details.append(
+                {
+                    "leader": ldr,
+                    "name": nm,
+                    "is_vacant": is_vac,
+                    "so": ag_so,
+                    "gp": ag_gp,
+                    "paid": ag_paid,
+                    "tidak_paid_so": ag_unp,
+                    "sa": ag_sa,
+                    "status_harian": st_harian,
+                }
+            )
+
+        paid_items.sort(key=lambda x: (-x[0], x[1]))
+        gp_items.sort(key=lambda x: (-x[0], x[1]))
+        agent_details.sort(
+            key=lambda x: (
+                1 if x["is_vacant"] else 0,
+                -x["paid"],
+                -x["gp"],
+                -x["so"],
+                -x["sa"],
+                x["name"],
+            )
+        )
+        agents_paid_str = [lbl for _, lbl in paid_items]
+        agents_gp_str = [lbl for _, lbl in gp_items]
+
         rows.append(
             {
                 "leader": ldr,
                 "so": int(so_ldr.get(ldr, 0)),
+                "gp": int(gp_ldr.get(ldr, 0)),
                 "paid": int(paid_ldr.get(ldr, 0)),
                 "sa": int(sa_ldr.get(ldr, 0)),
                 "blm_so": len(blm_so_nm),
                 "blm_paid": len(blm_paid_nm),
                 "blm_sa": len(blm_sa_nm),
+                "sudah_paid_agents": len(agents_paid_str),
+                "sudah_gp_agents": len(agents_gp_str),
                 "total_agents": len(ag_list),
                 "agents_blm_so": blm_so_nm,
                 "agents_blm_paid": blm_paid_nm,
                 "agents_blm_sa": blm_sa_nm,
+                "agents_paid": agents_paid_str,
+                "agents_gp": agents_gp_str,
+                "agents_tidak_paid": tidak_paid_nm,
+                "agent_details": agent_details,
                 "is_grand_total": False,
             }
         )
@@ -960,15 +1259,22 @@ def hitung_rekap_harian_blm_produktif_py(
             {
                 "leader": "Grand Total",
                 "so": sum(r["so"] for r in rows),
+                "gp": sum(r["gp"] for r in rows),
                 "paid": sum(r["paid"] for r in rows),
                 "sa": sum(r["sa"] for r in rows),
                 "blm_so": sum(r["blm_so"] for r in rows),
                 "blm_paid": sum(r["blm_paid"] for r in rows),
                 "blm_sa": sum(r["blm_sa"] for r in rows),
+                "sudah_paid_agents": sum(r["sudah_paid_agents"] for r in rows),
+                "sudah_gp_agents": sum(r["sudah_gp_agents"] for r in rows),
                 "total_agents": sum(r["total_agents"] for r in rows),
                 "agents_blm_so": [],
                 "agents_blm_paid": [],
                 "agents_blm_sa": [],
+                "agents_paid": [],
+                "agents_gp": [],
+                "agents_tidak_paid": [],
+                "agent_details": [],
                 "is_grand_total": True,
             }
         )
@@ -1529,7 +1835,7 @@ def susun_pesan_telegram(
 
     footer = (
         "\n━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔥 <i>Bagi agen yang persentasenya masih di bawah {target_persen_mtd}%, wajib kejar kuota Paid per hari &amp; SA per hari agar tembus Target Bulanan (Komisi 35%)!</i> 💪✨"
+        f"🔥 <i>Bagi agen yang persentasenya masih di bawah {target_persen_mtd}%, wajib kejar kuota Paid per hari &amp; SA per hari agar tembus Tier Insentif (25%-35% + Rp 200rb/Yearly)!</i> 💪✨"
     )
 
     blok_pesan = []
@@ -1574,6 +1880,7 @@ def susun_pesan_telegram(
             else:
                 badge_status = f"✅ <b>ON-TRACK MTD ({persen_int}% &ge; Target {target_persen_mtd}%)</b>"
 
+            tier_str = escape_html_tg(str(r.get("Tier_Komisi", "Tier 0 (0%)")))
             teks_agen = (
                 f"<b>{no_urut}. 👤 {nama_agen}</b> ({level_agen})\n"
                 f"├ 📌 Status MTD       : {badge_status}\n"
@@ -1583,7 +1890,7 @@ def susun_pesan_telegram(
                 f"├ 📅 <b>Wajib Kejar Mingguan</b> : <b>{paid_mgg} Paid/minggu</b> &amp; <b>{sa_mgg} SA/minggu</b>\n"
                 f"├ 🎯 <b>Target Total Bulanan</b> : <b>{target_total_val} SA</b> (Wajib <b>{target_paid_bln} Paid</b>)\n"
                 f"├ 🚀 Runrate {total_hari_int} Hari  : <b>{runrate_val} SA</b>\n"
-                f"└ 💰 Estimasi Komisi  : <b>{komisi_str}</b>"
+                f"└ 💰 Estimasi Komisi  : <b>{komisi_str}</b> ({tier_str})"
             )
             blok_pesan.append(teks_agen)
 
@@ -2211,10 +2518,10 @@ total_hari_bulan_ini = st.sidebar.number_input(
 )
 
 hari_berjalan_saat_ini = st.sidebar.number_input(
-    "Hari Berjalan Saat Ini (misal 17)",
+    "Hari Berjalan Saat Ini (misal 22)",
     min_value=1,
     max_value=31,
-    value=17,
+    value=22,
     step=1,
 )
 
@@ -2669,6 +2976,7 @@ with tab_utama:
                 {
                     "Sales Leader": r["leader"],
                     f"{daily_prod_date_label} SO": r["so"],
+                    f"{daily_prod_date_label} GP": r.get("gp", 0),
                     f"{daily_prod_date_label} PAID": r["paid"],
                     f"{daily_prod_date_label} SA": r["sa"],
                     "Blm Produktif SO": r["blm_so"],
@@ -2678,16 +2986,36 @@ with tab_utama:
                 for r in daily_prod_rows
             ]
         )
+        df_daily_agent_export = pd.DataFrame(
+            [
+                {
+                    "Tanggal": daily_prod_date_label,
+                    "Sales Leader": ag["leader"],
+                    "Salesname": ag["name"],
+                    "SO": ag["so"],
+                    "GP": ag["gp"],
+                    "PAID": ag["paid"],
+                    "Belum Paid (SO)": ag["tidak_paid_so"],
+                    "SA": ag["sa"],
+                    "Status Harian": ag["status_harian"],
+                }
+                for r in daily_prod_rows
+                if not r.get("is_grand_total")
+                for ag in r.get("agent_details", [])
+            ]
+        )
 
         if daily_prod_rows and role_akses != "Agen":
             tr_html_dp = []
             for r in daily_prod_rows:
                 is_gt = bool(r.get("is_grand_total"))
+                gp_val = int(r.get("gp", 0))
                 if is_gt:
                     tr_html_dp.append(
                         f"<tr style='font-weight:800; background:#ffffff; border-top:2px solid #0f172a;'>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:left;'>{escape_html_tg(r['leader'])}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['so']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center; color:#92400e;'>{gp_val}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['paid']}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['sa']}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center; background:#fce4d6;'>{r['blm_so']}</td>"
@@ -2700,6 +3028,7 @@ with tab_utama:
                         f"<tr>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:left;'>{escape_html_tg(r['leader'])}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['so']}</td>"
+                        f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center; color:#92400e; font-weight:700;'>{gp_val}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['paid']}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['sa']}</td>"
                         f"<td style='padding:6px 10px; border:1px solid #cbd5e1; text-align:center;'>{r['blm_so']}</td>"
@@ -2710,15 +3039,16 @@ with tab_utama:
 
             tabel_dp_html = (
                 "<div style='overflow-x:auto; margin-bottom:14px;'>"
-                "<table style='width:100%; max-width:860px; border-collapse:collapse; font-size:0.88rem; background:#fff; color:#0f172a;'>"
+                "<table style='width:100%; max-width:920px; border-collapse:collapse; font-size:0.88rem; background:#fff; color:#0f172a;'>"
                 "<thead>"
                 "<tr>"
                 "<th rowspan='2' style='background:#002060; color:#fff; padding:8px 12px; border:1px solid #475569; text-align:center;'>Sales Leader</th>"
-                f"<th colspan='3' style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>{escape_html_tg(daily_prod_date_label)}</th>"
+                f"<th colspan='4' style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>{escape_html_tg(daily_prod_date_label)}</th>"
                 "<th colspan='3' style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>Jumlah Agent Blm Produktif</th>"
                 "</tr>"
                 "<tr>"
                 "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>SO</th>"
+                "<th style='background:#002060; color:#fde68a; padding:6px 10px; border:1px solid #475569; text-align:center;'>GP</th>"
                 "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>PAID</th>"
                 "<th style='background:#002060; color:#fff; padding:6px 10px; border:1px solid #475569; text-align:center;'>SA</th>"
                 "<th style='background:#d90000; color:#fff; padding:6px 10px; border:1px solid #991b1b; text-align:center;'>SO</th>"
@@ -2731,16 +3061,33 @@ with tab_utama:
             )
             st.markdown(tabel_dp_html, unsafe_allow_html=True)
 
-            with st.expander(f"🔎 Lihat Rincian Nama Agen Belum Produktif ({daily_prod_date_label})"):
-                for r in daily_prod_rows:
-                    if r.get("is_grand_total"):
-                        continue
-                    st.markdown(
-                        f"**{escape_html_tg(r['leader'])}** ({r['total_agents']} slot tim) — "
-                        f"0 SO ({r['blm_so']}): `{', '.join(r['agents_blm_so']) or 'Semua Produktif'}` | "
-                        f"0 PAID ({r['blm_paid']}): `{', '.join(r['agents_blm_paid']) or 'Semua Produktif'}` | "
-                        f"0 SA ({r['blm_sa']}): `{', '.join(r['agents_blm_sa']) or 'Semua Produktif'}`"
-                    )
+            st.markdown(f"#### 👥 Rincian Per Agent ({escape_html_tg(daily_prod_date_label)}): Sudah PAID, Sudah GP &amp; Tidak PAID")
+            for r in daily_prod_rows:
+                if r.get("is_grand_total"):
+                    continue
+                st.markdown(
+                    f"**{escape_html_tg(r['leader'])}** ({r['total_agents']} slot tim | "
+                    f"SO: `{r['so']}` | GP: `{r.get('gp', 0)}` | PAID: `{r['paid']}` | SA: `{r['sa']}`)\n"
+                    f"- ✅ **Sudah PAID ({r.get('sudah_paid_agents', 0)})**: {', '.join(r.get('agents_paid', [])) or '-'}\n"
+                    f"- 💳 **Sudah GP ({r.get('sudah_gp_agents', 0)})**: {', '.join(r.get('agents_gp', [])) or '-'}\n"
+                    f"- ❌ **Tidak PAID ({r['blm_paid']})**: {', '.join(r.get('agents_tidak_paid', [])) or 'Semua PAID'}"
+                )
+
+            if not df_daily_agent_export.empty:
+                filter_st_1b = st.radio(
+                    f"Filter Tabel Rincian Agent Harian ({daily_prod_date_label}):",
+                    ["Semua Agent", "Sudah PAID", "Sudah GP", "Tidak PAID"],
+                    horizontal=True,
+                    key="filter_1b_agent_status",
+                )
+                df_1b_show = df_daily_agent_export.copy()
+                if filter_st_1b == "Sudah PAID":
+                    df_1b_show = df_1b_show[df_1b_show["PAID"] > 0]
+                elif filter_st_1b == "Sudah GP":
+                    df_1b_show = df_1b_show[df_1b_show["GP"] > 0]
+                elif filter_st_1b == "Tidak PAID":
+                    df_1b_show = df_1b_show[df_1b_show["PAID"] == 0]
+                st.dataframe(df_1b_show, width="stretch", hide_index=True)
 
         # =====================================================================
         # 3C. DASHBOARD 1C: MONITORING WORK ORDER (WO TODAY & SA | WO BESOK | WAITING WO)
@@ -3000,7 +3347,7 @@ with tab_utama:
             else:
                 df_grp_paid = pd.DataFrame(columns=["Agent_Key", "PAID NOV"])
 
-            # Hitung SA NOV & Breakdown Paket (3 Monthly, Monthly, Semesterly, Yearly) & Total Revenue
+            # Hitung SA NOV, Breakdown Paket (3M/M/Sem/Y), & Revenue First Payment (Excl. PPn 11%)
             if not df_mtd_ini_clean.empty:
                 df_mtd_ini_clean["Salesname_Clean"] = df_mtd_ini_clean[
                     "Salesname"
@@ -3008,12 +3355,23 @@ with tab_utama:
                 df_mtd_ini_clean["Service Price"] = pd.to_numeric(
                     df_mtd_ini_clean["Service Price"], errors="coerce"
                 ).fillna(0.0)
+                amt_ser = (
+                    pd.to_numeric(df_mtd_ini_clean["Amount"], errors="coerce").fillna(0.0)
+                    if "Amount" in df_mtd_ini_clean.columns
+                    else pd.Series(0.0, index=df_mtd_ini_clean.index)
+                )
 
                 tipe_paket_str = (
                     df_mtd_ini_clean["Tipe Paket"].astype(str).str.strip()
                     if "Tipe Paket" in df_mtd_ini_clean.columns
                     else pd.Series("", index=df_mtd_ini_clean.index)
                 )
+                df_mtd_ini_clean["_rev_fp"] = [
+                    normalisasi_rev_fp_row(tp, sp, amt)
+                    for tp, sp, amt in zip(
+                        tipe_paket_str, df_mtd_ini_clean["Service Price"], amt_ser
+                    )
+                ]
                 df_mtd_ini_clean["cnt_3monthly"] = (
                     tipe_paket_str.str.upper().isin(["3 MONTHLY", "3MONTHLY"])
                 ).astype(int)
@@ -3035,7 +3393,7 @@ with tab_utama:
                         Monthly=("cnt_monthly", "sum"),
                         Semesterly=("cnt_semesterly", "sum"),
                         Yearly=("cnt_yearly", "sum"),
-                        Total_Revenue=("Service Price", "sum"),
+                        Total_Revenue=("_rev_fp", "sum"),
                     )
                     .rename(
                         columns={
@@ -3067,12 +3425,6 @@ with tab_utama:
                 ).strip(),
                 axis=1,
             )
-
-            # Filter berdasarkan Scope Leader
-            if leader_login != "Semua Leader":
-                df_agent = df_agent[
-                    df_agent["SALES LEADER"] == leader_login
-                ].copy()
 
             df_agent = pd.merge(
                 df_agent, df_grp_so, on="Agent_Key", how="left"
@@ -3175,14 +3527,32 @@ with tab_utama:
                 df_agent["Catchup_SA_Mingguan"] * rasio_paid_float
             ).astype(int)
 
-            # 6. Estimasi Komisi (35% jika SA NOV >= TARGET ALL, 20% jika < TARGET ALL)
-            df_agent["Revenue_Netto"] = df_agent["Total_Revenue"] * 0.89
-            df_agent["Estimasi_Komisi_Num"] = np.where(
-                (df_agent["TARGET ALL"] > 0)
-                & (df_agent["SA NOV"] >= df_agent["TARGET ALL"]),
-                df_agent["Revenue_Netto"] * 0.35,
-                df_agent["Revenue_Netto"] * 0.20,
-            )
+            # 6. Estimasi Komisi Resmi Agent & Sales Leader (`Hitung Insentif FP - Okt 2026TL`)
+            df_agent["Rev_FP"] = df_agent["Total_Revenue"].astype(float)
+            df_agent["Revenue_Netto"] = df_agent["Rev_FP"]
+            kom_res = [
+                hitung_komisi_agen_resmi(int(sa), float(rv), int(yr))
+                for sa, rv, yr in zip(
+                    df_agent["SA NOV"], df_agent["Rev_FP"], df_agent["Yearly"]
+                )
+            ]
+            df_agent["Tier_Label"] = [k["tier"] for k in kom_res]
+            df_agent["Pct_Insentif"] = [k["pct_int"] for k in kom_res]
+            df_agent["Tier_Komisi"] = [k["tier_komisi"] for k in kom_res]
+            df_agent["Insentif_FP_Num"] = [k["insentif_fp"] for k in kom_res]
+            df_agent["Insentif_Yearly_Num"] = [k["insentif_yearly"] for k in kom_res]
+            df_agent["Estimasi_Komisi_Num"] = [k["est_komisi"] for k in kom_res]
+
+            df_leader_komisi = hitung_komisi_leader_tabel_py(df_mtd_ini, df_agent)
+            if leader_login != "Semua Leader":
+                df_agent = df_agent[
+                    df_agent["SALES LEADER"] == leader_login
+                ].copy()
+                df_leader_komisi_view = df_leader_komisi[
+                    df_leader_komisi["leader"] == leader_login
+                ].copy()
+            else:
+                df_leader_komisi_view = df_leader_komisi.copy()
 
             # Urutkan Leader berdasarkan persentase tim tertinggi (persis seperti Gambar 1)
             urutan_ldr_pct = (
@@ -3266,32 +3636,62 @@ with tab_utama:
                         f"{float(ra['Harus_SA_Per_Hari_Desimal']):.2f} SA/hari",
                     )
                     ka5.metric(
-                        "Estimasi Komisi Anda",
+                        f"Estimasi Komisi ({ra['Tier_Komisi']})",
                         format_rupiah(ra["Estimasi_Komisi_Num"]),
-                        f"Runrate: {int(ra['RUNRATE 30 HARI'])} SA",
+                        f"FP: {format_rupiah(ra['Insentif_FP_Num'])} | Yearly: {format_rupiah(ra['Insentif_Yearly_Num'])}",
                     )
 
             elif role_akses == "Finance":
-                tot_rev_kotor = float(df_agent["Total_Revenue"].sum())
-                tot_rev_netto = float(df_agent["Revenue_Netto"].sum())
-                tot_komisi_all = float(df_agent["Estimasi_Komisi_Num"].sum())
+                tot_rev_fp = float(df_agent["Rev_FP"].sum())
+                tot_rev_kotor = tot_rev_fp * 1.11
+                tot_komisi_ag = float(df_agent["Estimasi_Komisi_Num"].sum())
+                if not df_leader_komisi_view.empty:
+                    df_lk_non = df_leader_komisi_view[~df_leader_komisi_view["is_total"]]
+                    tot_komisi_ldr = float(df_lk_non["insentif_leader"].sum())
+                else:
+                    tot_komisi_ldr = 0.0
                 kf1, kf2, kf3, kf4 = st.columns(4)
                 kf1.metric(
-                    "Total Revenue Kotor",
-                    format_rupiah(tot_rev_kotor),
+                    "Revenue First Payment (Excl. PPn 11%)",
+                    format_rupiah(tot_rev_fp),
+                    f"Incl. PPn 11%: {format_rupiah(tot_rev_kotor)}",
                 )
                 kf2.metric(
-                    "Total Harga Netto (Potong PPN 11%)",
-                    format_rupiah(tot_rev_netto),
+                    "Total Insentif Agent",
+                    format_rupiah(tot_komisi_ag),
                 )
                 kf3.metric(
-                    "Total Estimasi Komisi Dicairkan",
-                    format_rupiah(tot_komisi_all),
+                    "Total Insentif Sales Leader",
+                    format_rupiah(tot_komisi_ldr),
+                    f"Total Gabungan: {format_rupiah(tot_komisi_ag + tot_komisi_ldr)}",
                 )
                 kf4.metric(
                     "Total SA Bulan Berjalan",
                     f"{int(df_agent['SA NOV'].sum()):,} SA".replace(",", "."),
                 )
+
+            if role_akses != "Agen" and not df_leader_komisi_view.empty:
+                st.markdown("#### 🏆 Rekap Komisi Resmi Sales Leader (Excl. PPn 11%)")
+                st.caption(
+                    "Rumus resmi Leader: Min 140 SA Tim & Rev FP >= Rp 35jt (Tier 1: 4%, Tier 2 >= 37,5jt: 5%, Tier 3 >= 45jt: 6%, Tier 4 >= 55jt: 8%). "
+                    "Agent: Min 15 SA & Rev FP >= Rp 3,75jt (Tier 1: 25%, Tier 2 >= 4,5jt: 30%, Tier 3 >= 5,5jt: 35%) + Rp 200rb/Yearly."
+                )
+                df_lk_disp = pd.DataFrame(
+                    [
+                        {
+                            "Sales Leader": lr["leader"],
+                            "SA Tim": int(lr["sa_tim"]),
+                            "Rev. FP Tim (Excl. PPn)": format_rupiah(lr["rev_fp_tim"]),
+                            "Yearly Tim": int(lr["p_yr_tim"]),
+                            "Tier Leader": lr["tier_komisi"],
+                            "Insentif Leader": format_rupiah(lr["insentif_leader"]),
+                            "Total Komisi Agent": format_rupiah(lr["total_komisi_agen"]),
+                            "Total Komisi Tim": format_rupiah(lr["total_komisi_tim"]),
+                        }
+                        for _, lr in df_leader_komisi_view.iterrows()
+                    ]
+                )
+                st.dataframe(df_lk_disp, width="stretch", hide_index=True)
 
             # =================================================================
             # 5. PENYUSUNAN TABEL UTAMA & SUB-TOTAL PER LEADER
@@ -3336,6 +3736,10 @@ with tab_utama:
                             "STATUS PERSENTASE": status_pct_str,
                             "Harus Paid / Hari": f"{paid_hr_b} Paid/hr ({paid_hr_d:.1f})",
                             "Harus SA / Hari": f"{sa_hr_b} SA/hr ({sa_hr_d:.1f})",
+                            "Tier Komisi": r["Tier_Komisi"],
+                            "Rev. FP (Excl. PPn)": format_rupiah(r["Rev_FP"]),
+                            "Insentif FP": format_rupiah(r["Insentif_FP_Num"]),
+                            "Ins. Yearly": format_rupiah(r["Insentif_Yearly_Num"]),
                             "Estimasi Komisi": format_rupiah(
                                 r["Estimasi_Komisi_Num"]
                             ),
@@ -3385,6 +3789,10 @@ with tab_utama:
                         "STATUS PERSENTASE": f"{jml_kurang_ldr} Agen < {target_persen_mtd}%",
                         "Harus Paid / Hari": f"{sum_paid_hr} Paid/hr",
                         "Harus SA / Hari": f"{sum_sa_hr} SA/hr",
+                        "Tier Komisi": "-",
+                        "Rev. FP (Excl. PPn)": format_rupiah(grp_ldr["Rev_FP"].sum()),
+                        "Insentif FP": format_rupiah(grp_ldr["Insentif_FP_Num"].sum()),
+                        "Ins. Yearly": format_rupiah(grp_ldr["Insentif_Yearly_Num"].sum()),
                         "Estimasi Komisi": format_rupiah(
                             grp_ldr["Estimasi_Komisi_Num"].sum()
                         ),
@@ -3423,6 +3831,10 @@ with tab_utama:
                     "STATUS PERSENTASE",
                     "Harus Paid / Hari",
                     "Harus SA / Hari",
+                    "Tier Komisi",
+                    "Rev. FP (Excl. PPn)",
+                    "Insentif FP",
+                    "Ins. Yearly",
                     "Estimasi Komisi",
                 ]
             )
@@ -3537,6 +3949,14 @@ with tab_utama:
                 if not df_daily_prod_export.empty:
                     df_daily_prod_export.to_excel(
                         writer, index=False, sheet_name="Rekap_Harian_Blm_Produktif"
+                    )
+                if not df_daily_agent_export.empty:
+                    df_daily_agent_export.to_excel(
+                        writer, index=False, sheet_name="Rincian_Harian_Agent"
+                    )
+                if role_akses != "Agen" and not df_leader_komisi_view.empty:
+                    df_leader_komisi_view.to_excel(
+                        writer, index=False, sheet_name="Komisi_Sales_Leader"
                     )
                 if wo_summary and wo_summary.get("leader_summary"):
                     pd.DataFrame(wo_summary["leader_summary"]).to_excel(
