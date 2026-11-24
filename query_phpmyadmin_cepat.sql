@@ -235,18 +235,18 @@ CREATE TABLE `rekap_wo_monitoring` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `rekap_wo_monitoring` (`tgl_wo_today`, `tgl_wo_besok`, `sales_leader`, `today_sa`, `today_on_installation`, `today_total`, `besok_on_installation`, `besok_waiting_wo`, `wo_besok`, `waiting_wo`) VALUES
-('24-Nov-26', '25-Nov-26', 'Alfian Bagus Setiawan', 2, 6, 8, 5, 1, 6, 4),
+('24-Nov-26', '25-Nov-26', 'Alfian Bagus Setiawan', 2, 6, 8, 5, 1, 6, 2),
 ('24-Nov-26', '25-Nov-26', 'Anis Anggraini', 0, 11, 11, 9, 0, 9, 1),
-('24-Nov-26', '25-Nov-26', 'Eka Hardiansyah', 2, 12, 14, 10, 0, 10, 3),
-('24-Nov-26', '25-Nov-26', 'Fahrul Amrin', 9, 12, 21, 3, 0, 3, 3),
-('24-Nov-26', '25-Nov-26', 'Firliansyah', 3, 17, 20, 11, 1, 12, 3),
+('24-Nov-26', '25-Nov-26', 'Eka Hardiansyah', 2, 12, 14, 10, 0, 10, 2),
+('24-Nov-26', '25-Nov-26', 'Fahrul Amrin', 9, 12, 21, 3, 0, 3, 0),
+('24-Nov-26', '25-Nov-26', 'Firliansyah', 3, 17, 20, 11, 1, 12, 1),
 ('24-Nov-26', '25-Nov-26', 'Jarot Arie Sasmita', 4, 7, 11, 8, 0, 8, 0),
-('24-Nov-26', '25-Nov-26', 'Muhammad Rezky Jaladara', 1, 6, 7, 5, 1, 6, 3),
+('24-Nov-26', '25-Nov-26', 'Muhammad Rezky Jaladara', 1, 6, 7, 5, 1, 6, 2),
 ('24-Nov-26', '25-Nov-26', 'Tiara Muna Dayuningtyas', 4, 11, 15, 8, 0, 8, 2),
-('24-Nov-26', '25-Nov-26', 'Tika Saraswati', 3, 19, 22, 10, 0, 10, 1),
+('24-Nov-26', '25-Nov-26', 'Tika Saraswati', 3, 19, 22, 10, 0, 10, 0),
 ('24-Nov-26', '25-Nov-26', 'Yovi Arian', 2, 21, 23, 7, 0, 7, 1),
 ('24-Nov-26', '25-Nov-26', 'Yudha Irawan', 4, 15, 19, 8, 0, 8, 3),
-('24-Nov-26', '25-Nov-26', 'Grand Total', 34, 137, 171, 84, 3, 87, 24);
+('24-Nov-26', '25-Nov-26', 'Grand Total', 34, 137, 171, 84, 3, 87, 14);
 
 -- ----------------------------------------------------------------------------
 -- 3. TABEL: detail_komisi_dan_kuota_agen (Detail Performa, Kuota Harian & Komisi)

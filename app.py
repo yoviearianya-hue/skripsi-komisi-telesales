@@ -1321,18 +1321,17 @@ def hitung_wo_laporan_py(
     """Menghitung 3 Tabel Work Order sesuai Pivot Excel acuan perusahaan:
     1. WO TODAY   (Instalasi Date == tgl_wo, Status in On Installation / Active[SA])
     2. WO BESOK   (Hanya Instalasi Date == besok / tgl_wo + 1 hari, Status = ALL misal On Installation & Waiting WO)
-    3. WAITING WO (Status == Waiting WO pada bulan aktif + bulan lalu, baik Instalasi Date terisi maupun blank)
+    3. WAITING WO (Instalasi Date == blank, Status IN [Back To Sales, READY, Reschedule, Waiting WO] pd bulan aktif)
     """
     tgl_besok = tgl_wo + datetime.timedelta(days=1)
     today_lbl = f"{tgl_wo.day}-{NAMA_BULAN_TAMPIL.get(tgl_wo.month, 'Nov')}-{str(tgl_wo.year)[-2:]}"
     besok_lbl = f"{tgl_besok.day}-{NAMA_BULAN_TAMPIL.get(tgl_besok.month, 'Nov')}-{str(tgl_besok.year)[-2:]}"
 
     kosong = {
-        "calc_version": 4,
+        "calc_version": 5,
         "day": tgl_wo.day,
         "today_label": today_lbl,
         "besok_label": besok_lbl,
-        "besok_range_label": besok_lbl,
         "wo_today_columns": [],
         "wo_today_rows": [],
         "wo_today_totals": {"sa": 0, "on_installation": 0, "total": 0, "statuses": {}},
@@ -1341,12 +1340,10 @@ def hitung_wo_laporan_py(
         "wo_besok_rows": [],
         "wo_besok_totals": {"on_installation": 0, "waiting_wo": 0, "total": 0, "statuses": {}},
         "wo_besok_total": 0,
-        "wo_besok_h1_total": 0,
-        "wo_besok_later_total": 0,
         "waiting_wo_columns": [],
         "waiting_wo_rows": [],
         "waiting_wo_total": 0,
-        "waiting_wo_breakdown": {"Waiting WO": 0},
+        "waiting_wo_breakdown": {},
         "leader_summary": [],
         "agent_summary": [],
     }
@@ -1385,7 +1382,6 @@ def hitung_wo_laporan_py(
     summary_agent: dict[str, dict[str, dict]] = {}
 
     bln_aktif_ym = (int(tahun_ini) * 100) + int(bulan_ini)
-    bln_lalu_ym = ((int(tahun_ini) - 1) * 100 + 12) if int(bulan_ini) == 1 else (int(tahun_ini) * 100 + int(bulan_ini) - 1)
 
     def _add_pv(mp: dict, st_tot: dict, l_key: str, s_key: str, st_col_nm: str) -> None:
         st_tot[st_col_nm] = st_tot.get(st_col_nm, 0) + 1
@@ -1452,11 +1448,11 @@ def hitung_wo_laporan_py(
                 sm["besok_waiting_wo"] += 1
                 sag["besok_waiting_wo"] += 1
 
-        # 3. WAITING WO (Status == Waiting WO pada bulan aktif + bulan lalu)
-        if st_low == "waiting wo":
+        # 3. WAITING WO (Instalasi Date == blank & Status IN Back To Sales / READY / Reschedule / Waiting WO pd bulan aktif)
+        if d_inst is None and st_low in ("back to sales", "ready", "reschedule", "waiting wo"):
             cr_ym = (d_cr.year * 100 + d_cr.month) if d_cr else None
-            if cr_ym is None or (bln_lalu_ym <= cr_ym <= bln_aktif_ym):
-                _add_pv(waiting_map, waiting_status_totals, ldr, sn, "Waiting WO")
+            if cr_ym is None or cr_ym == bln_aktif_ym:
+                _add_pv(waiting_map, waiting_status_totals, ldr, sn, st_col)
                 sm, sag = _ens()
                 sm["waiting_wo"] += 1
                 sag["waiting_wo"] += 1
@@ -1464,7 +1460,7 @@ def hitung_wo_laporan_py(
     today_other_sorted = {k: today_other_statuses[k] for k in sorted(today_other_statuses.keys(), key=lambda s: s.lower())}
     today_cols, today_rows, gt_today_tot, today_st_sorted = _susun_pivot_wo_status_py(today_map, today_status_totals)
     besok_cols, besok_rows, gt_besok_tot, besok_st_sorted = _susun_pivot_wo_status_py(besok_map, besok_status_totals)
-    waiting_cols, waiting_rows, gt_wait_tot, _ = _susun_pivot_wo_status_py(waiting_map, waiting_status_totals)
+    waiting_cols, waiting_rows, gt_wait_tot, waiting_st_sorted = _susun_pivot_wo_status_py(waiting_map, waiting_status_totals)
 
     summary_rows = [
         dict(summary_ldr[ldr], is_grand_total=False)
@@ -1496,11 +1492,10 @@ def hitung_wo_laporan_py(
             agent_summary_rows.append(ag_b[sn_s])
 
     return {
-        "calc_version": 4,
+        "calc_version": 5,
         "day": tgl_wo.day,
         "today_label": today_lbl,
         "besok_label": besok_lbl,
-        "besok_range_label": besok_lbl,
         "wo_today_columns": today_cols,
         "wo_today_rows": today_rows,
         "wo_today_totals": {
@@ -1519,12 +1514,10 @@ def hitung_wo_laporan_py(
             "statuses": besok_st_sorted,
         },
         "wo_besok_total": gt_besok_tot,
-        "wo_besok_h1_total": gt_besok_tot,
-        "wo_besok_later_total": 0,
         "waiting_wo_columns": waiting_cols,
         "waiting_wo_rows": waiting_rows,
         "waiting_wo_total": gt_wait_tot,
-        "waiting_wo_breakdown": {"Waiting WO": gt_wait_tot},
+        "waiting_wo_breakdown": waiting_st_sorted,
         "leader_summary": summary_rows,
         "agent_summary": agent_summary_rows,
     }
@@ -1713,7 +1706,7 @@ def susun_pesan_telegram(
     if wo_summary and wo_summary.get("leader_summary"):
         wo_tot = wo_summary.get("wo_today_totals", {})
         bsk_tot = wo_summary.get("wo_besok_totals", {})
-        besok_rng_tg = escape_html_tg(str(wo_summary.get("besok_label", wo_summary.get("besok_range_label", ""))))
+        besok_rng_tg = escape_html_tg(str(wo_summary.get("besok_label", "")))
         ringkasan_mtd += (
             f"\n🛠️ <b>MONITORING WO ({escape_html_tg(wo_summary.get('today_label', ''))})</b>\n"
             f"├ 1. WO Today   : <b>{int(wo_tot.get('total', 0))}</b> "
@@ -3037,7 +3030,7 @@ with tab_utama:
             kwo3.metric(
                 "3️⃣ WAITING WO",
                 f"{wo_summary['waiting_wo_total']} Customer",
-                "Status = Waiting WO (Termasuk Terjadwal Pending & Blank)",
+                "Instalasi = Blank | Back To Sales, READY, Reschedule, Waiting WO",
             )
             oth_st = wo_summary.get("wo_today_other_statuses") or {}
             if oth_st:
@@ -3108,7 +3101,7 @@ with tab_utama:
                 if wo_summary["waiting_wo_rows"]:
                     st.dataframe(_df_pivot_wo_ui(wo_summary["waiting_wo_rows"], wait_cols_ui), width="stretch", hide_index=True)
                 else:
-                    st.info("Tidak ada antrean Waiting WO bulan ini/lalu.")
+                    st.info("Tidak ada antrean Waiting WO (Instalasi Blank) pada bulan aktif.")
             with tab_wogal:
                 wo_imgs = buat_semua_gambar_wo(wo_summary, include_pivot=True, include_tim=True, include_kartu_agent=False)
                 if wo_imgs:

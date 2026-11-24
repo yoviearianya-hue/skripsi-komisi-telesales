@@ -1,5 +1,5 @@
 {
-    "calc_engine_version": 7,
+    "calc_engine_version": 8,
     "periode_label": "24-Nov-2026",
     "hari_berjalan": 24,
     "total_hari": 30,
@@ -1907,11 +1907,10 @@
         24
     ],
     "wo_summary": {
-        "calc_version": 4,
+        "calc_version": 5,
         "day": 24,
         "today_label": "24-Nov-26",
         "besok_label": "25-Nov-26",
-        "besok_range_label": "25-Nov-26",
         "available_days": [
             1,
             2,
@@ -3681,8 +3680,6 @@
             }
         },
         "wo_besok_total": 87,
-        "wo_besok_h1_total": 87,
-        "wo_besok_later_total": 0,
         "waiting_wo_columns": [
             "Waiting WO"
         ],
@@ -3691,9 +3688,9 @@
                 "leader": "Alfian Bagus Setiawan",
                 "salesname": "Fauzan Seftiady",
                 "statuses": {
-                    "Waiting WO": 2
+                    "Waiting WO": 1
                 },
-                "total": 2,
+                "total": 1,
                 "row_type": "agent"
             },
             {
@@ -3707,20 +3704,11 @@
             },
             {
                 "leader": "Alfian Bagus Setiawan",
-                "salesname": "Sinarsih Febrianti Dakhi",
-                "statuses": {
-                    "Waiting WO": 1
-                },
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Alfian Bagus Setiawan",
                 "salesname": "Alfian Bagus Setiawan Total",
                 "statuses": {
-                    "Waiting WO": 4
+                    "Waiting WO": 2
                 },
-                "total": 4,
+                "total": 2,
                 "row_type": "leader_total"
             },
             {
@@ -3745,68 +3733,23 @@
                 "leader": "Eka Hardiansyah",
                 "salesname": "Muhamad Rifki Ramadhan",
                 "statuses": {
-                    "Waiting WO": 3
-                },
-                "total": 3,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Eka Hardiansyah",
-                "salesname": "Eka Hardiansyah Total",
-                "statuses": {
-                    "Waiting WO": 3
-                },
-                "total": 3,
-                "row_type": "leader_total"
-            },
-            {
-                "leader": "Fahrul Amrin",
-                "salesname": "Natalia Bakara",
-                "statuses": {
-                    "Waiting WO": 1
-                },
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Fahrul Amrin",
-                "salesname": "Shera Rega Vilanty",
-                "statuses": {
-                    "Waiting WO": 1
-                },
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Fahrul Amrin",
-                "salesname": "Tommy prasetyo",
-                "statuses": {
-                    "Waiting WO": 1
-                },
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Fahrul Amrin",
-                "salesname": "Fahrul Amrin Total",
-                "statuses": {
-                    "Waiting WO": 3
-                },
-                "total": 3,
-                "row_type": "leader_total"
-            },
-            {
-                "leader": "Firliansyah",
-                "salesname": "Rico Sampe Toding",
-                "statuses": {
                     "Waiting WO": 2
                 },
                 "total": 2,
                 "row_type": "agent"
             },
             {
+                "leader": "Eka Hardiansyah",
+                "salesname": "Eka Hardiansyah Total",
+                "statuses": {
+                    "Waiting WO": 2
+                },
+                "total": 2,
+                "row_type": "leader_total"
+            },
+            {
                 "leader": "Firliansyah",
-                "salesname": "Yuni Erlina Wati Latuliu",
+                "salesname": "Rico Sampe Toding",
                 "statuses": {
                     "Waiting WO": 1
                 },
@@ -3817,23 +3760,14 @@
                 "leader": "Firliansyah",
                 "salesname": "Firliansyah Total",
                 "statuses": {
-                    "Waiting WO": 3
+                    "Waiting WO": 1
                 },
-                "total": 3,
+                "total": 1,
                 "row_type": "leader_total"
             },
             {
                 "leader": "Muhammad Rezky Jaladara",
                 "salesname": "Agung Dwi Jayanto",
-                "statuses": {
-                    "Waiting WO": 1
-                },
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Muhammad Rezky Jaladara",
-                "salesname": "Dairi Tumanggor",
                 "statuses": {
                     "Waiting WO": 1
                 },
@@ -3853,9 +3787,9 @@
                 "leader": "Muhammad Rezky Jaladara",
                 "salesname": "Muhammad Rezky Jaladara Total",
                 "statuses": {
-                    "Waiting WO": 3
+                    "Waiting WO": 2
                 },
-                "total": 3,
+                "total": 2,
                 "row_type": "leader_total"
             },
             {
@@ -3883,24 +3817,6 @@
                     "Waiting WO": 2
                 },
                 "total": 2,
-                "row_type": "leader_total"
-            },
-            {
-                "leader": "Tika Saraswati",
-                "salesname": "Abimanyu Kusuma",
-                "statuses": {
-                    "Waiting WO": 1
-                },
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Tika Saraswati",
-                "salesname": "Tika Saraswati Total",
-                "statuses": {
-                    "Waiting WO": 1
-                },
-                "total": 1,
                 "row_type": "leader_total"
             },
             {
@@ -3952,15 +3868,15 @@
                 "leader": "Grand Total",
                 "salesname": "Grand Total",
                 "statuses": {
-                    "Waiting WO": 24
+                    "Waiting WO": 14
                 },
-                "total": 24,
+                "total": 14,
                 "row_type": "grand_total"
             }
         ],
-        "waiting_wo_total": 24,
+        "waiting_wo_total": 14,
         "waiting_wo_breakdown": {
-            "Waiting WO": 24
+            "Waiting WO": 14
         },
         "leader_summary": [
             {
@@ -3971,7 +3887,7 @@
                 "besok_on_installation": 5,
                 "besok_waiting_wo": 1,
                 "wo_besok": 6,
-                "waiting_wo": 4,
+                "waiting_wo": 2,
                 "is_grand_total": false
             },
             {
@@ -3993,7 +3909,7 @@
                 "besok_on_installation": 10,
                 "besok_waiting_wo": 0,
                 "wo_besok": 10,
-                "waiting_wo": 3,
+                "waiting_wo": 2,
                 "is_grand_total": false
             },
             {
@@ -4004,7 +3920,7 @@
                 "besok_on_installation": 3,
                 "besok_waiting_wo": 0,
                 "wo_besok": 3,
-                "waiting_wo": 3,
+                "waiting_wo": 0,
                 "is_grand_total": false
             },
             {
@@ -4015,7 +3931,7 @@
                 "besok_on_installation": 11,
                 "besok_waiting_wo": 1,
                 "wo_besok": 12,
-                "waiting_wo": 3,
+                "waiting_wo": 1,
                 "is_grand_total": false
             },
             {
@@ -4037,7 +3953,7 @@
                 "besok_on_installation": 5,
                 "besok_waiting_wo": 1,
                 "wo_besok": 6,
-                "waiting_wo": 3,
+                "waiting_wo": 2,
                 "is_grand_total": false
             },
             {
@@ -4059,7 +3975,7 @@
                 "besok_on_installation": 10,
                 "besok_waiting_wo": 0,
                 "wo_besok": 10,
-                "waiting_wo": 1,
+                "waiting_wo": 0,
                 "is_grand_total": false
             },
             {
@@ -4092,7 +4008,7 @@
                 "besok_on_installation": 84,
                 "besok_waiting_wo": 3,
                 "wo_besok": 87,
-                "waiting_wo": 24,
+                "waiting_wo": 14,
                 "is_grand_total": true
             }
         ],
@@ -4139,7 +4055,7 @@
                 "besok_on_installation": 0,
                 "besok_waiting_wo": 1,
                 "wo_besok": 1,
-                "waiting_wo": 2
+                "waiting_wo": 1
             },
             {
                 "leader": "Alfian Bagus Setiawan",
@@ -4205,7 +4121,7 @@
                 "besok_on_installation": 1,
                 "besok_waiting_wo": 0,
                 "wo_besok": 1,
-                "waiting_wo": 1
+                "waiting_wo": 0
             },
             {
                 "leader": "Anis Anggraini",
@@ -4348,7 +4264,7 @@
                 "besok_on_installation": 1,
                 "besok_waiting_wo": 0,
                 "wo_besok": 1,
-                "waiting_wo": 3
+                "waiting_wo": 2
             },
             {
                 "leader": "Eka Hardiansyah",
@@ -4436,7 +4352,7 @@
                 "besok_on_installation": 1,
                 "besok_waiting_wo": 0,
                 "wo_besok": 1,
-                "waiting_wo": 1
+                "waiting_wo": 0
             },
             {
                 "leader": "Fahrul Amrin",
@@ -4451,17 +4367,6 @@
             },
             {
                 "leader": "Fahrul Amrin",
-                "salesname": "Shera Rega Vilanty",
-                "today_sa": 0,
-                "today_on_installation": 0,
-                "today_total": 0,
-                "besok_on_installation": 0,
-                "besok_waiting_wo": 0,
-                "wo_besok": 0,
-                "waiting_wo": 1
-            },
-            {
-                "leader": "Fahrul Amrin",
                 "salesname": "Tommy prasetyo",
                 "today_sa": 0,
                 "today_on_installation": 1,
@@ -4469,7 +4374,7 @@
                 "besok_on_installation": 0,
                 "besok_waiting_wo": 0,
                 "wo_besok": 0,
-                "waiting_wo": 1
+                "waiting_wo": 0
             },
             {
                 "leader": "Fahrul Amrin",
@@ -4568,7 +4473,7 @@
                 "besok_on_installation": 1,
                 "besok_waiting_wo": 1,
                 "wo_besok": 2,
-                "waiting_wo": 2
+                "waiting_wo": 1
             },
             {
                 "leader": "Firliansyah",
@@ -4612,7 +4517,7 @@
                 "besok_on_installation": 1,
                 "besok_waiting_wo": 0,
                 "wo_besok": 1,
-                "waiting_wo": 1
+                "waiting_wo": 0
             },
             {
                 "leader": "Firliansyah",
@@ -4744,7 +4649,7 @@
                 "besok_on_installation": 1,
                 "besok_waiting_wo": 1,
                 "wo_besok": 2,
-                "waiting_wo": 1
+                "waiting_wo": 0
             },
             {
                 "leader": "Muhammad Rezky Jaladara",
@@ -4876,7 +4781,7 @@
                 "besok_on_installation": 0,
                 "besok_waiting_wo": 0,
                 "wo_besok": 0,
-                "waiting_wo": 1
+                "waiting_wo": 0
             },
             {
                 "leader": "Tika Saraswati",
@@ -5241,7 +5146,7 @@
             }
         ],
         "total_baris_prospect": 16964,
-        "updated_at": "2026-11-24 04:32:36",
+        "updated_at": "2026-11-24 05:02:55",
         "updated_by": "Paket Server Terbaru"
     },
     "mtd_rows": [

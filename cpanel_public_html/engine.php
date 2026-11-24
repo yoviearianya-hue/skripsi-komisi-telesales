@@ -192,11 +192,6 @@ function ke_angka($v): ?float
     return (float)$s;
 }
 
-function format_rupiah($nilai): string
-{
-    return 'Rp ' . number_format((float)round((float)$nilai), 0, ',', '.');
-}
-
 /* ------------------------------------------------------------------------- */
 /* ENKRIPSI BRANKAS VAULT (PBKDF2 + SHA256-CTR + HMAC-SHA256 — SINKRON PYTHON) */
 /* ------------------------------------------------------------------------- */
@@ -1638,7 +1633,7 @@ function susun_pivot_wo_status(array $mapByLdrAgent, array $statusTotals): array
  * Menghitung 3 Tabel Work Order sesuai Pivot Excel acuan perusahaan:
  *   1. WO TODAY   (Instalasi Date = hariWo, Status in On Installation / Active[SA])
  *   2. WO BESOK   (Hanya Instalasi Date = besok / hariWo + 1 hari, Status = ALL misal On Installation & Waiting WO)
- *   3. WAITING WO (Status = Waiting WO pada bulan aktif + bulan lalu, baik Instalasi Date terisi maupun blank)
+ *   3. WAITING WO (Instalasi Date = blank, Status IN [Back To Sales, READY, Reschedule, Waiting WO] pd bulan aktif)
  * @param list<array> $prospect
  * @return array<string,mixed>
  */
@@ -1652,7 +1647,6 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
     $tglTodayInt = (int)$dtToday->format('Ymd');
     $tglBesokInt = (int)$dtBesok->format('Ymd');
     $blnTahunAktif = ($tahun * 100) + $bulan;
-    $blnTahunLalu = ($bulan === 1) ? (($tahun - 1) * 100 + 12) : (($tahun * 100) + ($bulan - 1));
 
     $todayLabel = (int)$dtToday->format('j') . '-' . (NAMA_BULAN_TAMPIL[(int)$dtToday->format('n')] ?? 'Nov') . '-' . substr($dtToday->format('Y'), -2);
     $besokLabel = (int)$dtBesok->format('j') . '-' . (NAMA_BULAN_TAMPIL[(int)$dtBesok->format('n')] ?? 'Nov') . '-' . substr($dtBesok->format('Y'), -2);
@@ -1749,11 +1743,11 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
             }
         }
 
-        // 3. WAITING WO (Status == Waiting WO pada bulan aktif + bulan lalu, termasuk yang sudah terjadwal H+1 / blank)
-        if ($stLow === 'waiting wo') {
+        // 3. WAITING WO (Instalasi Date = blank & Status IN Back To Sales / READY / Reschedule / Waiting WO pd bulan aktif)
+        if ($instInt === null && in_array($stLow, ['back to sales', 'ready', 'reschedule', 'waiting wo'], true)) {
             $crYm = $crInt !== null ? intdiv($crInt, 100) : null;
-            if ($crYm === null || ($crYm >= $blnTahunLalu && $crYm <= $blnTahunAktif)) {
-                $addPivot($waitingMap, $waitingStatusTotals, $ldr, $sn, 'Waiting WO');
+            if ($crYm === null || $crYm === $blnTahunAktif) {
+                $addPivot($waitingMap, $waitingStatusTotals, $ldr, $sn, $stCol);
                 $ensureSummary();
                 $summaryLdr[$ldr]['waiting_wo']++;
                 $summaryAgent[$ldr][$sn]['waiting_wo']++;
@@ -1814,11 +1808,10 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
     }
 
     return [
-        'calc_version' => 4,
+        'calc_version' => 5,
         'day' => $hariValid,
         'today_label' => $todayLabel,
         'besok_label' => $besokLabel,
-        'besok_range_label' => $besokLabel,
         'available_days' => daftar_hari_wo_tersedia($prospect, $bulan, $tahun, $hariValid),
         'wo_today_columns' => $todayPivot['columns'],
         'wo_today_rows' => $todayPivot['rows'],
@@ -1838,12 +1831,10 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
             'statuses' => $besokPivot['status_totals'],
         ],
         'wo_besok_total' => $besokPivot['grand_total'],
-        'wo_besok_h1_total' => $besokPivot['grand_total'],
-        'wo_besok_later_total' => 0,
         'waiting_wo_columns' => $waitingPivot['columns'],
         'waiting_wo_rows' => $waitingPivot['rows'],
         'waiting_wo_total' => $waitingPivot['grand_total'],
-        'waiting_wo_breakdown' => ['Waiting WO' => $waitingPivot['grand_total']],
+        'waiting_wo_breakdown' => $waitingPivot['status_totals'],
         'leader_summary' => $leaderSummaryRows,
         'agent_summary' => $agentSummaryRows,
     ];
@@ -2196,7 +2187,7 @@ function proses_data(array $o): array
 
     $namaBln = NAMA_BULAN_TAMPIL[$bulanIni] ?? 'Nov';
     return [
-        'calc_engine_version' => 7,
+        'calc_engine_version' => 8,
         'periode_label' => $hari . '-' . $namaBln . '-' . $tahun,
         'hari_berjalan' => $hari,
         'total_hari' => $totalHari,
