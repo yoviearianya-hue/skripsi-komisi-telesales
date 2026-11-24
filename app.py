@@ -256,24 +256,10 @@ st.markdown(
 FOLDER_PROYEK = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_TARGET_PATH = os.path.join(FOLDER_PROYEK, "TARGET PER MONTH.xlsx")
 DEFAULT_PROSPECT_FILES = [
-    os.path.join(FOLDER_PROYEK, "list_prospect September.xls"),
-    os.path.join(FOLDER_PROYEK, "list_prospect Oktober.xls"),
-    os.path.join(FOLDER_PROYEK, "list_prospect November.xls"),
+    os.path.join(FOLDER_PROYEK, "list_prospect September.xlsx"),
+    os.path.join(FOLDER_PROYEK, "list_prospect Oktober.xlsx"),
+    os.path.join(FOLDER_PROYEK, "list_prospect November.xlsx"),
 ]
-FILE_URL_PUBLIK = os.path.join(FOLDER_PROYEK, "url_publik_aktif.txt")
-
-
-def ambil_url_publik_aktif() -> str:
-    """Membaca URL Go-Live Publik (https://*.trycloudflare.com) yang sedang aktif."""
-    if os.path.isfile(FILE_URL_PUBLIK):
-        try:
-            with open(FILE_URL_PUBLIK, "r", encoding="utf-8") as f:
-                url = f.read().strip()
-            if url.startswith("http"):
-                return url
-        except Exception:
-            pass
-    return ""
 
 
 def ambil_url_lan_aktif(port: int = 8501) -> str:
@@ -1017,9 +1003,21 @@ def dedup_prospect_df(df: pd.DataFrame) -> pd.DataFrame:
         return df
     df_c = df.copy()
     if "Prospect No" in df_c.columns:
-        pno = df_c["Prospect No"].astype("object").fillna("").astype(str).str.strip()
+        pno = (
+            df_c["Prospect No"]
+            .astype("object")
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\.0+$", "", regex=True)
+        )
         cno = (
-            df_c["Customer No"].astype("object").fillna("").astype(str).str.strip()
+            df_c["Customer No"]
+            .astype("object")
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\.0+$", "", regex=True)
             if "Customer No" in df_c.columns
             else pd.Series("", index=df_c.index)
         )
@@ -1255,22 +1253,62 @@ def hitung_rekap_harian_blm_produktif_py(
     return rows, date_label
 
 
-def _susun_pivot_wo_1kolom_py(by_ldr_ag: dict[str, dict[str, int]]) -> tuple[list[dict], int]:
-    """Menyusun pivot Excel 1-kolom (Sales Leader -> Salesname -> Leader Total -> Grand Total)."""
+def _susun_pivot_wo_status_py(
+    map_ldr_ag: dict[str, dict[str, dict]],
+    status_totals: dict[str, int],
+) -> tuple[list[str], list[dict], int, dict[str, int]]:
+    """Helper terpadu menyusun pivot Excel multi-status (Sales Leader -> Salesname -> Status... -> Grand Total)."""
+    cols = sorted(status_totals.keys(), key=lambda s: s.lower())
+    status_totals_sorted = {k: status_totals[k] for k in cols}
     rows: list[dict] = []
     grand = 0
-    for ldr in sorted(by_ldr_ag.keys(), key=lambda s: s.lower()):
-        ag_map = by_ldr_ag[ldr]
-        sub = 0
+    gt_statuses = {c: 0 for c in cols}
+
+    for ldr in sorted(map_ldr_ag.keys(), key=lambda s: s.lower()):
+        ag_map = map_ldr_ag[ldr]
+        sub_tot = 0
+        sub_st = {c: 0 for c in cols}
         for sn in sorted(ag_map.keys(), key=lambda s: s.lower()):
-            cnt = int(ag_map[sn])
-            sub += cnt
-            rows.append({"leader": ldr, "salesname": sn, "total": cnt, "row_type": "agent"})
-        grand += sub
-        rows.append({"leader": ldr, "salesname": f"{ldr} Total", "total": sub, "row_type": "leader_total"})
+            cell = ag_map[sn]
+            tot = int(cell.get("total", 0))
+            sub_tot += tot
+            st_row = {}
+            for col_nm in cols:
+                v_c = int(cell.get("statuses", {}).get(col_nm, 0))
+                st_row[col_nm] = v_c
+                sub_st[col_nm] += v_c
+            rows.append(
+                {
+                    "leader": ldr,
+                    "salesname": sn,
+                    "statuses": st_row,
+                    "total": tot,
+                    "row_type": "agent",
+                }
+            )
+        grand += sub_tot
+        for col_nm in cols:
+            gt_statuses[col_nm] += sub_st[col_nm]
+        rows.append(
+            {
+                "leader": ldr,
+                "salesname": f"{ldr} Total",
+                "statuses": sub_st,
+                "total": sub_tot,
+                "row_type": "leader_total",
+            }
+        )
     if rows:
-        rows.append({"leader": "Grand Total", "salesname": "Grand Total", "total": grand, "row_type": "grand_total"})
-    return rows, grand
+        rows.append(
+            {
+                "leader": "Grand Total",
+                "salesname": "Grand Total",
+                "statuses": gt_statuses,
+                "total": grand,
+                "row_type": "grand_total",
+            }
+        )
+    return cols, rows, grand, status_totals_sorted
 
 
 def hitung_wo_laporan_py(
@@ -1280,41 +1318,35 @@ def hitung_wo_laporan_py(
     tahun_ini: int,
     leader_filter: str = "Semua Leader",
 ) -> dict:
-    """Menghitung 3 Tabel Work Order sesuai Pivot Excel perusahaan:
-    1. WO TODAY  (Instalasi Date == tgl_wo, Status = ALL -> termasuk Active sebagai SA)
-    2. WO BESOK  (Hanya Instalasi Date == besok / tgl_wo + 1 hari, Status = ALL)
-    3. WAITING WO (Instalasi Date == blank, Status in Back To Sales / READY / Reschedule / Waiting WO)
+    """Menghitung 3 Tabel Work Order sesuai Pivot Excel acuan perusahaan:
+    1. WO TODAY   (Instalasi Date == tgl_wo, Status in On Installation / Active[SA])
+    2. WO BESOK   (Hanya Instalasi Date == besok / tgl_wo + 1 hari, Status = ALL misal On Installation & Waiting WO)
+    3. WAITING WO (Status == Waiting WO pada bulan aktif + bulan lalu, baik Instalasi Date terisi maupun blank)
     """
     tgl_besok = tgl_wo + datetime.timedelta(days=1)
     today_lbl = f"{tgl_wo.day}-{NAMA_BULAN_TAMPIL.get(tgl_wo.month, 'Nov')}-{str(tgl_wo.year)[-2:]}"
     besok_lbl = f"{tgl_besok.day}-{NAMA_BULAN_TAMPIL.get(tgl_besok.month, 'Nov')}-{str(tgl_besok.year)[-2:]}"
 
     kosong = {
-        "calc_version": 3,
+        "calc_version": 4,
         "day": tgl_wo.day,
         "today_label": today_lbl,
         "besok_label": besok_lbl,
         "besok_range_label": besok_lbl,
         "wo_today_columns": [],
         "wo_today_rows": [],
-        "wo_today_totals": {
-            "sa": 0,
-            "on_installation": 0,
-            "reschedule": 0,
-            "refund": 0,
-            "waiting_wo": 0,
-            "other": 0,
-            "total": 0,
-            "statuses": {},
-        },
+        "wo_today_totals": {"sa": 0, "on_installation": 0, "total": 0, "statuses": {}},
         "wo_today_other_statuses": {},
+        "wo_besok_columns": [],
         "wo_besok_rows": [],
+        "wo_besok_totals": {"on_installation": 0, "waiting_wo": 0, "total": 0, "statuses": {}},
         "wo_besok_total": 0,
         "wo_besok_h1_total": 0,
         "wo_besok_later_total": 0,
+        "waiting_wo_columns": [],
         "waiting_wo_rows": [],
         "waiting_wo_total": 0,
-        "waiting_wo_breakdown": {"Back To Sales": 0, "READY": 0, "Reschedule": 0, "Waiting WO": 0},
+        "waiting_wo_breakdown": {"Waiting WO": 0},
         "leader_summary": [],
         "agent_summary": [],
     }
@@ -1335,28 +1367,31 @@ def hitung_wo_laporan_py(
         return {
             "today_sa": 0,
             "today_on_installation": 0,
-            "today_reschedule": 0,
-            "today_waiting_wo": 0,
-            "today_refund": 0,
-            "today_other": 0,
             "today_total": 0,
+            "besok_on_installation": 0,
+            "besok_waiting_wo": 0,
             "wo_besok": 0,
             "waiting_wo": 0,
         }
 
     today_map: dict[str, dict[str, dict]] = {}
-    today_col_set: set[str] = set()
     today_status_totals: dict[str, int] = {}
-    waiting_map: dict[str, dict[str, int]] = {}
-    waiting_breakdown = {"Back To Sales": 0, "READY": 0, "Reschedule": 0, "Waiting WO": 0}
-    besok_map: dict[str, dict[str, int]] = {}
-    besok_h1_total = 0
-    besok_later_total = 0
+    today_other_statuses: dict[str, int] = {}
+    besok_map: dict[str, dict[str, dict]] = {}
+    besok_status_totals: dict[str, int] = {}
+    waiting_map: dict[str, dict[str, dict]] = {}
+    waiting_status_totals: dict[str, int] = {}
     summary_ldr: dict[str, dict] = {}
     summary_agent: dict[str, dict[str, dict]] = {}
 
     bln_aktif_ym = (int(tahun_ini) * 100) + int(bulan_ini)
     bln_lalu_ym = ((int(tahun_ini) - 1) * 100 + 12) if int(bulan_ini) == 1 else (int(tahun_ini) * 100 + int(bulan_ini) - 1)
+
+    def _add_pv(mp: dict, st_tot: dict, l_key: str, s_key: str, st_col_nm: str) -> None:
+        st_tot[st_col_nm] = st_tot.get(st_col_nm, 0) + 1
+        cell_p = mp.setdefault(l_key, {}).setdefault(s_key, {"statuses": {}, "total": 0})
+        cell_p["statuses"][st_col_nm] = cell_p["statuses"].get(st_col_nm, 0) + 1
+        cell_p["total"] += 1
 
     for _, row in df_p.iterrows():
         if has_cust_col:
@@ -1374,6 +1409,7 @@ def hitung_wo_laporan_py(
 
         st_raw = str(row.get("Status", "") or "").strip()
         st_low = st_raw.lower()
+        st_col = st_raw if st_raw else "(blank)"
         dt_inst = row.get("Instalasi Date") if "Instalasi Date" in df_p.columns else pd.NaT
         dt_cr = row.get("Created Date") if "Created Date" in df_p.columns else pd.NaT
         d_inst = dt_inst.date() if pd.notna(dt_inst) else None
@@ -1387,172 +1423,68 @@ def hitung_wo_laporan_py(
                 ag_b[sn] = {"leader": ldr, "salesname": sn, **_empty_c()}
             return summary_ldr[ldr], ag_b[sn]
 
-        # 1. WO TODAY (Instalasi Date == tgl_wo, Status = ALL -> termasuk Active sebagai SA)
+        # 1. WO TODAY (Instalasi Date == tgl_wo, Status in On Installation / Active[SA])
         if d_inst == tgl_wo:
-            st_col = st_raw if st_raw else "(blank)"
-            today_col_set.add(st_col)
-            today_status_totals[st_col] = today_status_totals.get(st_col, 0) + 1
-
-            cell = today_map.setdefault(ldr, {}).setdefault(sn, {**_empty_c(), "statuses": {}})
-            cell["statuses"][st_col] = cell["statuses"].get(st_col, 0) + 1
-            cell["today_total"] += 1
-
-            sm, sag = _ens()
-            sm["today_total"] += 1
-            sag["today_total"] += 1
-
-            if st_low == "active":
-                cell["today_sa"] += 1
-                sm["today_sa"] += 1
-                sag["today_sa"] += 1
-            elif st_low == "on installation":
-                cell["today_on_installation"] += 1
-                sm["today_on_installation"] += 1
-                sag["today_on_installation"] += 1
-            elif st_low == "reschedule":
-                cell["today_reschedule"] += 1
-                sm["today_reschedule"] += 1
-                sag["today_reschedule"] += 1
-            elif st_low == "waiting wo":
-                cell["today_waiting_wo"] += 1
-                sm["today_waiting_wo"] += 1
-                sag["today_waiting_wo"] += 1
+            if st_low in ("on installation", "active"):
+                _add_pv(today_map, today_status_totals, ldr, sn, st_col)
+                sm, sag = _ens()
+                sm["today_total"] += 1
+                sag["today_total"] += 1
+                if st_low == "active":
+                    sm["today_sa"] += 1
+                    sag["today_sa"] += 1
+                else:
+                    sm["today_on_installation"] += 1
+                    sag["today_on_installation"] += 1
             else:
-                if st_low == "refund":
-                    cell["today_refund"] += 1
-                    sm["today_refund"] += 1
-                    sag["today_refund"] += 1
-                cell["today_other"] += 1
-                sm["today_other"] += 1
-                sag["today_other"] += 1
+                today_other_statuses[st_col] = today_other_statuses.get(st_col, 0) + 1
 
         # 2. WO BESOK (Hanya Instalasi Date == besok / tgl_wo + 1 hari, Status = ALL)
         if d_inst == tgl_besok:
-            besok_map.setdefault(ldr, {})
-            besok_map[ldr][sn] = besok_map[ldr].get(sn, 0) + 1
-            besok_h1_total += 1
+            _add_pv(besok_map, besok_status_totals, ldr, sn, st_col)
             sm, sag = _ens()
             sm["wo_besok"] += 1
             sag["wo_besok"] += 1
+            if st_low == "on installation":
+                sm["besok_on_installation"] += 1
+                sag["besok_on_installation"] += 1
+            elif st_low == "waiting wo":
+                sm["besok_waiting_wo"] += 1
+                sag["besok_waiting_wo"] += 1
 
-        # 3. WAITING WO (Instalasi Date == blank, Status in Back To Sales / READY / Reschedule / Waiting WO)
-        if d_inst is None and st_low in ("back to sales", "ready", "reschedule", "waiting wo"):
+        # 3. WAITING WO (Status == Waiting WO pada bulan aktif + bulan lalu)
+        if st_low == "waiting wo":
             cr_ym = (d_cr.year * 100 + d_cr.month) if d_cr else None
             if cr_ym is None or (bln_lalu_ym <= cr_ym <= bln_aktif_ym):
-                waiting_map.setdefault(ldr, {})
-                waiting_map[ldr][sn] = waiting_map[ldr].get(sn, 0) + 1
-                if st_low == "back to sales":
-                    waiting_breakdown["Back To Sales"] += 1
-                elif st_low == "ready":
-                    waiting_breakdown["READY"] += 1
-                elif st_low == "reschedule":
-                    waiting_breakdown["Reschedule"] += 1
-                else:
-                    waiting_breakdown["Waiting WO"] += 1
+                _add_pv(waiting_map, waiting_status_totals, ldr, sn, "Waiting WO")
                 sm, sag = _ens()
                 sm["waiting_wo"] += 1
                 sag["waiting_wo"] += 1
 
-    today_cols = sorted(today_col_set, key=lambda s: s.lower())
-    today_status_totals_sorted = {k: today_status_totals[k] for k in today_cols}
-
-    today_rows: list[dict] = []
-    gt_sa = gt_on = gt_resch = gt_wait = gt_ref = gt_other = gt_tot = 0
-    gt_statuses = {c: 0 for c in today_cols}
-    for ldr in sorted(today_map.keys(), key=lambda s: s.lower()):
-        ag_map = today_map[ldr]
-        s_sa = s_on = s_resch = s_wait = s_ref = s_other = s_tot = 0
-        s_statuses = {c: 0 for c in today_cols}
-        for sn in sorted(ag_map.keys(), key=lambda s: s.lower()):
-            c = ag_map[sn]
-            s_sa += c["today_sa"]
-            s_on += c["today_on_installation"]
-            s_resch += c["today_reschedule"]
-            s_wait += c["today_waiting_wo"]
-            s_ref += c["today_refund"]
-            s_other += c["today_other"]
-            s_tot += c["today_total"]
-            st_row = {}
-            for col_nm in today_cols:
-                v_c = int(c["statuses"].get(col_nm, 0))
-                st_row[col_nm] = v_c
-                s_statuses[col_nm] += v_c
-            today_rows.append(
-                {
-                    "leader": ldr,
-                    "salesname": sn,
-                    "sa": c["today_sa"],
-                    "on_installation": c["today_on_installation"],
-                    "reschedule": c["today_reschedule"],
-                    "refund": c["today_refund"],
-                    "waiting_wo": c["today_waiting_wo"],
-                    "other": c["today_other"],
-                    "total": c["today_total"],
-                    "statuses": st_row,
-                    "row_type": "agent",
-                }
-            )
-        gt_sa += s_sa
-        gt_on += s_on
-        gt_resch += s_resch
-        gt_wait += s_wait
-        gt_ref += s_ref
-        gt_other += s_other
-        gt_tot += s_tot
-        for col_nm in today_cols:
-            gt_statuses[col_nm] += s_statuses[col_nm]
-        today_rows.append(
-            {
-                "leader": ldr,
-                "salesname": f"{ldr} Total",
-                "sa": s_sa,
-                "on_installation": s_on,
-                "reschedule": s_resch,
-                "refund": s_ref,
-                "waiting_wo": s_wait,
-                "other": s_other,
-                "total": s_tot,
-                "statuses": s_statuses,
-                "row_type": "leader_total",
-            }
-        )
-    if today_rows:
-        today_rows.append(
-            {
-                "leader": "Grand Total",
-                "salesname": "Grand Total",
-                "sa": gt_sa,
-                "on_installation": gt_on,
-                "reschedule": gt_resch,
-                "refund": gt_ref,
-                "waiting_wo": gt_wait,
-                "other": gt_other,
-                "total": gt_tot,
-                "statuses": gt_statuses,
-                "row_type": "grand_total",
-            }
-        )
-
-    waiting_rows, waiting_total = _susun_pivot_wo_1kolom_py(waiting_map)
-    besok_rows, besok_total = _susun_pivot_wo_1kolom_py(besok_map)
+    today_other_sorted = {k: today_other_statuses[k] for k in sorted(today_other_statuses.keys(), key=lambda s: s.lower())}
+    today_cols, today_rows, gt_today_tot, today_st_sorted = _susun_pivot_wo_status_py(today_map, today_status_totals)
+    besok_cols, besok_rows, gt_besok_tot, besok_st_sorted = _susun_pivot_wo_status_py(besok_map, besok_status_totals)
+    waiting_cols, waiting_rows, gt_wait_tot, _ = _susun_pivot_wo_status_py(waiting_map, waiting_status_totals)
 
     summary_rows = [
         dict(summary_ldr[ldr], is_grand_total=False)
         for ldr in sorted(summary_ldr.keys(), key=lambda s: s.lower())
     ]
+    gt_today_sa = sum(int(r["today_sa"]) for r in summary_rows)
+    gt_today_on = sum(int(r["today_on_installation"]) for r in summary_rows)
+    gt_besok_on = sum(int(r["besok_on_installation"]) for r in summary_rows)
+    gt_besok_wait = sum(int(r["besok_waiting_wo"]) for r in summary_rows)
     if summary_rows:
         summary_rows.append(
             {
                 "leader": "Grand Total",
-                "today_sa": gt_sa,
-                "today_on_installation": gt_on,
-                "today_reschedule": gt_resch,
-                "today_waiting_wo": gt_wait,
-                "today_refund": gt_ref,
-                "today_other": gt_other,
-                "today_total": gt_tot,
-                "wo_besok": besok_total,
-                "waiting_wo": waiting_total,
+                "today_sa": gt_today_sa,
+                "today_on_installation": gt_today_on,
+                "today_total": gt_today_tot,
+                "besok_on_installation": gt_besok_on,
+                "besok_waiting_wo": gt_besok_wait,
+                "wo_besok": gt_besok_tot,
+                "waiting_wo": gt_wait_tot,
                 "is_grand_total": True,
             }
         )
@@ -1564,7 +1496,7 @@ def hitung_wo_laporan_py(
             agent_summary_rows.append(ag_b[sn_s])
 
     return {
-        "calc_version": 3,
+        "calc_version": 4,
         "day": tgl_wo.day,
         "today_label": today_lbl,
         "besok_label": besok_lbl,
@@ -1572,23 +1504,27 @@ def hitung_wo_laporan_py(
         "wo_today_columns": today_cols,
         "wo_today_rows": today_rows,
         "wo_today_totals": {
-            "sa": gt_sa,
-            "on_installation": gt_on,
-            "reschedule": gt_resch,
-            "refund": gt_ref,
-            "waiting_wo": gt_wait,
-            "other": gt_other,
-            "total": gt_tot,
-            "statuses": today_status_totals_sorted,
+            "sa": gt_today_sa,
+            "on_installation": gt_today_on,
+            "total": gt_today_tot,
+            "statuses": today_st_sorted,
         },
-        "wo_today_other_statuses": {},
+        "wo_today_other_statuses": today_other_sorted,
+        "wo_besok_columns": besok_cols,
         "wo_besok_rows": besok_rows,
-        "wo_besok_total": besok_total,
-        "wo_besok_h1_total": besok_h1_total,
-        "wo_besok_later_total": besok_later_total,
+        "wo_besok_totals": {
+            "on_installation": gt_besok_on,
+            "waiting_wo": gt_besok_wait,
+            "total": gt_besok_tot,
+            "statuses": besok_st_sorted,
+        },
+        "wo_besok_total": gt_besok_tot,
+        "wo_besok_h1_total": gt_besok_tot,
+        "wo_besok_later_total": 0,
+        "waiting_wo_columns": waiting_cols,
         "waiting_wo_rows": waiting_rows,
-        "waiting_wo_total": waiting_total,
-        "waiting_wo_breakdown": waiting_breakdown,
+        "waiting_wo_total": gt_wait_tot,
+        "waiting_wo_breakdown": {"Waiting WO": gt_wait_tot},
         "leader_summary": summary_rows,
         "agent_summary": agent_summary_rows,
     }
@@ -1776,29 +1712,25 @@ def susun_pesan_telegram(
 
     if wo_summary and wo_summary.get("leader_summary"):
         wo_tot = wo_summary.get("wo_today_totals", {})
-        besok_rng_tg = escape_html_tg(str(wo_summary.get("besok_range_label", wo_summary.get("besok_label", ""))))
+        bsk_tot = wo_summary.get("wo_besok_totals", {})
+        besok_rng_tg = escape_html_tg(str(wo_summary.get("besok_label", wo_summary.get("besok_range_label", ""))))
         ringkasan_mtd += (
             f"\n🛠️ <b>MONITORING WO ({escape_html_tg(wo_summary.get('today_label', ''))})</b>\n"
             f"├ 1. WO Today   : <b>{int(wo_tot.get('total', 0))}</b> "
-            f"(<b>SA {int(wo_tot.get('sa', 0))}</b> | On Install {int(wo_tot.get('on_installation', 0))} | Resched {int(wo_tot.get('reschedule', 0))} | Wait {int(wo_tot.get('waiting_wo', 0))} | Lain {int(wo_tot.get('other', 0))})\n"
-            f"├ 2. WO Besok ({besok_rng_tg}) : <b>{int(wo_summary.get('wo_besok_total', 0))}</b>\n"
-            f"└ 3. Waiting WO (Blank) : <b>{int(wo_summary.get('waiting_wo_total', 0))}</b>\n"
+            f"(<b>SA {int(wo_tot.get('sa', 0))}</b> | On Install {int(wo_tot.get('on_installation', 0))})\n"
+            f"├ 2. WO Besok ({besok_rng_tg}) : <b>{int(wo_summary.get('wo_besok_total', 0))}</b> "
+            f"(On Install {int(bsk_tot.get('on_installation', 0))} | Waiting WO {int(bsk_tot.get('waiting_wo', 0))})\n"
+            f"└ 3. Waiting WO : <b>{int(wo_summary.get('waiting_wo_total', 0))}</b>\n"
         )
 
     ldr_aman = escape_html_tg(leader_login)
-    url_publik_tg = ambil_url_publik_aktif()
-    baris_link_tg = (
-        f"🌐 Link Dashboard Web : <a href=\"{escape_html_tg(url_publik_tg)}\">{escape_html_tg(url_publik_tg)}</a>\n"
-        if url_publik_tg
-        else ""
-    )
     header = (
         f"📊 <b>LAPORAN PERFORMA &amp; TARGET TELESALES</b>\n"
+        f"🌐 Portal Resmi  : <b>https://laporantelesalesoxygen.my.id</b>\n"
         f"👨‍💼 Scope Leader : <b>{ldr_aman}</b>\n"
         f"🗓 Periode       : <b>{hari_berjalan_int}-{kode_bln_ini}-{tahun_int}</b> "
         f"(Sisa {sisa_hari_int} Hari / {sisa_minggu_int} Minggu)\n"
         f"🎯 Target Persentase Berjalan (MTD) : <b>{target_persen_mtd}%</b>\n"
-        f"{baris_link_tg}"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{ringkasan_mtd}"
         f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -2315,18 +2247,12 @@ if st.sidebar.button("🚪 Keluar / Ganti Akun (Logout)", width="stretch"):
 # HANYA ADMIN MASTER yang dapat melihat Brankas ID & Password, Log Firewall, dan Simulasi Role
 role_akses = role_login_awal
 if is_admin_master:
-    url_publik_sidebar = ambil_url_publik_aktif()
     url_lan_sidebar = ambil_url_lan_aktif(8501)
     with st.sidebar.expander(
-        "🌐 Link Akses Go-Live (Khusus Admin Master)", expanded=False
+        "🌐 Link Akses Portal Resmi (Khusus Admin Master)", expanded=False
     ):
-        st.markdown("✅ **Domain Live Resmi (cPanel Non-Docker):**  \nhttps://laporantelesalesoxygen.my.id/index.php")
-        if url_publik_sidebar:
-            st.markdown(
-                f"✅ **Tunnel Publik Cadangan:**  \n"
-                f"[{url_publik_sidebar}]({url_publik_sidebar})"
-            )
-        st.markdown(f"📶 **Akses Wi-Fi / LAN Kantor:**  \n`{url_lan_sidebar}`")
+        st.markdown("✅ **Domain Live Resmi (cPanel):**  \nhttps://laporantelesalesoxygen.my.id/index.php")
+        st.markdown(f"📶 **Akses Wi-Fi / LAN Lokal:**  \n`{url_lan_sidebar}`")
 
     with st.sidebar.expander(
         "🔐 Brankas ID & Password (Khusus Admin Master)", expanded=False
@@ -2426,7 +2352,7 @@ if is_admin_master:
                 try:
                     from sync_ke_server import sync_files_ke_server
 
-                    nov_path = os.path.join(FOLDER_PROYEK, "list_prospect November.xls")
+                    nov_path = os.path.join(FOLDER_PROYEK, "list_prospect November.xlsx")
                     res_sync = sync_files_ke_server(
                         url_server="https://laporantelesalesoxygen.my.id/index.php",
                         api_user=sa_uid,
@@ -2489,10 +2415,10 @@ total_hari_bulan_ini = st.sidebar.number_input(
 )
 
 hari_berjalan_saat_ini = st.sidebar.number_input(
-    "Hari Berjalan Saat Ini (misal 22)",
+    "Hari Berjalan Saat Ini (misal 24)",
     min_value=1,
     max_value=31,
-    value=22,
+    value=24,
     step=1,
 )
 
@@ -3088,28 +3014,35 @@ with tab_utama:
         if role_akses != "Agen":
             kwo1, kwo2, kwo3 = st.columns(3)
             wo_t = wo_summary["wo_today_totals"]
+            wo_b = wo_summary.get("wo_besok_totals") or {}
             wo_sa = int(wo_t.get("sa", 0))
             wo_tot_t = int(wo_t.get("total", 0))
             wo_st_parts = " | ".join(
-                f"{k}: {v}" for k, v in (wo_t.get("statuses") or {}).items()
+                f"{'SA (Active)' if k.lower() == 'active' else k}: {v}"
+                for k, v in (wo_t.get("statuses") or {}).items()
+            )
+            bsk_st_parts = " | ".join(
+                f"{k}: {v}" for k, v in (wo_b.get("statuses") or {}).items()
             )
             kwo1.metric(
                 f"1️⃣ WO TODAY ({wo_summary['today_label']})",
                 f"{wo_tot_t} Customer  |  SA: {wo_sa}",
-                wo_st_parts or "Semua status Instalasi Date Today",
+                wo_st_parts or "On Installation & Active (SA)",
             )
             kwo2.metric(
                 f"2️⃣ WO BESOK ({wo_summary['besok_label']})",
                 f"{wo_summary['wo_besok_total']} Customer",
-                f"Hanya Instalasi Date = {wo_summary['besok_label']} (Besok H+1, Status = ALL)",
+                bsk_st_parts or f"Instalasi Date = {wo_summary['besok_label']} (Besok H+1)",
             )
-            brk_w = wo_summary.get("waiting_wo_breakdown") or {}
-            brk_txt = " | ".join(f"{k}: {v}" for k, v in brk_w.items() if v > 0) or "Back To Sales / READY / Reschedule / Waiting WO"
             kwo3.metric(
-                "3️⃣ WAITING WO (Instalasi Blank)",
+                "3️⃣ WAITING WO",
                 f"{wo_summary['waiting_wo_total']} Customer",
-                brk_txt,
+                "Status = Waiting WO (Termasuk Terjadwal Pending & Blank)",
             )
+            oth_st = wo_summary.get("wo_today_other_statuses") or {}
+            if oth_st:
+                oth_txt = " | ".join(f"{k}: {v}" for k, v in oth_st.items())
+                st.caption(f"ℹ️ Status lain pd Instalasi Date {wo_summary['today_label']} (di luar On Installation & SA): {oth_txt}")
 
             tab_wos, tab_wo1, tab_wo2, tab_wo3, tab_wogal = st.tabs(
                 [
@@ -3129,12 +3062,11 @@ with tab_utama:
                                 "Sales Leader": r["leader"],
                                 "Total WO Today": r["today_total"],
                                 "SA (Active)": r.get("today_sa", 0),
-                                "On Install": r.get("today_on_installation", 0),
-                                "Reschedule": r.get("today_reschedule", 0),
-                                "Waiting WO (Today)": r.get("today_waiting_wo", 0),
-                                "Lainnya": r.get("today_other", 0),
+                                "On Installation": r.get("today_on_installation", 0),
                                 f"WO Besok ({wo_summary['besok_label']})": r["wo_besok"],
-                                "Waiting WO (Blank)": r["waiting_wo"],
+                                "Besok On Install": r.get("besok_on_installation", 0),
+                                "Besok Waiting WO": r.get("besok_waiting_wo", 0),
+                                "Waiting WO": r["waiting_wo"],
                             }
                             for r in sum_rows
                         ]
@@ -3142,61 +3074,41 @@ with tab_utama:
                     st.dataframe(df_wo_sum, width="stretch", hide_index=True)
                 else:
                     st.info("Belum ada data Work Order pada tanggal tersebut.")
+
+            def _df_pivot_wo_ui(rows_src: list[dict], cols_src: list[str], rename_active: bool = False) -> pd.DataFrame:
+                recs = []
+                for r in rows_src:
+                    rec_u = {
+                        "Sales Leader": "" if r["row_type"] in ("leader_total", "grand_total") else r["leader"],
+                        "Salesname": r["salesname"],
+                    }
+                    st_map_r = r.get("statuses") or {}
+                    for cn_u in cols_src:
+                        lbl_c = "Active (SA)" if (rename_active and cn_u.lower() == "active") else cn_u
+                        val_c = int(st_map_r.get(cn_u, 0))
+                        rec_u[lbl_c] = val_c if (val_c > 0 or r["row_type"] == "grand_total") else ""
+                    rec_u["Grand Total"] = r["total"]
+                    recs.append(rec_u)
+                return pd.DataFrame(recs)
+
             with tab_wo1:
                 today_cols_ui = wo_summary.get("wo_today_columns") or []
                 if wo_summary["wo_today_rows"]:
-                    rows_ui_today = []
-                    for r in wo_summary["wo_today_rows"]:
-                        rec_u = {
-                            "Sales Leader": "" if r["row_type"] in ("leader_total", "grand_total") else r["leader"],
-                            "Salesname": r["salesname"],
-                        }
-                        st_map_r = r.get("statuses") or {}
-                        for cn_u in today_cols_ui:
-                            lbl_c = "Active (SA)" if cn_u.lower() == "active" else cn_u
-                            val_c = int(st_map_r.get(cn_u, 0))
-                            rec_u[lbl_c] = val_c if (val_c > 0 or r["row_type"] == "grand_total") else ""
-                        rec_u["Grand Total"] = r["total"]
-                        rows_ui_today.append(rec_u)
-                    st.dataframe(pd.DataFrame(rows_ui_today), width="stretch", hide_index=True)
+                    st.dataframe(_df_pivot_wo_ui(wo_summary["wo_today_rows"], today_cols_ui, rename_active=True), width="stretch", hide_index=True)
                 else:
                     st.info(f"Tidak ada data WO Today pada {wo_summary['today_label']}.")
             with tab_wo2:
+                besok_cols_ui = wo_summary.get("wo_besok_columns") or []
                 if wo_summary["wo_besok_rows"]:
-                    st.dataframe(
-                        pd.DataFrame(
-                            [
-                                {
-                                    "Sales Leader": "" if r["row_type"] in ("leader_total", "grand_total") else r["leader"],
-                                    "Salesname": r["salesname"],
-                                    "Grand Total": r["total"],
-                                }
-                                for r in wo_summary["wo_besok_rows"]
-                            ]
-                        ),
-                        width="stretch",
-                        hide_index=True,
-                    )
+                    st.dataframe(_df_pivot_wo_ui(wo_summary["wo_besok_rows"], besok_cols_ui), width="stretch", hide_index=True)
                 else:
                     st.info(f"Belum ada jadwal WO Besok ({wo_summary['besok_label']}).")
             with tab_wo3:
+                wait_cols_ui = wo_summary.get("waiting_wo_columns") or ["Waiting WO"]
                 if wo_summary["waiting_wo_rows"]:
-                    st.dataframe(
-                        pd.DataFrame(
-                            [
-                                {
-                                    "Sales Leader": "" if r["row_type"] in ("leader_total", "grand_total") else r["leader"],
-                                    "Salesname": r["salesname"],
-                                    "Grand Total": r["total"],
-                                }
-                                for r in wo_summary["waiting_wo_rows"]
-                            ]
-                        ),
-                        width="stretch",
-                        hide_index=True,
-                    )
+                    st.dataframe(_df_pivot_wo_ui(wo_summary["waiting_wo_rows"], wait_cols_ui), width="stretch", hide_index=True)
                 else:
-                    st.info("Tidak ada antrean Waiting WO (Instalasi Blank) bulan ini/lalu.")
+                    st.info("Tidak ada antrean Waiting WO bulan ini/lalu.")
             with tab_wogal:
                 wo_imgs = buat_semua_gambar_wo(wo_summary, include_pivot=True, include_tim=True, include_kartu_agent=False)
                 if wo_imgs:

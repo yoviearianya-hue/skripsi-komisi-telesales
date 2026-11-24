@@ -996,8 +996,8 @@ function baca_file_prospect(string $path, string $namaTampil): array
         $harga = ke_angka($get($iHarga));
         $amount = ke_angka($get($iAmount));
 
-        $pnoVal = trim((string)($get($iPno) ?? ''));
-        $cnoVal = trim((string)($get($iCno) ?? ''));
+        $pnoVal = preg_replace('/\.0+$/', '', trim((string)($get($iPno) ?? ''))) ?? '';
+        $cnoVal = preg_replace('/\.0+$/', '', trim((string)($get($iCno) ?? ''))) ?? '';
         $cnameRaw = trim((string)($get($iCname) ?? ''));
         $cnameVal = u_upper(rapatkan_spasi($cnameRaw));
         $hasCust = ($iCname === null) ? true : ($cnameRaw !== '');
@@ -1027,19 +1027,37 @@ function baca_file_prospect(string $path, string $namaTampil): array
 }
 
 /**
- * Menormalkan primary key prospect dari format lama PK:pno|cno|cname ke PK2:pno|cname
- * agar baris yg Customer No-nya baru terisi saat pembayaran tidak menjadi duplikat.
+ * Menormalkan primary key prospect (PK lama & akhiran .0 dari Excel numeric) ke PK2:pno|cname
+ * agar penggabungan file .xls dan .xlsx tidak meninggalkan baris duplikat.
  */
 function normalisasi_pk_prospect(string $rawKey): string
 {
-    if (str_starts_with($rawKey, 'PK2:') || str_starts_with($rawKey, 'PKC:') || str_starts_with($rawKey, 'MD5:')) {
+    if (str_starts_with($rawKey, 'PK2:')) {
+        $parts = explode('|', substr($rawKey, 4), 2);
+        if (count($parts) === 2) {
+            $pno = preg_replace('/\.0+$/', '', trim($parts[0])) ?? trim($parts[0]);
+            $cname = u_upper(rapatkan_spasi(trim($parts[1])));
+            return 'PK2:' . $pno . '|' . $cname;
+        }
+        return $rawKey;
+    }
+    if (str_starts_with($rawKey, 'PKC:')) {
+        $parts = explode('|', substr($rawKey, 4), 2);
+        if (count($parts) === 2) {
+            $pno = preg_replace('/\.0+$/', '', trim($parts[0])) ?? trim($parts[0]);
+            $cno = preg_replace('/\.0+$/', '', trim($parts[1])) ?? trim($parts[1]);
+            return 'PKC:' . $pno . '|' . $cno;
+        }
+        return $rawKey;
+    }
+    if (str_starts_with($rawKey, 'MD5:')) {
         return $rawKey;
     }
     if (str_starts_with($rawKey, 'PK:')) {
         $parts = explode('|', substr($rawKey, 3), 3);
         if (count($parts) === 3) {
-            $pno = trim($parts[0]);
-            $cno = trim($parts[1]);
+            $pno = preg_replace('/\.0+$/', '', trim($parts[0])) ?? trim($parts[0]);
+            $cno = preg_replace('/\.0+$/', '', trim($parts[1])) ?? trim($parts[1]);
             $cname = u_upper(rapatkan_spasi(trim($parts[2])));
             if ($pno !== '' && $cname !== '') {
                 return 'PK2:' . $pno . '|' . $cname;
@@ -1541,55 +1559,86 @@ function daftar_hari_wo_tersedia(array $prospect, int $bulan, int $tahun, int $s
 }
 
 /**
- * Menyusun baris Pivot Excel 1-kolom (Sales Leader -> Salesname -> Leader Total -> Grand Total).
- * @param array<string,array<string,int>> $byLdrAgent
- * @return array{rows:list<array<string,mixed>>,grand_total:int}
+ * Helper terpadu menyusun Pivot Excel multi-status (Sales Leader -> Salesname -> Status... -> Grand Total).
+ * @param array<string,array<string,array{statuses:array<string,int>,total:int}>> $mapByLdrAgent
+ * @param array<string,int> $statusTotals
+ * @return array{columns:list<string>,rows:list<array<string,mixed>>,grand_total:int,status_totals:array<string,int>}
  */
-function susun_pivot_wo_1kolom(array $byLdrAgent): array
+function susun_pivot_wo_status(array $mapByLdrAgent, array $statusTotals): array
 {
-    $leaders = array_keys($byLdrAgent);
+    $cols = array_keys($statusTotals);
+    usort($cols, 'strnatcasecmp');
+    ksort($statusTotals, SORT_NATURAL | SORT_FLAG_CASE);
+
+    $leaders = array_keys($mapByLdrAgent);
     usort($leaders, 'strnatcasecmp');
+
     $rows = [];
     $grand = 0;
+    $gtStatuses = array_fill_keys($cols, 0);
+
     foreach ($leaders as $ldr) {
-        $agenMap = $byLdrAgent[$ldr];
+        $agenMap = $mapByLdrAgent[$ldr];
         $agenNames = array_keys($agenMap);
         usort($agenNames, 'strnatcasecmp');
-        $sub = 0;
+        $subTot = 0;
+        $subSt = array_fill_keys($cols, 0);
+
         foreach ($agenNames as $sn) {
-            $cnt = (int)$agenMap[$sn];
-            $sub += $cnt;
+            $cell = $agenMap[$sn];
+            $tot = (int)($cell['total'] ?? 0);
+            $subTot += $tot;
+            $rowSt = [];
+            foreach ($cols as $colNm) {
+                $v = (int)($cell['statuses'][$colNm] ?? 0);
+                $rowSt[$colNm] = $v;
+                $subSt[$colNm] += $v;
+            }
             $rows[] = [
                 'leader' => $ldr,
                 'salesname' => $sn,
-                'total' => $cnt,
+                'statuses' => $rowSt,
+                'total' => $tot,
                 'row_type' => 'agent',
             ];
         }
-        $grand += $sub;
+
+        $grand += $subTot;
+        foreach ($cols as $colNm) {
+            $gtStatuses[$colNm] += $subSt[$colNm];
+        }
         $rows[] = [
             'leader' => $ldr,
             'salesname' => $ldr . ' Total',
-            'total' => $sub,
+            'statuses' => $subSt,
+            'total' => $subTot,
             'row_type' => 'leader_total',
         ];
     }
+
     if ($rows) {
         $rows[] = [
             'leader' => 'Grand Total',
             'salesname' => 'Grand Total',
+            'statuses' => $gtStatuses,
             'total' => $grand,
             'row_type' => 'grand_total',
         ];
     }
-    return ['rows' => $rows, 'grand_total' => $grand];
+
+    return [
+        'columns' => $cols,
+        'rows' => $rows,
+        'grand_total' => $grand,
+        'status_totals' => $statusTotals,
+    ];
 }
 
 /**
- * Menghitung 3 Tabel Work Order sesuai Pivot Excel perusahaan:
- *   1. WO TODAY  (Instalasi Date = hariWo, Status = ALL -> termasuk Active/SA, On Installation, Propose To Cancel, READY, Refund, Reschedule, Waiting WO)
- *   2. WO BESOK  (Hanya Instalasi Date = besok / hariWo + 1 hari, Status = ALL; tanggal > besok tidak dimasukkan)
- *   3. WAITING WO (Instalasi Date = blank, Status in Back To Sales / READY / Reschedule / Waiting WO pada bulan aktif + bulan lalu)
+ * Menghitung 3 Tabel Work Order sesuai Pivot Excel acuan perusahaan:
+ *   1. WO TODAY   (Instalasi Date = hariWo, Status in On Installation / Active[SA])
+ *   2. WO BESOK   (Hanya Instalasi Date = besok / hariWo + 1 hari, Status = ALL misal On Installation & Waiting WO)
+ *   3. WAITING WO (Status = Waiting WO pada bulan aktif + bulan lalu, baik Instalasi Date terisi maupun blank)
  * @param list<array> $prospect
  * @return array<string,mixed>
  */
@@ -1608,19 +1657,13 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
     $todayLabel = (int)$dtToday->format('j') . '-' . (NAMA_BULAN_TAMPIL[(int)$dtToday->format('n')] ?? 'Nov') . '-' . substr($dtToday->format('Y'), -2);
     $besokLabel = (int)$dtBesok->format('j') . '-' . (NAMA_BULAN_TAMPIL[(int)$dtBesok->format('n')] ?? 'Nov') . '-' . substr($dtBesok->format('Y'), -2);
 
-    $todayByLdrAgent = [];
-    $todayColSet = [];
+    $todayMap = [];
     $todayStatusTotals = [];
-    $waitingByLdrAgent = [];
-    $waitingBreakdown = [
-        'Back To Sales' => 0,
-        'READY' => 0,
-        'Reschedule' => 0,
-        'Waiting WO' => 0,
-    ];
-    $besokByLdrAgent = [];
-    $besokH1Total = 0;
-    $besokLaterTotal = 0;
+    $todayOtherStatuses = [];
+    $besokMap = [];
+    $besokStatusTotals = [];
+    $waitingMap = [];
+    $waitingStatusTotals = [];
     $summaryLdr = [];
     $summaryAgent = [];
 
@@ -1628,14 +1671,21 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
         return [
             'today_sa' => 0,
             'today_on_installation' => 0,
-            'today_reschedule' => 0,
-            'today_waiting_wo' => 0,
-            'today_refund' => 0,
-            'today_other' => 0,
             'today_total' => 0,
+            'besok_on_installation' => 0,
+            'besok_waiting_wo' => 0,
             'wo_besok' => 0,
             'waiting_wo' => 0,
         ];
+    };
+
+    $addPivot = static function (array &$map, array &$totSt, string $ldr, string $sn, string $stCol): void {
+        $totSt[$stCol] = ($totSt[$stCol] ?? 0) + 1;
+        if (!isset($map[$ldr][$sn])) {
+            $map[$ldr][$sn] = ['statuses' => [], 'total' => 0];
+        }
+        $map[$ldr][$sn]['statuses'][$stCol] = ($map[$ldr][$sn]['statuses'][$stCol] ?? 0) + 1;
+        $map[$ldr][$sn]['total']++;
     };
 
     foreach ($prospect as $r) {
@@ -1654,6 +1704,7 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
         $crInt = isset($r[P_CREATED]) && $r[P_CREATED] !== null ? (int)$r[P_CREATED] : null;
         $stRaw = trim((string)($r[P_STATUS_WO] ?? ''));
         $stLow = u_lower($stRaw);
+        $stCol = $stRaw !== '' ? $stRaw : '(blank)';
 
         $ensureSummary = static function () use (&$summaryLdr, &$summaryAgent, $ldr, $sn, $emptyCounters): void {
             if (!isset($summaryLdr[$ldr])) {
@@ -1664,73 +1715,45 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
             }
         };
 
-        // 1. WO TODAY (Instalasi Date == Today, Status = ALL -> termasuk Active sebagai SA!)
+        // 1. WO TODAY (Instalasi Date == Today, Status = On Installation & Active[SA] agar selaras Gambar 1 & tracking SA)
         if ($instInt === $tglTodayInt) {
-            $stCol = $stRaw !== '' ? $stRaw : '(blank)';
-            $todayColSet[$stCol] = true;
-            $todayStatusTotals[$stCol] = ($todayStatusTotals[$stCol] ?? 0) + 1;
-
-            if (!isset($todayByLdrAgent[$ldr][$sn])) {
-                $todayByLdrAgent[$ldr][$sn] = array_merge($emptyCounters(), ['statuses' => []]);
-            }
-            $todayByLdrAgent[$ldr][$sn]['statuses'][$stCol] = ($todayByLdrAgent[$ldr][$sn]['statuses'][$stCol] ?? 0) + 1;
-            $todayByLdrAgent[$ldr][$sn]['today_total']++;
-
-            $ensureSummary();
-            $summaryLdr[$ldr]['today_total']++;
-            $summaryAgent[$ldr][$sn]['today_total']++;
-
-            if ($stLow === 'active') {
-                $todayByLdrAgent[$ldr][$sn]['today_sa']++;
-                $summaryLdr[$ldr]['today_sa']++;
-                $summaryAgent[$ldr][$sn]['today_sa']++;
-            } elseif ($stLow === 'on installation') {
-                $todayByLdrAgent[$ldr][$sn]['today_on_installation']++;
-                $summaryLdr[$ldr]['today_on_installation']++;
-                $summaryAgent[$ldr][$sn]['today_on_installation']++;
-            } elseif ($stLow === 'reschedule') {
-                $todayByLdrAgent[$ldr][$sn]['today_reschedule']++;
-                $summaryLdr[$ldr]['today_reschedule']++;
-                $summaryAgent[$ldr][$sn]['today_reschedule']++;
-            } elseif ($stLow === 'waiting wo') {
-                $todayByLdrAgent[$ldr][$sn]['today_waiting_wo']++;
-                $summaryLdr[$ldr]['today_waiting_wo']++;
-                $summaryAgent[$ldr][$sn]['today_waiting_wo']++;
-            } else {
-                if ($stLow === 'refund') {
-                    $todayByLdrAgent[$ldr][$sn]['today_refund']++;
-                    $summaryLdr[$ldr]['today_refund']++;
-                    $summaryAgent[$ldr][$sn]['today_refund']++;
+            if ($stLow === 'on installation' || $stLow === 'active') {
+                $addPivot($todayMap, $todayStatusTotals, $ldr, $sn, $stCol);
+                $ensureSummary();
+                $summaryLdr[$ldr]['today_total']++;
+                $summaryAgent[$ldr][$sn]['today_total']++;
+                if ($stLow === 'active') {
+                    $summaryLdr[$ldr]['today_sa']++;
+                    $summaryAgent[$ldr][$sn]['today_sa']++;
+                } else {
+                    $summaryLdr[$ldr]['today_on_installation']++;
+                    $summaryAgent[$ldr][$sn]['today_on_installation']++;
                 }
-                $todayByLdrAgent[$ldr][$sn]['today_other']++;
-                $summaryLdr[$ldr]['today_other']++;
-                $summaryAgent[$ldr][$sn]['today_other']++;
+            } else {
+                $todayOtherStatuses[$stCol] = ($todayOtherStatuses[$stCol] ?? 0) + 1;
             }
         }
 
-        // 2. WO BESOK (Hanya Instalasi Date == besok / Today + 1 hari, Status = ALL)
+        // 2. WO BESOK (Hanya Instalasi Date == Besok / Today + 1 hari, Status = ALL: On Installation, Waiting WO, dll.)
         if ($instInt === $tglBesokInt) {
-            $besokByLdrAgent[$ldr][$sn] = ($besokByLdrAgent[$ldr][$sn] ?? 0) + 1;
-            $besokH1Total++;
+            $addPivot($besokMap, $besokStatusTotals, $ldr, $sn, $stCol);
             $ensureSummary();
             $summaryLdr[$ldr]['wo_besok']++;
             $summaryAgent[$ldr][$sn]['wo_besok']++;
+            if ($stLow === 'on installation') {
+                $summaryLdr[$ldr]['besok_on_installation']++;
+                $summaryAgent[$ldr][$sn]['besok_on_installation']++;
+            } elseif ($stLow === 'waiting wo') {
+                $summaryLdr[$ldr]['besok_waiting_wo']++;
+                $summaryAgent[$ldr][$sn]['besok_waiting_wo']++;
+            }
         }
 
-        // 3. WAITING WO (Instalasi Date == blank & Status in Back To Sales | READY | Reschedule | Waiting WO)
-        if ($instInt === null && in_array($stLow, ['back to sales', 'ready', 'reschedule', 'waiting wo'], true)) {
+        // 3. WAITING WO (Status == Waiting WO pada bulan aktif + bulan lalu, termasuk yang sudah terjadwal H+1 / blank)
+        if ($stLow === 'waiting wo') {
             $crYm = $crInt !== null ? intdiv($crInt, 100) : null;
             if ($crYm === null || ($crYm >= $blnTahunLalu && $crYm <= $blnTahunAktif)) {
-                $waitingByLdrAgent[$ldr][$sn] = ($waitingByLdrAgent[$ldr][$sn] ?? 0) + 1;
-                if ($stLow === 'back to sales') {
-                    $waitingBreakdown['Back To Sales']++;
-                } elseif ($stLow === 'ready') {
-                    $waitingBreakdown['READY']++;
-                } elseif ($stLow === 'reschedule') {
-                    $waitingBreakdown['Reschedule']++;
-                } else {
-                    $waitingBreakdown['Waiting WO']++;
-                }
+                $addPivot($waitingMap, $waitingStatusTotals, $ldr, $sn, 'Waiting WO');
                 $ensureSummary();
                 $summaryLdr[$ldr]['waiting_wo']++;
                 $summaryAgent[$ldr][$sn]['waiting_wo']++;
@@ -1738,108 +1761,18 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
         }
     }
 
-    // Urutkan kolom status WO TODAY alfabetis persis Pivot Excel
-    $todayCols = array_keys($todayColSet);
-    usort($todayCols, 'strnatcasecmp');
-    ksort($todayStatusTotals, SORT_NATURAL | SORT_FLAG_CASE);
+    ksort($todayOtherStatuses, SORT_NATURAL | SORT_FLAG_CASE);
+    $todayPivot = susun_pivot_wo_status($todayMap, $todayStatusTotals);
+    $besokPivot = susun_pivot_wo_status($besokMap, $besokStatusTotals);
+    $waitingPivot = susun_pivot_wo_status($waitingMap, $waitingStatusTotals);
 
-    // Susun Pivot WO TODAY (kolom dinamis sesuai status yang muncul + SA + Grand Total)
-    $todayLeaders = array_keys($todayByLdrAgent);
-    usort($todayLeaders, 'strnatcasecmp');
-    $todayRows = [];
-    $gtSa = 0;
-    $gtOn = 0;
-    $gtResch = 0;
-    $gtWait = 0;
-    $gtRef = 0;
-    $gtOther = 0;
-    $gtTot = 0;
-    $gtStatuses = array_fill_keys($todayCols, 0);
-
-    foreach ($todayLeaders as $ldr) {
-        $agenMap = $todayByLdrAgent[$ldr];
-        $agenNames = array_keys($agenMap);
-        usort($agenNames, 'strnatcasecmp');
-        $subSa = 0;
-        $subOn = 0;
-        $subResch = 0;
-        $subWait = 0;
-        $subRef = 0;
-        $subOther = 0;
-        $subTot = 0;
-        $subStatuses = array_fill_keys($todayCols, 0);
-
-        foreach ($agenNames as $sn) {
-            $c = $agenMap[$sn];
-            $subSa += $c['today_sa'];
-            $subOn += $c['today_on_installation'];
-            $subResch += $c['today_reschedule'];
-            $subWait += $c['today_waiting_wo'];
-            $subRef += $c['today_refund'];
-            $subOther += $c['today_other'];
-            $subTot += $c['today_total'];
-            $stMapRow = [];
-            foreach ($todayCols as $colNm) {
-                $valC = (int)($c['statuses'][$colNm] ?? 0);
-                $stMapRow[$colNm] = $valC;
-                $subStatuses[$colNm] += $valC;
-            }
-            $todayRows[] = [
-                'leader' => $ldr,
-                'salesname' => $sn,
-                'sa' => $c['today_sa'],
-                'on_installation' => $c['today_on_installation'],
-                'reschedule' => $c['today_reschedule'],
-                'refund' => $c['today_refund'],
-                'waiting_wo' => $c['today_waiting_wo'],
-                'other' => $c['today_other'],
-                'total' => $c['today_total'],
-                'statuses' => $stMapRow,
-                'row_type' => 'agent',
-            ];
-        }
-        $gtSa += $subSa;
-        $gtOn += $subOn;
-        $gtResch += $subResch;
-        $gtWait += $subWait;
-        $gtRef += $subRef;
-        $gtOther += $subOther;
-        $gtTot += $subTot;
-        foreach ($todayCols as $colNm) {
-            $gtStatuses[$colNm] += $subStatuses[$colNm];
-        }
-        $todayRows[] = [
-            'leader' => $ldr,
-            'salesname' => $ldr . ' Total',
-            'sa' => $subSa,
-            'on_installation' => $subOn,
-            'reschedule' => $subResch,
-            'refund' => $subRef,
-            'waiting_wo' => $subWait,
-            'other' => $subOther,
-            'total' => $subTot,
-            'statuses' => $subStatuses,
-            'row_type' => 'leader_total',
-        ];
-    }
-    if ($todayRows) {
-        $todayRows[] = [
-            'leader' => 'Grand Total',
-            'salesname' => 'Grand Total',
-            'sa' => $gtSa,
-            'on_installation' => $gtOn,
-            'reschedule' => $gtResch,
-            'refund' => $gtRef,
-            'waiting_wo' => $gtWait,
-            'other' => $gtOther,
-            'total' => $gtTot,
-            'statuses' => $gtStatuses,
-            'row_type' => 'grand_total',
-        ];
-    }
-
-    $waitingPivot = susun_pivot_wo_1kolom($waitingByLdrAgent);
-    $besokPivot = susun_pivot_wo_1kolom($besokByLdrAgent);
+    $gtTodaySa = 0;
+    $gtTodayOn = 0;
+    $gtTodayTot = 0;
+    $gtBesokOn = 0;
+    $gtBesokWait = 0;
+    $gtBesokTot = 0;
+    $gtWaitTot = 0;
 
     $sumLeaders = array_keys($summaryLdr);
     usort($sumLeaders, 'strnatcasecmp');
@@ -1848,19 +1781,24 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
         $rowS = $summaryLdr[$ldr];
         $rowS['is_grand_total'] = false;
         $leaderSummaryRows[] = $rowS;
+        $gtTodaySa += (int)$rowS['today_sa'];
+        $gtTodayOn += (int)$rowS['today_on_installation'];
+        $gtTodayTot += (int)$rowS['today_total'];
+        $gtBesokOn += (int)$rowS['besok_on_installation'];
+        $gtBesokWait += (int)$rowS['besok_waiting_wo'];
+        $gtBesokTot += (int)$rowS['wo_besok'];
+        $gtWaitTot += (int)$rowS['waiting_wo'];
     }
     if ($leaderSummaryRows) {
         $leaderSummaryRows[] = [
             'leader' => 'Grand Total',
-            'today_sa' => $gtSa,
-            'today_on_installation' => $gtOn,
-            'today_reschedule' => $gtResch,
-            'today_waiting_wo' => $gtWait,
-            'today_refund' => $gtRef,
-            'today_other' => $gtOther,
-            'today_total' => $gtTot,
-            'wo_besok' => $besokPivot['grand_total'],
-            'waiting_wo' => $waitingPivot['grand_total'],
+            'today_sa' => $gtTodaySa,
+            'today_on_installation' => $gtTodayOn,
+            'today_total' => $gtTodayTot,
+            'besok_on_installation' => $gtBesokOn,
+            'besok_waiting_wo' => $gtBesokWait,
+            'wo_besok' => $gtBesokTot,
+            'waiting_wo' => $gtWaitTot,
             'is_grand_total' => true,
         ];
     }
@@ -1876,32 +1814,36 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
     }
 
     return [
-        'calc_version' => 3,
+        'calc_version' => 4,
         'day' => $hariValid,
         'today_label' => $todayLabel,
         'besok_label' => $besokLabel,
         'besok_range_label' => $besokLabel,
         'available_days' => daftar_hari_wo_tersedia($prospect, $bulan, $tahun, $hariValid),
-        'wo_today_columns' => $todayCols,
-        'wo_today_rows' => $todayRows,
+        'wo_today_columns' => $todayPivot['columns'],
+        'wo_today_rows' => $todayPivot['rows'],
         'wo_today_totals' => [
-            'sa' => $gtSa,
-            'on_installation' => $gtOn,
-            'reschedule' => $gtResch,
-            'refund' => $gtRef,
-            'waiting_wo' => $gtWait,
-            'other' => $gtOther,
-            'total' => $gtTot,
-            'statuses' => $todayStatusTotals,
+            'sa' => $gtTodaySa,
+            'on_installation' => $gtTodayOn,
+            'total' => $gtTodayTot,
+            'statuses' => $todayPivot['status_totals'],
         ],
-        'wo_today_other_statuses' => [],
+        'wo_today_other_statuses' => $todayOtherStatuses,
+        'wo_besok_columns' => $besokPivot['columns'],
         'wo_besok_rows' => $besokPivot['rows'],
+        'wo_besok_totals' => [
+            'on_installation' => $gtBesokOn,
+            'waiting_wo' => $gtBesokWait,
+            'total' => $gtBesokTot,
+            'statuses' => $besokPivot['status_totals'],
+        ],
         'wo_besok_total' => $besokPivot['grand_total'],
-        'wo_besok_h1_total' => $besokH1Total,
-        'wo_besok_later_total' => $besokLaterTotal,
+        'wo_besok_h1_total' => $besokPivot['grand_total'],
+        'wo_besok_later_total' => 0,
+        'waiting_wo_columns' => $waitingPivot['columns'],
         'waiting_wo_rows' => $waitingPivot['rows'],
         'waiting_wo_total' => $waitingPivot['grand_total'],
-        'waiting_wo_breakdown' => $waitingBreakdown,
+        'waiting_wo_breakdown' => ['Waiting WO' => $waitingPivot['grand_total']],
         'leader_summary' => $leaderSummaryRows,
         'agent_summary' => $agentSummaryRows,
     ];
@@ -2254,7 +2196,7 @@ function proses_data(array $o): array
 
     $namaBln = NAMA_BULAN_TAMPIL[$bulanIni] ?? 'Nov';
     return [
-        'calc_engine_version' => 6,
+        'calc_engine_version' => 7,
         'periode_label' => $hari . '-' . $namaBln . '-' . $tahun,
         'hari_berjalan' => $hari,
         'total_hari' => $totalHari,

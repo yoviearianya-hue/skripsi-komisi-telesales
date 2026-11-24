@@ -58,7 +58,7 @@ def generate_sql_files() -> None:
     df_leader_komisi = getattr(modul_app, "df_leader_komisi", pd.DataFrame())
     df_mtd_ini = modul_app.df_mtd_ini.copy()
     daily_prod_rows = list(getattr(modul_app, "daily_prod_rows", []))
-    daily_prod_label = str(getattr(modul_app, "daily_prod_date_label", "22-Nov-26"))
+    daily_prod_label = str(getattr(modul_app, "daily_prod_date_label", "24-Nov-26"))
     wo_summary = dict(getattr(modul_app, "wo_summary", {}) or {})
     kol_oct = modul_app.kol_sa_oct
     kol_nov = modul_app.kol_sa_nov
@@ -192,20 +192,21 @@ def generate_sql_files() -> None:
                 "  `tgl_wo_today` varchar(30) NOT NULL,",
                 "  `tgl_wo_besok` varchar(30) NOT NULL,",
                 "  `sales_leader` varchar(120) NOT NULL,",
+                "  `today_sa` int(11) NOT NULL DEFAULT 0,",
                 "  `today_on_installation` int(11) NOT NULL DEFAULT 0,",
-                "  `today_refund` int(11) NOT NULL DEFAULT 0,",
-                "  `today_waiting_wo` int(11) NOT NULL DEFAULT 0,",
                 "  `today_total` int(11) NOT NULL DEFAULT 0,",
-                "  `waiting_wo` int(11) NOT NULL DEFAULT 0,",
+                "  `besok_on_installation` int(11) NOT NULL DEFAULT 0,",
+                "  `besok_waiting_wo` int(11) NOT NULL DEFAULT 0,",
                 "  `wo_besok` int(11) NOT NULL DEFAULT 0,",
+                "  `waiting_wo` int(11) NOT NULL DEFAULT 0,",
                 "  PRIMARY KEY (`id`)",
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
                 "",
-                "INSERT INTO `rekap_wo_monitoring` (`tgl_wo_today`, `tgl_wo_besok`, `sales_leader`, `today_on_installation`, `today_refund`, `today_waiting_wo`, `today_total`, `waiting_wo`, `wo_besok`) VALUES",
+                "INSERT INTO `rekap_wo_monitoring` (`tgl_wo_today`, `tgl_wo_besok`, `sales_leader`, `today_sa`, `today_on_installation`, `today_total`, `besok_on_installation`, `besok_waiting_wo`, `wo_besok`, `waiting_wo`) VALUES",
             ]
         )
         val_wo = [
-            f"({sql_str(wo_t_lbl)}, {sql_str(wo_b_lbl)}, {sql_str(r['leader'])}, {sql_num(r['today_on_installation'])}, {sql_num(r['today_refund'])}, {sql_num(r['today_waiting_wo'])}, {sql_num(r['today_total'])}, {sql_num(r['waiting_wo'])}, {sql_num(r['wo_besok'])})"
+            f"({sql_str(wo_t_lbl)}, {sql_str(wo_b_lbl)}, {sql_str(r['leader'])}, {sql_num(r.get('today_sa', 0))}, {sql_num(r['today_on_installation'])}, {sql_num(r['today_total'])}, {sql_num(r.get('besok_on_installation', 0))}, {sql_num(r.get('besok_waiting_wo', 0))}, {sql_num(r['wo_besok'])}, {sql_num(r['waiting_wo'])})"
             for r in wo_sum_rows
         ]
         lines.append(",\n".join(val_wo) + ";\n")

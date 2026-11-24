@@ -29,8 +29,8 @@ def sync_files_ke_server(
     bulan_ini: int = 11,
     tahun: int = 2026,
     total_hari: int = 30,
-    hari_berjalan: int = 22,
-    hari_harian: int = 22,
+    hari_berjalan: int = 24,
+    hari_harian: int = 24,
     hari_wo: int | None = None,
     rasio_paid: float = 1.25,
     mode_prospect: str = "merge",
@@ -102,16 +102,16 @@ def main() -> None:
     parser.add_argument("--bulan-ini", type=int, default=11)
     parser.add_argument("--tahun", type=int, default=2026)
     parser.add_argument("--total-hari", type=int, default=30)
-    parser.add_argument("--hari", type=int, default=22)
-    parser.add_argument("--hari-harian", type=int, default=22)
-    parser.add_argument("--hari-wo", type=int, default=22)
+    parser.add_argument("--hari", type=int, default=24)
+    parser.add_argument("--hari-harian", type=int, default=24)
+    parser.add_argument("--hari-wo", type=int, default=24)
     parser.add_argument("--rasio", type=float, default=1.25)
     parser.add_argument("--mode", choices=["merge", "replace"], default="merge")
     parser.add_argument("--target", default=os.path.join(FOLDER_PROYEK, "TARGET PER MONTH.xlsx"))
     parser.add_argument(
         "--prospect",
         nargs="*",
-        default=[os.path.join(FOLDER_PROYEK, "list_prospect November.xls")],
+        default=[os.path.join(FOLDER_PROYEK, "list_prospect November.xlsx")],
     )
     args = parser.parse_args()
 

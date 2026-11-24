@@ -701,10 +701,9 @@ def buat_gambar_rincian_harian_agent(
 
 
 def buat_gambar_wo_ringkasan(wo_summary: dict) -> bytes:
-    """Merender tabel PNG Ringkasan WO Today (beserta SA/Active), WO Besok & Waiting WO per Sales Leader."""
+    """Merender tabel PNG Ringkasan WO Today (On Installation & SA), WO Besok & Waiting WO per Sales Leader."""
     today_lbl = str(wo_summary.get("today_label", ""))
-    besok_lbl = str(wo_summary.get("besok_label", ""))
-    besok_rng = besok_lbl or str(wo_summary.get("besok_range_label", ""))
+    besok_lbl = str(wo_summary.get("besok_label", "")) or str(wo_summary.get("besok_range_label", ""))
     rows_src = wo_summary.get("leader_summary") or []
 
     kolom = [
@@ -712,15 +711,15 @@ def buat_gambar_wo_ringkasan(wo_summary: dict) -> bytes:
         "TOTAL\nTODAY",
         "SA\n(ACTIVE)",
         "ON\nINSTALL",
-        "RESCHED",
+        f"TOTAL\n({besok_lbl})",
+        "ON\nINSTALL",
         "WAIT\nWO",
-        "LAINNYA",
-        f"WO BESOK\n({besok_rng})",
-        "WAITING WO\n(BLANK)",
+        "WAITING\nWO",
     ]
     grup_header = [
-        (f"1. WO TODAY ({today_lbl})", 1, 6, "#002060"),
-        ("2. BESOK & 3. WAITING WO", 7, 8, "#065f46"),
+        (f"1. WO TODAY ({today_lbl})", 1, 3, "#002060"),
+        (f"2. WO BESOK ({besok_lbl})", 4, 6, "#065f46"),
+        ("3. WAITING WO", 7, 7, "#92400e"),
     ]
 
     baris = []
@@ -736,10 +735,9 @@ def buat_gambar_wo_ringkasan(wo_summary: dict) -> bytes:
                 _fmt_angka(r.get("today_total", 0)),
                 _fmt_angka(r.get("today_sa", 0)),
                 _fmt_angka(r.get("today_on_installation", 0)),
-                _fmt_angka(r.get("today_reschedule", 0)),
-                _fmt_angka(r.get("today_waiting_wo", 0)),
-                _fmt_angka(r.get("today_other", 0)),
                 _fmt_angka(r.get("wo_besok", 0)),
+                _fmt_angka(r.get("besok_on_installation", 0)),
+                _fmt_angka(r.get("besok_waiting_wo", 0)),
                 _fmt_angka(r.get("waiting_wo", 0)),
             ]
         )
@@ -751,72 +749,69 @@ def buat_gambar_wo_ringkasan(wo_summary: dict) -> bytes:
                 return {"bg": "#c9daf8", "fg": "#1e3a8a", "bold": True}
             if c == 2:
                 return {"bg": "#bbf7d0", "fg": "#14532d", "bold": True}
-            if c == 7:
+            if c == 4:
                 return {"bg": "#d1fae5", "fg": "#065f46", "bold": True}
-            if c == 8:
+            if c == 7:
                 return {"bg": "#fde68a", "fg": "#92400e", "bold": True}
         else:
             if c == 1:
                 return {"bg": "#eff6ff", "bold": True}
             if c == 2:
                 return {"bg": "#f0fdf4", "fg": "#166534", "bold": True}
-            if c == 7:
+            if c == 4:
                 return {"bg": "#ecfdf5", "bold": True}
-            if c == 8:
+            if c == 7:
                 return {"bg": "#fffbeb", "bold": True}
         return None
 
     waktu = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
     return render_tabel_png(
         judul=f"MONITORING WORK ORDER ({today_lbl} | WO BESOK | WAITING WO)",
-        sub_judul=f"1. WO TODAY ({today_lbl} + SA Active)  •  2. WO BESOK ({besok_rng}, Semua Status)  •  3. WAITING WO (Instalasi Blank)",
+        sub_judul=f"1. WO TODAY ({today_lbl}: On Install + SA Active)  •  2. WO BESOK ({besok_lbl}, H+1)  •  3. WAITING WO (Status = Waiting WO)",
         kolom=kolom,
         baris=baris,
-        rata=["l", "c", "c", "c", "c", "c", "c", "c", "c"],
+        rata=["l", "c", "c", "c", "c", "c", "c", "c"],
         gaya_baris=gaya,
         gaya_sel=gaya_sel,
         grup_header=grup_header,
         catatan=[
-            f"1. WO TODAY: Semua status pd Instalasi Date {today_lbl} (SA = Active). 2. WO BESOK: Hanya Instalasi Date = {besok_lbl} (H+1). 3. WAITING WO: Instalasi Blank (Back To Sales/READY/Reschedule/Waiting WO).",
+            f"1. WO TODAY: On Installation + Active(SA) pd {today_lbl}. 2. WO BESOK: Hanya Instalasi Date = {besok_lbl}. 3. WAITING WO: Status Waiting WO.",
             f"Dibuat otomatis: {waktu}",
         ],
     )
 
 
 def buat_gambar_wo_pivot(wo_summary: dict, mode: str) -> bytes:
-    """Merender tabel Pivot lengkap (Leader -> Salesname -> Total) untuk 'today', 'besok', atau 'waiting'."""
+    """Merender tabel Pivot lengkap (Leader -> Salesname -> Status... -> Grand Total) untuk 'today', 'besok', atau 'waiting'."""
     today_lbl = str(wo_summary.get("today_label", ""))
-    besok_lbl = str(wo_summary.get("besok_label", ""))
-    besok_rng = besok_lbl or str(wo_summary.get("besok_range_label", ""))
+    besok_lbl = str(wo_summary.get("besok_label", "")) or str(wo_summary.get("besok_range_label", ""))
     waktu = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
-
-    today_cols = list(wo_summary.get("wo_today_columns") or [])
-    idx_sa_col = -1
 
     if mode == "today":
         src = wo_summary.get("wo_today_rows") or []
-        disp_status_cols = ["Active (SA)" if c.lower() == "active" else c for c in today_cols]
-        kolom = ["Sales Leader", "Salesname", *disp_status_cols, "Grand Total"]
-        if "Active (SA)" in disp_status_cols:
-            idx_sa_col = 2 + disp_status_cols.index("Active (SA)")
-        rata = ["l", "l"] + ["c"] * (len(disp_status_cols) + 1)
-        judul = f"1. WO TODAY ({today_lbl}) — DETAIL PER AGENT & SA"
-        sub = f"Pivot Count of Customer Name pada Instalasi Date {today_lbl} (Status = ALL, Active = SA)"
+        raw_cols = list(wo_summary.get("wo_today_columns") or [])
+        disp_cols = ["Active (SA)" if c.lower() == "active" else c for c in raw_cols]
+        judul = f"1. WO TODAY ({today_lbl}) — ON INSTALLATION & SA"
+        sub = f"Pivot Count of Customer Name pada Instalasi Date {today_lbl} (On Installation + Active/SA)"
         hdr_bg = "#002060"
     elif mode == "besok":
         src = wo_summary.get("wo_besok_rows") or []
-        kolom = ["Sales Leader", "Salesname", "Grand Total"]
-        rata = ["l", "l", "c"]
-        judul = f"2. WO BESOK ({besok_rng}) — JADWAL INSTALASI"
-        sub = f"Hanya Instalasi Date = {besok_lbl} (Besok H+1, Status = ALL)"
+        raw_cols = list(wo_summary.get("wo_besok_columns") or [])
+        disp_cols = list(raw_cols)
+        judul = f"2. WO BESOK ({besok_lbl}) — JADWAL INSTALASI"
+        sub = f"Pivot Count of Customer Name pada Instalasi Date = {besok_lbl} (Hanya H+1, Status = ALL)"
         hdr_bg = "#065f46"
     else:
         src = wo_summary.get("waiting_wo_rows") or []
-        kolom = ["Sales Leader", "Salesname", "Grand Total"]
-        rata = ["l", "l", "c"]
-        judul = "3. WAITING WO (INSTALASI BLANK) — DETAIL PER AGENT"
-        sub = "Instalasi Date = (blank) | Status: Back To Sales, READY, Reschedule, Waiting WO"
+        raw_cols = list(wo_summary.get("waiting_wo_columns") or ["Waiting WO"])
+        disp_cols = list(raw_cols)
+        judul = "3. WAITING WO — ANTREAN PENJADWALAN"
+        sub = "Pivot Count of Customer Name dengan Status = Waiting WO (Bulan Aktif & Bulan Lalu)"
         hdr_bg = "#92400e"
+
+    kolom = ["Sales Leader", "Salesname", *disp_cols, "Grand Total"]
+    idx_sa_col = (2 + disp_cols.index("Active (SA)")) if "Active (SA)" in disp_cols else -1
+    rata = ["l", "l"] + ["c"] * (len(disp_cols) + 1)
 
     baris = []
     gaya = []
@@ -833,15 +828,12 @@ def buat_gambar_wo_pivot(wo_summary: dict, mode: str) -> bytes:
         else:
             gaya.append(None)
 
-        if mode == "today":
-            st_map = r.get("statuses") or {}
-            vals = []
-            for cn in today_cols:
-                v = int(st_map.get(cn, 0))
-                vals.append(_fmt_angka(v) if (v > 0 or rt == "grand_total") else "")
-            baris.append([ldr_txt, sn_txt, *vals, _fmt_angka(r.get("total", 0))])
-        else:
-            baris.append([ldr_txt, sn_txt, _fmt_angka(r.get("total", 0))])
+        st_map = r.get("statuses") or {}
+        vals = []
+        for cn in raw_cols:
+            v = int(st_map.get(cn, r.get("total", 0) if len(raw_cols) == 1 and cn == "Waiting WO" else 0))
+            vals.append(_fmt_angka(v) if (v > 0 or rt == "grand_total") else "")
+        baris.append([ldr_txt, sn_txt, *vals, _fmt_angka(r.get("total", 0))])
 
     def gaya_sel(i: int, c: int, _t: str) -> dict | None:
         if c == len(kolom) - 1:
@@ -869,8 +861,7 @@ def buat_gambar_wo_per_leader(wo_summary: dict) -> list[tuple[str, bytes, str]]:
     if not ag_rows:
         return []
     today_lbl = str(wo_summary.get("today_label", ""))
-    besok_lbl = str(wo_summary.get("besok_label", ""))
-    besok_rng = besok_lbl or str(wo_summary.get("besok_range_label", ""))
+    besok_rng = str(wo_summary.get("besok_label", "")) or str(wo_summary.get("besok_range_label", ""))
     waktu = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
 
     by_ldr: dict[str, list[dict]] = {}
@@ -882,27 +873,26 @@ def buat_gambar_wo_per_leader(wo_summary: dict) -> list[tuple[str, bytes, str]]:
         grp = by_ldr[ldr]
         baris = []
         gaya = []
-        s_tot = s_sa = s_on = s_resch = s_wt = s_oth = s_bsk = s_wwo = 0
+        s_tot = s_sa = s_on = s_bsk = s_bon = s_bwt = s_wwo = 0
         for no, r in enumerate(grp, start=1):
             c_tot = int(r.get("today_total", 0))
             c_sa = int(r.get("today_sa", 0))
             c_on = int(r.get("today_on_installation", 0))
-            c_res = int(r.get("today_reschedule", 0))
-            c_wt = int(r.get("today_waiting_wo", 0))
-            c_oth = int(r.get("today_other", 0))
             c_bsk = int(r.get("wo_besok", 0))
+            c_bon = int(r.get("besok_on_installation", 0))
+            c_bwt = int(r.get("besok_waiting_wo", 0))
             c_wwo = int(r.get("waiting_wo", 0))
-            s_tot += c_tot; s_sa += c_sa; s_on += c_on; s_resch += c_res; s_wt += c_wt; s_oth += c_oth; s_bsk += c_bsk; s_wwo += c_wwo
+            s_tot += c_tot; s_sa += c_sa; s_on += c_on
+            s_bsk += c_bsk; s_bon += c_bon; s_bwt += c_bwt; s_wwo += c_wwo
             baris.append([
                 str(no),
                 str(r.get("salesname", "")),
                 _fmt_angka(c_tot),
                 _fmt_angka(c_sa) if c_sa else "-",
                 _fmt_angka(c_on) if c_on else "-",
-                _fmt_angka(c_res) if c_res else "-",
-                _fmt_angka(c_wt) if c_wt else "-",
-                _fmt_angka(c_oth) if c_oth else "-",
                 _fmt_angka(c_bsk),
+                _fmt_angka(c_bon) if c_bon else "-",
+                _fmt_angka(c_bwt) if c_bwt else "-",
                 _fmt_angka(c_wwo),
             ])
             gaya.append(None)
@@ -910,7 +900,7 @@ def buat_gambar_wo_per_leader(wo_summary: dict) -> list[tuple[str, bytes, str]]:
         idx_tot = len(baris)
         baris.append([
             "", f"TOTAL {ldr}", _fmt_angka(s_tot), _fmt_angka(s_sa), _fmt_angka(s_on),
-            _fmt_angka(s_resch), _fmt_angka(s_wt), _fmt_angka(s_oth), _fmt_angka(s_bsk), _fmt_angka(s_wwo),
+            _fmt_angka(s_bsk), _fmt_angka(s_bon), _fmt_angka(s_bwt), _fmt_angka(s_wwo),
         ])
         gaya.append({"bg": "#dbeafe", "bold": True})
 
@@ -919,23 +909,24 @@ def buat_gambar_wo_per_leader(wo_summary: dict) -> list[tuple[str, bytes, str]]:
                 return {"bg": "#c9daf8", "fg": "#1e3a8a", "bold": True} if i == it else {"bg": "#eff6ff", "bold": True}
             if c == 3:
                 return {"bg": "#bbf7d0", "fg": "#14532d", "bold": True} if i == it else {"bg": "#f0fdf4", "fg": "#166534", "bold": True}
-            if c == 8:
+            if c == 5:
                 return {"bg": "#d1fae5", "fg": "#065f46", "bold": True} if i == it else {"bg": "#ecfdf5", "bold": True}
-            if c == 9:
+            if c == 8:
                 return {"bg": "#fde68a", "fg": "#92400e", "bold": True} if i == it else {"bg": "#fffbeb", "bold": True}
             return None
 
         png_b = render_tabel_png(
             judul=f"WORK ORDER AGENT — TIM {ldr.upper()}",
-            sub_judul=f"1. WO Today ({today_lbl} + SA)  •  2. WO Besok ({besok_rng})  •  3. Waiting WO (Blank)",
-            kolom=["NO", "SALESNAME", "TOTAL\nTODAY", "SA\n(ACTIVE)", "ON\nINSTALL", "RESCHED", "WAIT\nWO", "LAINNYA", f"BESOK\n({besok_rng})", "WAITING\nWO"],
+            sub_judul=f"1. WO Today ({today_lbl})  •  2. WO Besok ({besok_rng})  •  3. Waiting WO",
+            kolom=["NO", "SALESNAME", "TOTAL\nTODAY", "SA\n(ACTIVE)", "ON\nINSTALL", f"TOTAL\n({besok_rng})", "ON\nINSTALL", "WAIT\nWO", "WAITING\nWO"],
             baris=baris,
-            rata=["c", "l", "c", "c", "c", "c", "c", "c", "c", "c"],
+            rata=["c", "l", "c", "c", "c", "c", "c", "c", "c"],
             gaya_baris=gaya,
             gaya_sel=gaya_sel,
             grup_header=[
-                (f"1. WO TODAY ({today_lbl})", 2, 7, "#002060"),
-                ("2. BESOK & 3. WAITING WO", 8, 9, "#065f46"),
+                (f"1. WO TODAY ({today_lbl})", 2, 4, "#002060"),
+                (f"2. WO BESOK ({besok_rng})", 5, 7, "#065f46"),
+                ("3. WAITING WO", 8, 8, "#92400e"),
             ],
             catatan=[f"Tim {ldr}: WO Today={s_tot} (SA={s_sa}) | WO Besok={s_bsk} | Waiting WO={s_wwo} | {waktu}"],
         )
@@ -943,40 +934,40 @@ def buat_gambar_wo_per_leader(wo_summary: dict) -> list[tuple[str, bytes, str]]:
         out.append((
             f"01D_{idx:02d}_WO_Tim_{safe_l}.png",
             png_b,
-            f"🛠️ <b>WO Detail Agent — Tim {_escape_html(ldr)}</b> | Today ({_escape_html(today_lbl)}): {s_tot} (SA {s_sa}) | Besok: {s_bsk} | Waiting: {s_wwo}",
+            f"🛠️ <b>WO Detail Agent — Tim {_escape_html(ldr)}</b> | Today ({_escape_html(today_lbl)}): {s_tot} (SA {s_sa}) | Besok ({_escape_html(besok_rng)}): {s_bsk} | Waiting: {s_wwo}",
         ))
     return out
 
 
 def buat_gambar_wo_kartu_agent(ag_row: dict, today_lbl: str, besok_lbl: str) -> bytes:
-    """Merender kartu foto PNG individual untuk 1 Agent (WO Today + SA, WO Besok, Waiting WO)."""
+    """Merender kartu foto PNG individual untuk 1 Agent (WO Today + SA, WO Besok H+1, Waiting WO)."""
     sn = str(ag_row.get("salesname", "-"))
     ldr = str(ag_row.get("leader", "-"))
     tot_i = int(ag_row.get("today_total", 0))
     sa_i = int(ag_row.get("today_sa", 0))
     on_i = int(ag_row.get("today_on_installation", 0))
-    res_i = int(ag_row.get("today_reschedule", 0))
-    wt_i = int(ag_row.get("today_waiting_wo", 0))
-    oth_i = int(ag_row.get("today_other", 0))
     bsk = int(ag_row.get("wo_besok", 0))
+    bon = int(ag_row.get("besok_on_installation", 0))
+    bwt = int(ag_row.get("besok_waiting_wo", 0))
     w_wo = int(ag_row.get("waiting_wo", 0))
 
     return render_tabel_png(
         judul=f"KARTU WO AGENT — {sn.upper()}",
-        sub_judul=f"Sales Leader: {ldr}  •  WO Today: {today_lbl}  •  WO Besok: >= {besok_lbl}",
-        kolom=["SALESNAME", "TOTAL TODAY", "SA (ACTIVE)", "ON INSTALL", "RESCHED", "WAIT WO", "LAINNYA", f"WO BESOK (>={besok_lbl})", "WAITING WO"],
-        baris=[[sn, _fmt_angka(tot_i), _fmt_angka(sa_i), _fmt_angka(on_i), _fmt_angka(res_i), _fmt_angka(wt_i), _fmt_angka(oth_i), _fmt_angka(bsk), _fmt_angka(w_wo)]],
-        rata=["l", "c", "c", "c", "c", "c", "c", "c", "c"],
+        sub_judul=f"Sales Leader: {ldr}  •  WO Today: {today_lbl}  •  WO Besok: {besok_lbl}",
+        kolom=["SALESNAME", "TOTAL TODAY", "SA (ACTIVE)", "ON INSTALL", f"BESOK ({besok_lbl})", "BESOK OI", "BESOK WAIT", "WAITING WO"],
+        baris=[[sn, _fmt_angka(tot_i), _fmt_angka(sa_i), _fmt_angka(on_i), _fmt_angka(bsk), _fmt_angka(bon), _fmt_angka(bwt), _fmt_angka(w_wo)]],
+        rata=["l", "c", "c", "c", "c", "c", "c", "c"],
         gaya_baris=[{"bg": "#ffffff", "bold": True}],
         gaya_sel=lambda i, c, _t: (
             {"bg": "#dbeafe", "fg": "#1e3a8a", "bold": True} if c == 1
             else ({"bg": "#bbf7d0", "fg": "#14532d", "bold": True} if c == 2
-                  else ({"bg": "#dcfce7", "fg": "#065f46", "bold": True} if c == 7
-                        else ({"bg": "#fef3c7", "fg": "#92400e", "bold": True} if c == 8 else None)))
+                  else ({"bg": "#dcfce7", "fg": "#065f46", "bold": True} if c == 4
+                        else ({"bg": "#fef3c7", "fg": "#92400e", "bold": True} if c == 7 else None)))
         ),
         grup_header=[
-            (f"1. WO TODAY ({today_lbl})", 1, 6, "#002060"),
-            ("2. BESOK & 3. WAITING WO", 7, 8, "#065f46"),
+            (f"1. WO TODAY ({today_lbl})", 1, 3, "#002060"),
+            (f"2. WO BESOK ({besok_lbl})", 4, 6, "#065f46"),
+            ("3. WAITING WO", 7, 7, "#92400e"),
         ],
         catatan=[f"Kartu Monitoring WO Pribadi — {sn} ({ldr})"],
     )
@@ -999,15 +990,15 @@ def buat_semua_gambar_wo(
     hasil.append((
         f"01C_Monitoring_WO_{today_lbl}.png",
         buat_gambar_wo_ringkasan(wo_summary),
-        f"🛠️ <b>Ringkasan Work Order</b> | 1. WO Today ({_escape_html(today_lbl)}): {int(tot_map.get('total', 0))} (SA: {int(tot_map.get('sa', 0))}) | 2. WO Besok: {int(wo_summary.get('wo_besok_total', 0))} | 3. Waiting WO: {int(wo_summary.get('waiting_wo_total', 0))}",
+        f"🛠️ <b>Ringkasan Work Order</b> | 1. WO Today ({_escape_html(today_lbl)}): {int(tot_map.get('total', 0))} (SA: {int(tot_map.get('sa', 0))}) | 2. WO Besok ({_escape_html(besok_lbl)}): {int(wo_summary.get('wo_besok_total', 0))} | 3. Waiting WO: {int(wo_summary.get('waiting_wo_total', 0))}",
     ))
     if include_pivot:
         if wo_summary.get("wo_today_rows"):
             hasil.append((f"01C1_WO_TODAY_{today_lbl}.png", buat_gambar_wo_pivot(wo_summary, "today"), f"1️⃣ <b>WO TODAY ({_escape_html(today_lbl)}) — Total {int(tot_map.get('total', 0))} (SA {int(tot_map.get('sa', 0))})</b>"))
         if wo_summary.get("wo_besok_rows"):
-            hasil.append((f"01C2_WO_BESOK_{besok_lbl}.png", buat_gambar_wo_pivot(wo_summary, "besok"), f"2️⃣ <b>WO BESOK (&gt;= {_escape_html(besok_lbl)}) — Total {int(wo_summary.get('wo_besok_total', 0))}</b>"))
+            hasil.append((f"01C2_WO_BESOK_{besok_lbl}.png", buat_gambar_wo_pivot(wo_summary, "besok"), f"2️⃣ <b>WO BESOK ({_escape_html(besok_lbl)}) — Total {int(wo_summary.get('wo_besok_total', 0))}</b>"))
         if wo_summary.get("waiting_wo_rows"):
-            hasil.append((f"01C3_WAITING_WO_{today_lbl}.png", buat_gambar_wo_pivot(wo_summary, "waiting"), f"3️⃣ <b>WAITING WO (Instalasi Blank) — Total {int(wo_summary.get('waiting_wo_total', 0))}</b>"))
+            hasil.append((f"01C3_WAITING_WO_{today_lbl}.png", buat_gambar_wo_pivot(wo_summary, "waiting"), f"3️⃣ <b>WAITING WO — Total {int(wo_summary.get('waiting_wo_total', 0))}</b>"))
     if include_tim:
         hasil.extend(buat_gambar_wo_per_leader(wo_summary))
     if include_kartu_agent:
@@ -1018,7 +1009,7 @@ def buat_semua_gambar_wo(
             hasil.append((
                 f"01E_WO_Agent_{safe_sn}.png",
                 buat_gambar_wo_kartu_agent(ag, today_lbl, besok_lbl),
-                f"👤 <b>Kartu WO — {_escape_html(sn)}</b> ({_escape_html(ldr)}) | Today: {int(ag.get('today_total', 0))} (SA: {int(ag.get('today_sa', 0))}) | Besok: {int(ag.get('wo_besok', 0))} | Waiting: {int(ag.get('waiting_wo', 0))}",
+                f"👤 <b>Kartu WO — {_escape_html(sn)}</b> ({_escape_html(ldr)}) | Today: {int(ag.get('today_total', 0))} (SA: {int(ag.get('today_sa', 0))}) | Besok ({_escape_html(besok_lbl)}): {int(ag.get('wo_besok', 0))} | Waiting: {int(ag.get('waiting_wo', 0))}",
             ))
     return hasil
 
