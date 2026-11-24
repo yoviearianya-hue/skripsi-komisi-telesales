@@ -1089,16 +1089,21 @@ function deduplikasi_pool_rows(array $rows): array
 function deteksi_bulan_penuh_rows(array $rows, int $minRowsPerMonth = 50): array
 {
     $counts = [];
+    $minDays = [];
     foreach ($rows as $row) {
         $cr = isset($row[4]) && $row[4] !== null ? (int)$row[4] : 0;
         if ($cr >= 20000101) {
             $ym = intdiv($cr, 100);
+            $day = $cr % 100;
             $counts[$ym] = ($counts[$ym] ?? 0) + 1;
+            if (!isset($minDays[$ym]) || $day < $minDays[$ym]) {
+                $minDays[$ym] = $day;
+            }
         }
     }
     $full = [];
     foreach ($counts as $ym => $cnt) {
-        if ($cnt >= $minRowsPerMonth) {
+        if ($cnt >= $minRowsPerMonth && ($minDays[$ym] ?? 31) <= 5) {
             $full[$ym] = true;
         }
     }
@@ -1583,7 +1588,7 @@ function susun_pivot_wo_1kolom(array $byLdrAgent): array
 /**
  * Menghitung 3 Tabel Work Order sesuai Pivot Excel perusahaan:
  *   1. WO TODAY  (Instalasi Date = hariWo, Status = ALL -> termasuk Active/SA, On Installation, Propose To Cancel, READY, Refund, Reschedule, Waiting WO)
- *   2. WO BESOK  (Instalasi Date > hariWo / Multiple Items terjadwal berikutnya, Status = ALL)
+ *   2. WO BESOK  (Hanya Instalasi Date = besok / hariWo + 1 hari, Status = ALL; tanggal > besok tidak dimasukkan)
  *   3. WAITING WO (Instalasi Date = blank, Status in Back To Sales / READY / Reschedule / Waiting WO pada bulan aktif + bulan lalu)
  * @param list<array> $prospect
  * @return array<string,mixed>
@@ -1703,14 +1708,10 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
             }
         }
 
-        // 2. WO BESOK (Instalasi Date > Today / Multiple Items terjadwal masa depan, Status = ALL)
-        if ($instInt !== null && $instInt > $tglTodayInt) {
+        // 2. WO BESOK (Hanya Instalasi Date == besok / Today + 1 hari, Status = ALL)
+        if ($instInt === $tglBesokInt) {
             $besokByLdrAgent[$ldr][$sn] = ($besokByLdrAgent[$ldr][$sn] ?? 0) + 1;
-            if ($instInt === $tglBesokInt) {
-                $besokH1Total++;
-            } else {
-                $besokLaterTotal++;
-            }
+            $besokH1Total++;
             $ensureSummary();
             $summaryLdr[$ldr]['wo_besok']++;
             $summaryAgent[$ldr][$sn]['wo_besok']++;
@@ -1875,11 +1876,11 @@ function hitung_wo_laporan(array $prospect, int $bulan, int $tahun, int $hariWo)
     }
 
     return [
-        'calc_version' => 2,
+        'calc_version' => 3,
         'day' => $hariValid,
         'today_label' => $todayLabel,
         'besok_label' => $besokLabel,
-        'besok_range_label' => '>= ' . $besokLabel,
+        'besok_range_label' => $besokLabel,
         'available_days' => daftar_hari_wo_tersedia($prospect, $bulan, $tahun, $hariValid),
         'wo_today_columns' => $todayCols,
         'wo_today_rows' => $todayRows,
@@ -2253,7 +2254,7 @@ function proses_data(array $o): array
 
     $namaBln = NAMA_BULAN_TAMPIL[$bulanIni] ?? 'Nov';
     return [
-        'calc_engine_version' => 5,
+        'calc_engine_version' => 6,
         'periode_label' => $hari . '-' . $namaBln . '-' . $tahun,
         'hari_berjalan' => $hari,
         'total_hari' => $totalHari,

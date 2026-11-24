@@ -1,5 +1,5 @@
 {
-    "calc_engine_version": 5,
+    "calc_engine_version": 6,
     "periode_label": "22-Nov-2026",
     "hari_berjalan": 22,
     "total_hari": 30,
@@ -1921,11 +1921,11 @@
         22
     ],
     "wo_summary": {
-        "calc_version": 2,
+        "calc_version": 3,
         "day": 22,
         "today_label": "22-Nov-26",
         "besok_label": "23-Nov-26",
-        "besok_range_label": ">= 23-Nov-26",
+        "besok_range_label": "23-Nov-26",
         "available_days": [
             1,
             2,
@@ -4001,12 +4001,6 @@
             },
             {
                 "leader": "Anis Anggraini",
-                "salesname": "Putry Cristallianieka Sudirman",
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Anis Anggraini",
                 "salesname": "Rohmi Amelia",
                 "total": 1,
                 "row_type": "agent"
@@ -4020,7 +4014,7 @@
             {
                 "leader": "Anis Anggraini",
                 "salesname": "Anis Anggraini Total",
-                "total": 6,
+                "total": 5,
                 "row_type": "leader_total"
             },
             {
@@ -4038,7 +4032,7 @@
             {
                 "leader": "Eka Hardiansyah",
                 "salesname": "Muhamad Rifki Ramadhan",
-                "total": 2,
+                "total": 1,
                 "row_type": "agent"
             },
             {
@@ -4049,21 +4043,9 @@
             },
             {
                 "leader": "Eka Hardiansyah",
-                "salesname": "Sri Wahyuningsih (MST)",
-                "total": 2,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Eka Hardiansyah",
                 "salesname": "Eka Hardiansyah Total",
-                "total": 8,
+                "total": 5,
                 "row_type": "leader_total"
-            },
-            {
-                "leader": "Fahrul Amrin",
-                "salesname": "Didid Novianto",
-                "total": 1,
-                "row_type": "agent"
             },
             {
                 "leader": "Fahrul Amrin",
@@ -4074,7 +4056,7 @@
             {
                 "leader": "Fahrul Amrin",
                 "salesname": "Fahrul Amrin Total",
-                "total": 3,
+                "total": 2,
                 "row_type": "leader_total"
             },
             {
@@ -4103,18 +4085,6 @@
             },
             {
                 "leader": "Firliansyah",
-                "salesname": "Muhammad Indra Pratama",
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Firliansyah",
-                "salesname": "Rico Sampe Toding",
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Firliansyah",
                 "salesname": "Riki Ardiansyah",
                 "total": 1,
                 "row_type": "agent"
@@ -4134,14 +4104,8 @@
             {
                 "leader": "Firliansyah",
                 "salesname": "Firliansyah Total",
-                "total": 9,
+                "total": 7,
                 "row_type": "leader_total"
-            },
-            {
-                "leader": "Jarot Arie Sasmita",
-                "salesname": "Cyndy Pertiwi Nasution",
-                "total": 1,
-                "row_type": "agent"
             },
             {
                 "leader": "Jarot Arie Sasmita",
@@ -4182,13 +4146,13 @@
             {
                 "leader": "Jarot Arie Sasmita",
                 "salesname": "Jarot Arie Sasmita Total",
-                "total": 11,
+                "total": 10,
                 "row_type": "leader_total"
             },
             {
                 "leader": "Muhammad Rezky Jaladara",
                 "salesname": "Agung Dwi Jayanto",
-                "total": 2,
+                "total": 1,
                 "row_type": "agent"
             },
             {
@@ -4224,7 +4188,7 @@
             {
                 "leader": "Muhammad Rezky Jaladara",
                 "salesname": "Muhammad Rezky Jaladara Total",
-                "total": 8,
+                "total": 7,
                 "row_type": "leader_total"
             },
             {
@@ -4271,32 +4235,20 @@
             },
             {
                 "leader": "Tika Saraswati",
-                "salesname": "Deny Rahmat Hidayat",
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Tika Saraswati",
                 "salesname": "Kuntum Kharisma Dewi",
                 "total": 1,
                 "row_type": "agent"
             },
             {
                 "leader": "Tika Saraswati",
-                "salesname": "Nurpi Apriansyah",
-                "total": 2,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Tika Saraswati",
                 "salesname": "Tika Saraswati Total",
-                "total": 7,
+                "total": 4,
                 "row_type": "leader_total"
             },
             {
                 "leader": "Yovi Arian",
                 "salesname": "Ali Yusup Ramadhan",
-                "total": 2,
+                "total": 1,
                 "row_type": "agent"
             },
             {
@@ -4308,12 +4260,6 @@
             {
                 "leader": "Yovi Arian",
                 "salesname": "Askih Milli Priyanto",
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Yovi Arian",
-                "salesname": "Dwi Afriyani",
                 "total": 1,
                 "row_type": "agent"
             },
@@ -4331,25 +4277,13 @@
             },
             {
                 "leader": "Yovi Arian",
-                "salesname": "Yayang Ardi Purnama",
-                "total": 2,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Yovi Arian",
                 "salesname": "Yovi Arian Total",
-                "total": 10,
+                "total": 6,
                 "row_type": "leader_total"
             },
             {
                 "leader": "Yudha Irawan",
                 "salesname": "Ariska Pratiwi",
-                "total": 1,
-                "row_type": "agent"
-            },
-            {
-                "leader": "Yudha Irawan",
-                "salesname": "Dewi Ratnasari",
                 "total": 1,
                 "row_type": "agent"
             },
@@ -4368,19 +4302,19 @@
             {
                 "leader": "Yudha Irawan",
                 "salesname": "Yudha Irawan Total",
-                "total": 4,
+                "total": 3,
                 "row_type": "leader_total"
             },
             {
                 "leader": "Grand Total",
                 "salesname": "Grand Total",
-                "total": 74,
+                "total": 57,
                 "row_type": "grand_total"
             }
         ],
-        "wo_besok_total": 74,
+        "wo_besok_total": 57,
         "wo_besok_h1_total": 57,
-        "wo_besok_later_total": 17,
+        "wo_besok_later_total": 0,
         "waiting_wo_rows": [
             {
                 "leader": "Anis Anggraini",
@@ -4593,7 +4527,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 24,
-                "wo_besok": 6,
+                "wo_besok": 5,
                 "waiting_wo": 3,
                 "is_grand_total": false
             },
@@ -4606,7 +4540,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 10,
-                "wo_besok": 8,
+                "wo_besok": 5,
                 "waiting_wo": 1,
                 "is_grand_total": false
             },
@@ -4619,7 +4553,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 20,
-                "wo_besok": 3,
+                "wo_besok": 2,
                 "waiting_wo": 1,
                 "is_grand_total": false
             },
@@ -4632,7 +4566,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 35,
-                "wo_besok": 9,
+                "wo_besok": 7,
                 "waiting_wo": 5,
                 "is_grand_total": false
             },
@@ -4645,7 +4579,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 9,
-                "wo_besok": 11,
+                "wo_besok": 10,
                 "waiting_wo": 2,
                 "is_grand_total": false
             },
@@ -4658,7 +4592,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 14,
-                "wo_besok": 8,
+                "wo_besok": 7,
                 "waiting_wo": 1,
                 "is_grand_total": false
             },
@@ -4684,7 +4618,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 22,
-                "wo_besok": 7,
+                "wo_besok": 4,
                 "waiting_wo": 1,
                 "is_grand_total": false
             },
@@ -4697,7 +4631,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 16,
-                "wo_besok": 10,
+                "wo_besok": 6,
                 "waiting_wo": 2,
                 "is_grand_total": false
             },
@@ -4710,7 +4644,7 @@
                 "today_refund": 0,
                 "today_other": 2,
                 "today_total": 15,
-                "wo_besok": 4,
+                "wo_besok": 3,
                 "waiting_wo": 5,
                 "is_grand_total": false
             },
@@ -4723,7 +4657,7 @@
                 "today_refund": 0,
                 "today_other": 2,
                 "today_total": 186,
-                "wo_besok": 74,
+                "wo_besok": 57,
                 "waiting_wo": 23,
                 "is_grand_total": true
             }
@@ -4895,7 +4829,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 1,
-                "wo_besok": 1,
+                "wo_besok": 0,
                 "waiting_wo": 0
             },
             {
@@ -5012,7 +4946,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 1,
-                "wo_besok": 2,
+                "wo_besok": 1,
                 "waiting_wo": 1
             },
             {
@@ -5029,19 +4963,6 @@
                 "waiting_wo": 0
             },
             {
-                "leader": "Eka Hardiansyah",
-                "salesname": "Sri Wahyuningsih (MST)",
-                "today_sa": 0,
-                "today_on_installation": 0,
-                "today_reschedule": 0,
-                "today_waiting_wo": 0,
-                "today_refund": 0,
-                "today_other": 0,
-                "today_total": 0,
-                "wo_besok": 2,
-                "waiting_wo": 0
-            },
-            {
                 "leader": "Fahrul Amrin",
                 "salesname": "Didid Novianto",
                 "today_sa": 0,
@@ -5051,7 +4972,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 1,
-                "wo_besok": 1,
+                "wo_besok": 0,
                 "waiting_wo": 0
             },
             {
@@ -5259,7 +5180,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 1,
-                "wo_besok": 1,
+                "wo_besok": 0,
                 "waiting_wo": 0
             },
             {
@@ -5285,7 +5206,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 4,
-                "wo_besok": 1,
+                "wo_besok": 0,
                 "waiting_wo": 1
             },
             {
@@ -5363,7 +5284,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 2,
-                "wo_besok": 1,
+                "wo_besok": 0,
                 "waiting_wo": 0
             },
             {
@@ -5454,7 +5375,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 1,
-                "wo_besok": 2,
+                "wo_besok": 1,
                 "waiting_wo": 0
             },
             {
@@ -5701,7 +5622,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 1,
-                "wo_besok": 1,
+                "wo_besok": 0,
                 "waiting_wo": 0
             },
             {
@@ -5740,7 +5661,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 3,
-                "wo_besok": 2,
+                "wo_besok": 0,
                 "waiting_wo": 0
             },
             {
@@ -5779,7 +5700,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 2,
-                "wo_besok": 2,
+                "wo_besok": 1,
                 "waiting_wo": 0
             },
             {
@@ -5844,7 +5765,7 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 2,
-                "wo_besok": 1,
+                "wo_besok": 0,
                 "waiting_wo": 1
             },
             {
@@ -5887,19 +5808,6 @@
                 "waiting_wo": 1
             },
             {
-                "leader": "Yovi Arian",
-                "salesname": "Yayang Ardi Purnama",
-                "today_sa": 0,
-                "today_on_installation": 0,
-                "today_reschedule": 0,
-                "today_waiting_wo": 0,
-                "today_refund": 0,
-                "today_other": 0,
-                "today_total": 0,
-                "wo_besok": 2,
-                "waiting_wo": 0
-            },
-            {
                 "leader": "Yudha Irawan",
                 "salesname": "Ahmad Maulana (MST 2)",
                 "today_sa": 0,
@@ -5922,19 +5830,6 @@
                 "today_refund": 0,
                 "today_other": 0,
                 "today_total": 3,
-                "wo_besok": 1,
-                "waiting_wo": 0
-            },
-            {
-                "leader": "Yudha Irawan",
-                "salesname": "Dewi Ratnasari",
-                "today_sa": 0,
-                "today_on_installation": 0,
-                "today_reschedule": 0,
-                "today_waiting_wo": 0,
-                "today_refund": 0,
-                "today_other": 0,
-                "today_total": 0,
                 "wo_besok": 1,
                 "waiting_wo": 0
             },
@@ -6101,7 +5996,7 @@
             }
         ],
         "total_baris_prospect": 16568,
-        "updated_at": "2026-11-22 04:59:04",
+        "updated_at": "2026-11-24 03:51:10",
         "updated_by": "Paket Server Terbaru"
     },
     "mtd_rows": [

@@ -1282,7 +1282,7 @@ def hitung_wo_laporan_py(
 ) -> dict:
     """Menghitung 3 Tabel Work Order sesuai Pivot Excel perusahaan:
     1. WO TODAY  (Instalasi Date == tgl_wo, Status = ALL -> termasuk Active sebagai SA)
-    2. WO BESOK  (Instalasi Date > tgl_wo / Multiple Items terjadwal berikutnya, Status = ALL)
+    2. WO BESOK  (Hanya Instalasi Date == besok / tgl_wo + 1 hari, Status = ALL)
     3. WAITING WO (Instalasi Date == blank, Status in Back To Sales / READY / Reschedule / Waiting WO)
     """
     tgl_besok = tgl_wo + datetime.timedelta(days=1)
@@ -1290,11 +1290,11 @@ def hitung_wo_laporan_py(
     besok_lbl = f"{tgl_besok.day}-{NAMA_BULAN_TAMPIL.get(tgl_besok.month, 'Nov')}-{str(tgl_besok.year)[-2:]}"
 
     kosong = {
-        "calc_version": 2,
+        "calc_version": 3,
         "day": tgl_wo.day,
         "today_label": today_lbl,
         "besok_label": besok_lbl,
-        "besok_range_label": f">= {besok_lbl}",
+        "besok_range_label": besok_lbl,
         "wo_today_columns": [],
         "wo_today_rows": [],
         "wo_today_totals": {
@@ -1426,14 +1426,11 @@ def hitung_wo_laporan_py(
                 sm["today_other"] += 1
                 sag["today_other"] += 1
 
-        # 2. WO BESOK (Instalasi Date > tgl_wo / Multiple Items masa depan, Status = ALL)
-        if d_inst is not None and d_inst > tgl_wo:
+        # 2. WO BESOK (Hanya Instalasi Date == besok / tgl_wo + 1 hari, Status = ALL)
+        if d_inst == tgl_besok:
             besok_map.setdefault(ldr, {})
             besok_map[ldr][sn] = besok_map[ldr].get(sn, 0) + 1
-            if d_inst == tgl_besok:
-                besok_h1_total += 1
-            else:
-                besok_later_total += 1
+            besok_h1_total += 1
             sm, sag = _ens()
             sm["wo_besok"] += 1
             sag["wo_besok"] += 1
@@ -1567,11 +1564,11 @@ def hitung_wo_laporan_py(
             agent_summary_rows.append(ag_b[sn_s])
 
     return {
-        "calc_version": 2,
+        "calc_version": 3,
         "day": tgl_wo.day,
         "today_label": today_lbl,
         "besok_label": besok_lbl,
-        "besok_range_label": f">= {besok_lbl}",
+        "besok_range_label": besok_lbl,
         "wo_today_columns": today_cols,
         "wo_today_rows": today_rows,
         "wo_today_totals": {
@@ -3073,7 +3070,7 @@ with tab_utama:
         col_wo_dt1, col_wo_dt2 = st.columns([1.2, 2.8])
         with col_wo_dt1:
             tgl_wo_pilih = st.date_input(
-                "Pilih Tanggal WO Today (Besok otomatis > Today):",
+                "Pilih Tanggal WO Today (Besok = Today + 1 hari):",
                 value=tgl_cek_harian,
                 key="tgl_cek_wo_monitoring",
             )
@@ -3102,9 +3099,9 @@ with tab_utama:
                 wo_st_parts or "Semua status Instalasi Date Today",
             )
             kwo2.metric(
-                f"2️⃣ WO BESOK ({wo_summary.get('besok_range_label', wo_summary['besok_label'])})",
+                f"2️⃣ WO BESOK ({wo_summary['besok_label']})",
                 f"{wo_summary['wo_besok_total']} Customer",
-                f"Instalasi Date > {wo_summary['today_label']} (H+1: {wo_summary.get('wo_besok_h1_total', 0)} | H+2+: {wo_summary.get('wo_besok_later_total', 0)})",
+                f"Hanya Instalasi Date = {wo_summary['besok_label']} (Besok H+1, Status = ALL)",
             )
             brk_w = wo_summary.get("waiting_wo_breakdown") or {}
             brk_txt = " | ".join(f"{k}: {v}" for k, v in brk_w.items() if v > 0) or "Back To Sales / READY / Reschedule / Waiting WO"
@@ -3136,7 +3133,7 @@ with tab_utama:
                                 "Reschedule": r.get("today_reschedule", 0),
                                 "Waiting WO (Today)": r.get("today_waiting_wo", 0),
                                 "Lainnya": r.get("today_other", 0),
-                                f"WO Besok ({wo_summary.get('besok_range_label', wo_summary['besok_label'])})": r["wo_besok"],
+                                f"WO Besok ({wo_summary['besok_label']})": r["wo_besok"],
                                 "Waiting WO (Blank)": r["waiting_wo"],
                             }
                             for r in sum_rows
@@ -3181,7 +3178,7 @@ with tab_utama:
                         hide_index=True,
                     )
                 else:
-                    st.info(f"Belum ada jadwal WO Besok (> {wo_summary['today_label']}).")
+                    st.info(f"Belum ada jadwal WO Besok ({wo_summary['besok_label']}).")
             with tab_wo3:
                 if wo_summary["waiting_wo_rows"]:
                     st.dataframe(

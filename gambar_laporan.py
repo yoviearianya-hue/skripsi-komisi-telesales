@@ -704,7 +704,7 @@ def buat_gambar_wo_ringkasan(wo_summary: dict) -> bytes:
     """Merender tabel PNG Ringkasan WO Today (beserta SA/Active), WO Besok & Waiting WO per Sales Leader."""
     today_lbl = str(wo_summary.get("today_label", ""))
     besok_lbl = str(wo_summary.get("besok_label", ""))
-    besok_rng = str(wo_summary.get("besok_range_label", f">= {besok_lbl}"))
+    besok_rng = besok_lbl or str(wo_summary.get("besok_range_label", ""))
     rows_src = wo_summary.get("leader_summary") or []
 
     kolom = [
@@ -777,7 +777,7 @@ def buat_gambar_wo_ringkasan(wo_summary: dict) -> bytes:
         gaya_sel=gaya_sel,
         grup_header=grup_header,
         catatan=[
-            f"1. WO TODAY: Semua status pd Instalasi Date {today_lbl} (SA = Active). 2. WO BESOK: Semua Instalasi Date > {today_lbl}. 3. WAITING WO: Instalasi Blank (Back To Sales/READY/Reschedule/Waiting WO).",
+            f"1. WO TODAY: Semua status pd Instalasi Date {today_lbl} (SA = Active). 2. WO BESOK: Hanya Instalasi Date = {besok_lbl} (H+1). 3. WAITING WO: Instalasi Blank (Back To Sales/READY/Reschedule/Waiting WO).",
             f"Dibuat otomatis: {waktu}",
         ],
     )
@@ -787,7 +787,7 @@ def buat_gambar_wo_pivot(wo_summary: dict, mode: str) -> bytes:
     """Merender tabel Pivot lengkap (Leader -> Salesname -> Total) untuk 'today', 'besok', atau 'waiting'."""
     today_lbl = str(wo_summary.get("today_label", ""))
     besok_lbl = str(wo_summary.get("besok_label", ""))
-    besok_rng = str(wo_summary.get("besok_range_label", f">= {besok_lbl}"))
+    besok_rng = besok_lbl or str(wo_summary.get("besok_range_label", ""))
     waktu = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
 
     today_cols = list(wo_summary.get("wo_today_columns") or [])
@@ -808,7 +808,7 @@ def buat_gambar_wo_pivot(wo_summary: dict, mode: str) -> bytes:
         kolom = ["Sales Leader", "Salesname", "Grand Total"]
         rata = ["l", "l", "c"]
         judul = f"2. WO BESOK ({besok_rng}) — JADWAL INSTALASI"
-        sub = f"Pivot Count of Customer Name untuk Instalasi Date > {today_lbl} (Multiple Items, Status = ALL)"
+        sub = f"Hanya Instalasi Date = {besok_lbl} (Besok H+1, Status = ALL)"
         hdr_bg = "#065f46"
     else:
         src = wo_summary.get("waiting_wo_rows") or []
@@ -870,7 +870,7 @@ def buat_gambar_wo_per_leader(wo_summary: dict) -> list[tuple[str, bytes, str]]:
         return []
     today_lbl = str(wo_summary.get("today_label", ""))
     besok_lbl = str(wo_summary.get("besok_label", ""))
-    besok_rng = str(wo_summary.get("besok_range_label", f">= {besok_lbl}"))
+    besok_rng = besok_lbl or str(wo_summary.get("besok_range_label", ""))
     waktu = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
 
     by_ldr: dict[str, list[dict]] = {}

@@ -235,17 +235,17 @@ CREATE TABLE `rekap_wo_monitoring` (
 
 INSERT INTO `rekap_wo_monitoring` (`tgl_wo_today`, `tgl_wo_besok`, `sales_leader`, `today_on_installation`, `today_refund`, `today_waiting_wo`, `today_total`, `waiting_wo`, `wo_besok`) VALUES
 ('22-Nov-26', '23-Nov-26', 'Alfian Bagus Setiawan', 12, 0, 1, 16, 0, 4),
-('22-Nov-26', '23-Nov-26', 'Anis Anggraini', 23, 0, 0, 24, 3, 6),
-('22-Nov-26', '23-Nov-26', 'Eka Hardiansyah', 9, 0, 0, 10, 1, 8),
-('22-Nov-26', '23-Nov-26', 'Fahrul Amrin', 19, 0, 0, 20, 1, 3),
-('22-Nov-26', '23-Nov-26', 'Firliansyah', 32, 0, 0, 35, 5, 9),
-('22-Nov-26', '23-Nov-26', 'Jarot Arie Sasmita', 9, 0, 0, 9, 2, 11),
-('22-Nov-26', '23-Nov-26', 'Muhammad Rezky Jaladara', 12, 0, 1, 14, 1, 8),
+('22-Nov-26', '23-Nov-26', 'Anis Anggraini', 23, 0, 0, 24, 3, 5),
+('22-Nov-26', '23-Nov-26', 'Eka Hardiansyah', 9, 0, 0, 10, 1, 5),
+('22-Nov-26', '23-Nov-26', 'Fahrul Amrin', 19, 0, 0, 20, 1, 2),
+('22-Nov-26', '23-Nov-26', 'Firliansyah', 32, 0, 0, 35, 5, 7),
+('22-Nov-26', '23-Nov-26', 'Jarot Arie Sasmita', 9, 0, 0, 9, 2, 10),
+('22-Nov-26', '23-Nov-26', 'Muhammad Rezky Jaladara', 12, 0, 1, 14, 1, 7),
 ('22-Nov-26', '23-Nov-26', 'Tiara Muna Dayuningtyas', 5, 0, 0, 5, 2, 4),
-('22-Nov-26', '23-Nov-26', 'Tika Saraswati', 18, 0, 1, 22, 1, 7),
-('22-Nov-26', '23-Nov-26', 'Yovi Arian', 15, 0, 0, 16, 2, 10),
-('22-Nov-26', '23-Nov-26', 'Yudha Irawan', 11, 0, 0, 15, 5, 4),
-('22-Nov-26', '23-Nov-26', 'Grand Total', 165, 0, 3, 186, 23, 74);
+('22-Nov-26', '23-Nov-26', 'Tika Saraswati', 18, 0, 1, 22, 1, 4),
+('22-Nov-26', '23-Nov-26', 'Yovi Arian', 15, 0, 0, 16, 2, 6),
+('22-Nov-26', '23-Nov-26', 'Yudha Irawan', 11, 0, 0, 15, 5, 3),
+('22-Nov-26', '23-Nov-26', 'Grand Total', 165, 0, 3, 186, 23, 57);
 
 -- ----------------------------------------------------------------------------
 -- 3. TABEL: detail_komisi_dan_kuota_agen (Detail Performa, Kuota Harian & Komisi)
