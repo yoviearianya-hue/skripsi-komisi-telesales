@@ -1773,13 +1773,20 @@ $authUser = $_SESSION['auth_user'] ?? null;
         .wo-panel tbody tr:hover td { background: #f8fafc; }
         tr.row-wo-ltotal td { background: #dbeafe !important; font-weight: 700; color: #0f172a; }
         tr.row-wo-gtotal td { background: #fef3c7 !important; font-weight: 800; color: #0f172a; border-top: 2px solid #0f172a; }
-        .wo-img-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-top: 12px; }
-        .wo-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; margin-top: 12px; }
+        .wo-img-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 16px; margin-top: 12px; }
+        .wo-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; margin-top: 12px; }
         .wo-img-card {
             background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px;
-            padding: 12px; display: flex; flex-direction: column; gap: 8px;
+            padding: 12px; display: flex; flex-direction: column; gap: 10px;
         }
-        .wo-img-card img { max-width: 100%; height: auto; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
+        .wo-img-card img { width: 100%; height: auto; border: 1px solid #94a3b8; border-radius: 6px; background: #fff; cursor: zoom-in; }
+        @media (max-width: 640px) { .wo-img-grid, .wo-card-grid { grid-template-columns: 1fr; } }
+        .hd-lightbox {
+            display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(15, 23, 42, 0.92);
+            padding: 18px; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+        }
+        .hd-lightbox.open { display: flex; }
+        .hd-lightbox img { max-width: 96vw; max-height: 86vh; border-radius: 8px; background: #fff; box-shadow: 0 20px 50px rgba(0,0,0,0.55); }
         .wo-toolbar {
             display: flex; flex-wrap: wrap; gap: 10px; align-items: end;
             background: #f1f5f9; border: 1px solid #cbd5e1; padding: 12px 14px; border-radius: 10px; margin: 10px 0;
@@ -2511,7 +2518,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-today', this)">1️⃣ WO TODAY (<?= $dispTodayTot ?> | SA <?= $dispTodaySa ?>)</button>
                 <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-besok', this)">2️⃣ WO BESOK (<?= $dispBesokTot ?>)</button>
                 <button type="button" class="wo-tab-btn" onclick="window.switchWoTab('wo-tab-wait', this)">3️⃣ WAITING WO (<?= $dispWaitTot ?>)</button>
-                <button type="button" class="wo-tab-btn" id="wo-btn-gal" onclick="window.woOpenGalleryTab(this)">🖼️ Foto PNG (Ringkasan &amp; Masing-Masing Agent)</button>
+                <button type="button" class="wo-tab-btn" id="wo-btn-gal" onclick="window.woOpenGalleryTab(this)">🖼️ Foto Gabungan HD &amp; Masing-Masing Agent</button>
             </div>
 
             <div id="wo-tab-sum" class="wo-panel active table-wrap">
@@ -2564,12 +2571,12 @@ $authUser = $_SESSION['auth_user'] ?? null;
 
             <div id="wo-tab-gallery" class="wo-panel">
                 <div class="wo-toolbar">
-                    <div style="flex:1; min-width:220px;">
-                        <b style="color:#002060;">🖼️ Galeri Foto PNG Monitoring Work Order</b>
-                        <div style="font-size:0.79rem; color:#475569;">Tersedia foto tabel <b>Ringkasan Leader</b>, <b>Pivot Detail 1/2/3</b>, <b>Per Tim Leader</b>, serta <b>Kartu Foto Masing-Masing Agent</b> siap unduh (PNG / ZIP) &amp; kirim Telegram.</div>
+                    <div style="flex:1; min-width:240px;">
+                        <b style="color:#002060;">🖼️ Galeri Foto Gabungan Super-HD (Anti-Blur WhatsApp &amp; Telegram)</b>
+                        <div style="font-size:0.79rem; color:#475569;">Ringkasan, WO Besok &amp; Waiting WO digabung dalam 1 lembar + WO Today multi-kolom beresolusi <b>2x Super-HD</b>, dilengkapi tombol <b>Copy langsung ke WhatsApp</b> &amp; <b>Zoom HD</b>.</div>
                     </div>
-                    <button type="button" onclick="window.woRenderTableGallery()" class="btn" style="padding:8px 14px; font-size:0.83rem;">🖼️ Render Foto Ringkasan &amp; Tim</button>
-                    <button type="button" onclick="window.woDownloadZip('tables')" class="btn btn-green" style="padding:8px 14px; font-size:0.83rem;">📦 Download Paket Foto Ringkasan (.zip)</button>
+                    <button type="button" onclick="window.woRenderTableGallery()" class="btn" style="padding:8px 14px; font-size:0.83rem;">🖼️ Render Foto Gabungan Super-HD</button>
+                    <button type="button" onclick="window.woDownloadZip('tables')" class="btn btn-green" style="padding:8px 14px; font-size:0.83rem;">📦 Download Paket Foto HD (.zip)</button>
                 </div>
                 <div id="wo-gal-tables"></div>
 
@@ -2825,7 +2832,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
     <div class="card">
         <h3 style="margin-top:0;">📲 3. KIRIM GAMBAR PRESENTASI &amp; TEKS LENGKAP KE BOT TELEGRAM (<code>@NoticeTelesalesbot</code>)</h3>
         <p style="font-size:0.83rem; color:#475569; margin-top:-6px; margin-bottom:14px;">
-            Sekarang mendukung pengiriman <b>🖼️ Gambar Tabel Presentasi (.png)</b> (Tabel MTD SA, Rekap Harian Blm Produktif, Ringkasan + Detail WO Today / Waiting WO / Besok / Per Tim, &amp; Detail Target Total per Leader — tanpa bocor detail Reguler/Yearly) <b>+ 📝 Pesan Teks Detail</b> langsung dari website!
+            Sekarang mendukung pengiriman <b>🖼️ Gambar Gabungan Super-HD (.png)</b> (Ringkasan Eksekutif gabungan MTD + Harian + WO, Pivot WO Today Multi-Kolom HD, Gabungan WO Besok &amp; Waiting WO, serta Laporan Lengkap Per Tim Leader — tanpa bocor detail Reguler/Yearly) <b>+ 📝 Pesan Teks Detail</b> langsung dari website!
             Pastikan bot <b>@NoticeTelesalesbot</b> sudah di-<code>/start</code> atau sudah dimasukkan ke grup Telegram tujuan.
         </p>
 
@@ -2867,7 +2874,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 </label>
                 <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem; font-weight:700;">
                     <input type="checkbox" name="include_wo" value="1" <?= ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['action'] ?? '') !== 'send_telegram' || !empty($_POST['include_wo'])) ? 'checked' : '' ?> style="width:auto; margin:0;">
-                    🛠️ Sertakan Ringkasan &amp; Foto WO (Summary, Pivot 1/2/3 &amp; Tim)
+                    🛠️ Gabungkan Monitoring &amp; Detail WO ke Foto Super-HD
                 </label>
                 <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.88rem; font-weight:700;">
                     <input type="checkbox" name="include_wo_cards" value="1" <?= !empty($_POST['include_wo_cards']) ? 'checked' : '' ?> style="width:auto; margin:0;">
@@ -2938,7 +2945,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
             const lines = String(text).split('\n');
             const sizeMatch = /\b(\d+)px\b/.exec(font);
             const px = sizeMatch ? Number(sizeMatch[1]) : 16;
-            const lineH = px * 1.2;
+            const lineH = px * 1.18;
             let y = (y0 + y1) / 2 - (lineH * lines.length) / 2 + lineH / 2;
             ctx.font = font;
             ctx.fillStyle = color;
@@ -2946,87 +2953,194 @@ $authUser = $_SESSION['auth_user'] ?? null;
             for (const ln of lines) {
                 if (align === 'l') {
                     ctx.textAlign = 'left';
-                    ctx.fillText(ln, x0 + 12, y);
+                    ctx.fillText(ln, Math.round(x0 + 13), Math.round(y));
                 } else if (align === 'r') {
                     ctx.textAlign = 'right';
-                    ctx.fillText(ln, x1 - 12, y);
+                    ctx.fillText(ln, Math.round(x1 - 13), Math.round(y));
                 } else {
                     ctx.textAlign = 'center';
-                    ctx.fillText(ln, (x0 + x1) / 2, y);
+                    ctx.fillText(ln, Math.round((x0 + x1) / 2), Math.round(y));
                 }
                 y += lineH;
             }
         }
 
-        function renderTablePng(spec) {
-            const margin = 28;
+        function partitionWoBlocks(rowsSrc, nCols) {
+            const nonGt = (rowsSrc || []).filter(r => (r.row_type || 'agent') !== 'grand_total');
+            const gtRows = (rowsSrc || []).filter(r => (r.row_type || 'agent') === 'grand_total');
+            if (!nonGt.length) return (rowsSrc && rowsSrc.length) ? [rowsSrc.slice()] : [];
+            if (nCols <= 1) return [nonGt.concat(gtRows)];
+
+            const blocks = [];
+            let cur = [];
+            for (const r of nonGt) {
+                cur.push(r);
+                if (r.row_type === 'leader_total') {
+                    blocks.push(cur);
+                    cur = [];
+                }
+            }
+            if (cur.length) blocks.push(cur);
+
+            if (blocks.length < nCols) {
+                const chunkSz = Math.max(1, Math.ceil(nonGt.length / nCols));
+                const slices = [];
+                for (let i = 0; i < nonGt.length; i += chunkSz) slices.push(nonGt.slice(i, i + chunkSz));
+                if (slices.length && gtRows.length) slices[slices.length - 1] = slices[slices.length - 1].concat(gtRows);
+                return slices;
+            }
+
+            const nb = blocks.length;
+            const pref = Array(nb + 1).fill(0);
+            for (let i = 0; i < nb; i++) pref[i + 1] = pref[i] + blocks[i].length;
+            const INF = 1e9;
+            const dp = Array.from({ length: nCols + 1 }, () => Array(nb + 1).fill(INF));
+            const cut = Array.from({ length: nCols + 1 }, () => Array(nb + 1).fill(0));
+            dp[0][0] = 0;
+            for (let k = 1; k <= nCols; k++) {
+                for (let i = k; i <= nb; i++) {
+                    for (let j = k - 1; j < i; j++) {
+                        const cost = Math.max(dp[k - 1][j], pref[i] - pref[j]);
+                        if (cost < dp[k][i]) {
+                            dp[k][i] = cost;
+                            cut[k][i] = j;
+                        }
+                    }
+                }
+            }
+            const bounds = [];
+            let pos = nb;
+            for (let k = nCols; k >= 1; k--) {
+                const prev = cut[k][pos];
+                bounds.push([prev, pos]);
+                pos = prev;
+            }
+            bounds.reverse();
+            const cols = [];
+            for (const [a, b] of bounds) {
+                const flat = [];
+                for (let i = a; i < b; i++) flat.push(...blocks[i]);
+                if (flat.length) cols.push(flat);
+            }
+            if (cols.length && gtRows.length) cols[cols.length - 1] = cols[cols.length - 1].concat(gtRows);
+            return cols;
+        }
+
+        function renderCompositePng(board) {
+            const margin = 36;
             const padCell = 14;
             const rowH = 38;
-            const fTitle = '800 26px ' + F_FACE;
-            const fSub   = '400 16px ' + F_FACE;
+            const panelGap = 24;
+            const rowGap = 26;
+
+            const fTitle = '800 30px ' + F_FACE;
+            const fSub   = '500 16px ' + F_FACE;
+            const fSec   = '800 16px ' + F_FACE;
             const fHead  = '700 15px ' + F_FACE;
             const fGroup = '700 15px ' + F_FACE;
-            const fCell  = '400 16px ' + F_FACE;
+            const fCell  = '500 16px ' + F_FACE;
             const fBold  = '700 16px ' + F_FACE;
-            const fNote  = '400 14px ' + F_FACE;
+            const fNote  = '500 14px ' + F_FACE;
             const fBan   = '800 16px ' + F_FACE;
 
             const tmpCanvas = document.createElement('canvas');
             const mCtx = tmpCanvas.getContext('2d');
-            const nCol = spec.columns.length;
-            const align = spec.align || Array(nCol).fill('c');
-            const groups = spec.groupHeaders || [];
-            const notes = spec.notes || [];
+            const notes = board.notes || [];
+            const panelRows = board.panelRows || [];
+            const measuredRows = [];
+            let maxRowW = 0;
 
-            let colW = [];
-            for (let c = 0; c < nCol; c++) {
-                let w = measureMulti(mCtx, spec.columns[c], fHead);
-                for (const r of spec.rows) {
-                    w = Math.max(w, measureMulti(mCtx, r[c], fBold));
+            for (const pRow of panelRows) {
+                const mRow = [];
+                let rowW = 0;
+                for (const spec of pRow) {
+                    const nCol = spec.columns.length;
+                    const groups = spec.groupHeaders || [];
+                    const secTitle = spec.sectionTitle || '';
+                    let colW = [];
+                    for (let c = 0; c < nCol; c++) {
+                        let w = measureMulti(mCtx, spec.columns[c], fHead);
+                        for (const r of spec.rows) w = Math.max(w, measureMulti(mCtx, r[c], fBold));
+                        colW.push(w + 2 * padCell);
+                    }
+                    for (const g of groups) {
+                        const need = measureMulti(mCtx, g.label, fGroup) + 2 * padCell;
+                        let have = 0;
+                        for (let c = g.start; c <= g.end; c++) have += colW[c];
+                        if (need > have) {
+                            const add = (need - have) / (g.end - g.start + 1);
+                            for (let c = g.start; c <= g.end; c++) colW[c] += add;
+                        }
+                    }
+                    let wNat = colW.reduce((a, b) => a + b, 0);
+                    if (secTitle) {
+                        const wSec = measureMulti(mCtx, secTitle, fSec) + 2 * padCell;
+                        if (wSec > wNat) {
+                            const rs = wSec / wNat;
+                            colW = colW.map(w => w * rs);
+                            wNat = wSec;
+                        }
+                    }
+                    const maxHeadLines = Math.max(1, ...spec.columns.map(k => String(k).split('\n').length));
+                    const headH = Math.ceil(maxHeadLines * 18 + 20);
+                    const groupH = groups.length ? 34 : 0;
+                    const secH = secTitle ? 36 : 0;
+                    const tabH = secH + groupH + headH + spec.rows.length * rowH;
+                    mRow.push({ spec, colW, wNat, secH, groupH, headH, tabH });
+                    rowW += wNat;
                 }
-                colW.push(w + 2 * padCell);
-            }
-            for (const g of groups) {
-                const need = measureMulti(mCtx, g.label, fGroup) + 2 * padCell;
-                let have = 0;
-                for (let c = g.start; c <= g.end; c++) have += colW[c];
-                if (need > have) {
-                    const add = (need - have) / (g.end - g.start + 1);
-                    for (let c = g.start; c <= g.end; c++) colW[c] += add;
-                }
+                if (mRow.length > 1) rowW += panelGap * (mRow.length - 1);
+                maxRowW = Math.max(maxRowW, rowW);
+                measuredRows.push(mRow);
             }
 
             let banW = 0, banLW = 0, banH = 0;
-            if (spec.banner) {
-                banLW = measureMulti(mCtx, spec.banner.left, fBan) + 36;
-                const banRW = measureMulti(mCtx, spec.banner.right, fBan) + 36;
-                banW = Math.max(banLW + banRW, measureMulti(mCtx, spec.banner.top, fBan) + 36);
+            if (board.banner) {
+                banLW = measureMulti(mCtx, board.banner.left, fBan) + 38;
+                const banRW = measureMulti(mCtx, board.banner.right, fBan) + 38;
+                banW = Math.max(banLW + banRW, measureMulti(mCtx, board.banner.top, fBan) + 38);
                 banH = 68;
             }
-
-            const titleW = Math.max(measureMulti(mCtx, spec.title, fTitle), measureMulti(mCtx, spec.subtitle, fSub));
+            const titleW = Math.max(measureMulti(mCtx, board.title, fTitle), measureMulti(mCtx, board.subtitle, fSub));
             let noteW = 0;
             for (const nt of notes) noteW = Math.max(noteW, measureMulti(mCtx, nt, fNote));
-            const tableW = colW.reduce((a, b) => a + b, 0);
-            const contentW = Math.max(tableW, titleW + (spec.banner ? banW + 40 : 0), noteW);
-            if (contentW > tableW) {
-                const ratio = contentW / tableW;
-                colW = colW.map(w => w * ratio);
+            const contentW = Math.ceil(Math.max(maxRowW, titleW + (board.banner ? banW + 44 : 0), noteW));
+
+            for (const mRow of measuredRows) {
+                const nP = mRow.length;
+                const availW = contentW - panelGap * Math.max(0, nP - 1);
+                const sumNat = mRow.reduce((a, b) => a + b.wNat, 0) || 1;
+                const sc = availW / sumNat;
+                let xCur = margin;
+                let usedW = 0;
+                for (let idx = 0; idx < nP; idx++) {
+                    const mp = mRow[idx];
+                    const cwInt = mp.colW.map(w => Math.floor(w * sc));
+                    const curSum = cwInt.reduce((a, b) => a + b, 0);
+                    const tgtW = (idx === nP - 1) ? (availW - usedW) : curSum;
+                    const diff = tgtW - curSum;
+                    if (diff !== 0 && cwInt.length) {
+                        let maxI = 0;
+                        for (let ci = 1; ci < cwInt.length; ci++) if (cwInt[ci] > cwInt[maxI]) maxI = ci;
+                        cwInt[maxI] += diff;
+                    }
+                    mp.colWInt = cwInt;
+                    mp.pw = cwInt.reduce((a, b) => a + b, 0);
+                    mp.x0 = xCur;
+                    xCur += mp.pw + panelGap;
+                    usedW += mp.pw;
+                }
             }
-            colW = colW.map(w => Math.ceil(w));
-            const totalW = colW.reduce((a, b) => a + b, 0);
 
-            const maxHeadLines = Math.max(...spec.columns.map(k => String(k).split('\n').length));
-            const headH = Math.ceil(maxHeadLines * 18 + 20);
-            const groupH = groups.length ? 34 : 0;
-            const titleBlkH = Math.max(66, banH) + 20;
-            const noteH = notes.length ? (notes.length * 22 + 16) : 0;
+            const titleBlkH = Math.max(66, banH) + 22;
+            const totalPanelH = measuredRows.reduce((s, r) => s + Math.max(...r.map(mp => mp.tabH)), 0) + rowGap * Math.max(0, measuredRows.length - 1);
+            const noteH = notes.length ? (notes.length * 24 + 18) : 0;
+            const imgW = contentW + 2 * margin;
+            const imgH = margin + 10 + titleBlkH + totalPanelH + noteH + margin;
 
-            const imgW = totalW + 2 * margin;
-            const imgH = margin + 8 + titleBlkH + groupH + headH + spec.rows.length * rowH + noteH + margin;
-
+            const maxDim = Math.max(imgW, imgH);
+            const scale = (maxDim * 2 <= 12000) ? 2.0 : Math.max(1.25, Math.floor((12000 / maxDim) * 10) / 10);
             const canvas = document.createElement('canvas');
-            const scale = (imgW * 1.5 + imgH * 1.5 <= 9000) ? 1.5 : 1.0;
             canvas.width = Math.round(imgW * scale);
             canvas.height = Math.round(imgH * scale);
             const ctx = canvas.getContext('2d');
@@ -3035,105 +3149,131 @@ $authUser = $_SESSION['auth_user'] ?? null;
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, imgW, imgH);
             ctx.fillStyle = '#1f3864';
-            ctx.fillRect(0, 0, imgW, 8);
+            ctx.fillRect(0, 0, imgW, 10);
 
-            const y0 = margin + 8;
+            const y0 = margin + 10;
             ctx.fillStyle = '#0f172a';
             ctx.font = fTitle;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
-            ctx.fillText(spec.title, margin, y0);
-            ctx.fillStyle = '#475569';
+            ctx.fillText(board.title, margin, y0);
+            ctx.fillStyle = '#334155';
             ctx.font = fSub;
-            ctx.fillText(spec.subtitle, margin, y0 + 36);
+            ctx.fillText(board.subtitle, margin, y0 + 38);
 
-            if (spec.banner) {
-                const bx1 = margin + totalW;
+            if (board.banner) {
+                const bx1 = margin + contentW;
                 const bx0 = bx1 - banW;
                 const bxm = bx0 + banLW;
                 ctx.fillStyle = '#6b1d36';
                 ctx.fillRect(bx0, y0, banW, 32);
                 ctx.strokeStyle = '#4a1525';
                 ctx.strokeRect(bx0, y0, banW, 32);
-                drawTextCell(ctx, [bx0, y0, bx1, y0 + 32], spec.banner.top, fBan, '#ffffff', 'c');
-
+                drawTextCell(ctx, [bx0, y0, bx1, y0 + 32], board.banner.top, fBan, '#ffffff', 'c');
                 ctx.fillStyle = '#58152b';
                 ctx.fillRect(bx0, y0 + 32, banLW, 36);
                 ctx.fillRect(bxm, y0 + 32, bx1 - bxm, 36);
                 ctx.strokeStyle = '#993355';
                 ctx.strokeRect(bx0, y0 + 32, banLW, 36);
                 ctx.strokeRect(bxm, y0 + 32, bx1 - bxm, 36);
-                drawTextCell(ctx, [bx0, y0 + 32, bxm, y0 + 68], spec.banner.left, fBan, '#ffffff', 'c');
-                drawTextCell(ctx, [bxm, y0 + 32, bx1, y0 + 68], spec.banner.right, fBan, '#fde047', 'c');
+                drawTextCell(ctx, [bx0, y0 + 32, bxm, y0 + 68], board.banner.left, fBan, '#ffffff', 'c');
+                drawTextCell(ctx, [bxm, y0 + 32, bx1, y0 + 68], board.banner.right, fBan, '#fde047', 'c');
             }
 
-            const yTab = y0 + titleBlkH;
-            const xs = [margin];
-            for (const w of colW) xs.push(xs[xs.length - 1] + w);
+            let yRow = y0 + titleBlkH;
+            for (const mRow of measuredRows) {
+                const rowMaxH = Math.max(...mRow.map(mp => mp.tabH));
+                for (const mp of mRow) {
+                    const spec = mp.spec;
+                    const xLeft = mp.x0;
+                    const pw = mp.pw;
+                    const colW = mp.colWInt;
+                    const nCol = spec.columns.length;
+                    const align = spec.align || Array(nCol).fill('c');
+                    const groups = spec.groupHeaders || [];
+                    const headBg = spec.headBg || '#1f3864';
+                    const secTitle = spec.sectionTitle || '';
+                    const secBg = spec.sectionBg || headBg;
 
-            const groupedCols = new Set();
-            const colHeadBg = {};
-            for (const g of groups) {
-                const bgG = g.bg || '#1f3864';
-                for (let c = g.start; c <= g.end; c++) {
-                    groupedCols.add(c);
-                    colHeadBg[c] = bgG;
+                    let yCur = yRow;
+                    if (secTitle) {
+                        ctx.fillStyle = secBg;
+                        ctx.fillRect(xLeft, yCur, pw, mp.secH);
+                        drawTextCell(ctx, [xLeft, yCur, xLeft + pw, yCur + mp.secH], secTitle, fSec, '#ffffff', 'l');
+                        yCur += mp.secH;
+                    }
+                    const yTab = yCur;
+                    const xs = [xLeft];
+                    for (const w of colW) xs.push(xs[xs.length - 1] + w);
+
+                    const groupedCols = new Set();
+                    const colHeadBg = {};
+                    for (const g of groups) {
+                        const bgG = g.bg || headBg;
+                        for (let c = g.start; c <= g.end; c++) { groupedCols.add(c); colHeadBg[c] = bgG; }
+                        ctx.fillStyle = bgG;
+                        ctx.fillRect(xs[g.start], yTab, xs[g.end + 1] - xs[g.start], mp.groupH);
+                        ctx.strokeStyle = '#5b6f99';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(xs[g.start], yTab, xs[g.end + 1] - xs[g.start], mp.groupH);
+                        drawTextCell(ctx, [xs[g.start], yTab, xs[g.end + 1], yTab + mp.groupH], g.label, fGroup, '#ffffff', 'c');
+                    }
+
+                    for (let c = 0; c < nCol; c++) {
+                        const bgH = colHeadBg[c] || headBg;
+                        const topY = groupedCols.has(c) ? (yTab + mp.groupH) : yTab;
+                        const hH = groupedCols.has(c) ? mp.headH : (mp.groupH + mp.headH);
+                        ctx.fillStyle = bgH;
+                        ctx.fillRect(xs[c], topY, xs[c + 1] - xs[c], hH);
+                        ctx.strokeStyle = '#5b6f99';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(xs[c], topY, xs[c + 1] - xs[c], hH);
+                        drawTextCell(ctx, [xs[c], topY, xs[c + 1], topY + hH], spec.columns[c], fHead, '#ffffff', 'c');
+                    }
+
+                    let y = yTab + mp.groupH + mp.headH;
+                    for (let i = 0; i < spec.rows.length; i++) {
+                        const row = spec.rows[i];
+                        const rb = (spec.rowStyles && spec.rowStyles[i]) || {};
+                        const baseBg = rb.bg || (i % 2 ? '#f5f7fb' : '#ffffff');
+                        for (let c = 0; c < nCol; c++) {
+                            const cs = (spec.cellStyle ? spec.cellStyle(i, c, row[c]) : null) || {};
+                            const bg = cs.bg || baseBg;
+                            const fg = cs.fg || rb.fg || '#0f172a';
+                            const isBold = (cs.bold !== undefined) ? cs.bold : !!rb.bold;
+                            const al = cs.align || align[c];
+                            ctx.fillStyle = bg;
+                            ctx.fillRect(xs[c], y, xs[c + 1] - xs[c], rowH);
+                            ctx.strokeStyle = '#94a3b8';
+                            ctx.lineWidth = 1;
+                            ctx.strokeRect(xs[c], y, xs[c + 1] - xs[c], rowH);
+                            drawTextCell(ctx, [xs[c], y, xs[c + 1], y + rowH], row[c], isBold ? fBold : fCell, fg, al);
+                        }
+                        y += rowH;
+                    }
+                    ctx.strokeStyle = headBg;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(xLeft, yTab, pw, y - yTab);
+                    ctx.lineWidth = 1;
                 }
-                ctx.fillStyle = bgG;
-                ctx.fillRect(xs[g.start], yTab, xs[g.end + 1] - xs[g.start], groupH);
-                ctx.strokeStyle = '#5b6f99';
-                ctx.strokeRect(xs[g.start], yTab, xs[g.end + 1] - xs[g.start], groupH);
-                drawTextCell(ctx, [xs[g.start], yTab, xs[g.end + 1], yTab + groupH], g.label, fGroup, '#ffffff', 'c');
+                yRow += rowMaxH + rowGap;
             }
 
-            for (let c = 0; c < nCol; c++) {
-                const bgH = colHeadBg[c] || spec.headBg || '#1f3864';
-                const topY = groupedCols.has(c) ? (yTab + groupH) : yTab;
-                const hH = groupedCols.has(c) ? headH : (groupH + headH);
-                ctx.fillStyle = bgH;
-                ctx.fillRect(xs[c], topY, xs[c + 1] - xs[c], hH);
-                ctx.strokeStyle = '#5b6f99';
-                ctx.strokeRect(xs[c], topY, xs[c + 1] - xs[c], hH);
-                drawTextCell(ctx, [xs[c], topY, xs[c + 1], topY + hH], spec.columns[c], fHead, '#ffffff', 'c');
-            }
-
-            let y = yTab + groupH + headH;
-            for (let i = 0; i < spec.rows.length; i++) {
-                const row = spec.rows[i];
-                const rb = (spec.rowStyles && spec.rowStyles[i]) || {};
-                const baseBg = rb.bg || (i % 2 ? '#f5f7fb' : '#ffffff');
-                for (let c = 0; c < nCol; c++) {
-                    const cs = (spec.cellStyle ? spec.cellStyle(i, c, row[c]) : null) || {};
-                    const bg = cs.bg || baseBg;
-                    const fg = cs.fg || rb.fg || '#0f172a';
-                    const isBold = (cs.bold !== undefined) ? cs.bold : !!rb.bold;
-                    const al = cs.align || align[c];
-                    ctx.fillStyle = bg;
-                    ctx.fillRect(xs[c], y, xs[c + 1] - xs[c], rowH);
-                    ctx.strokeStyle = '#a7b1c2';
-                    ctx.strokeRect(xs[c], y, xs[c + 1] - xs[c], rowH);
-                    drawTextCell(ctx, [xs[c], y, xs[c + 1], y + rowH], row[c], isBold ? fBold : fCell, fg, al);
+            if (notes.length) {
+                let ny = yRow - rowGap + 18;
+                ctx.fillStyle = '#334155';
+                ctx.font = fNote;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                for (const nt of notes) {
+                    ctx.fillText(nt, margin, ny);
+                    ny += 24;
                 }
-                y += rowH;
-            }
-            ctx.strokeStyle = '#1f3864';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(margin, yTab, totalW, y - yTab);
-            ctx.lineWidth = 1;
-
-            let ny = y + 18;
-            ctx.fillStyle = '#475569';
-            ctx.font = fNote;
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            for (const nt of notes) {
-                ctx.fillText(nt, margin, ny);
-                ny += 22;
             }
 
             return new Promise(resolve => {
                 canvas.toBlob(blob => {
-                    resolve({ blob: blob, dataUrl: canvas.toDataURL('image/png') });
+                    resolve({ blob: blob, dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height });
                 }, 'image/png');
             });
         }
@@ -3142,29 +3282,22 @@ $authUser = $_SESSION['auth_user'] ?? null;
             const totI = Number(ag.today_total || 0), saI = Number(ag.today_sa || 0), onI = Number(ag.today_on_installation || 0);
             const bskI = Number(ag.wo_besok || 0), bonI = Number(ag.besok_on_installation || 0), bwtI = Number(ag.besok_waiting_wo || 0);
             const wwoI = Number(ag.waiting_wo || 0);
-            const imgC = await renderTablePng({
+            const imgC = await renderCompositePng({
                 title: `KARTU WO AGENT — ${String(ag.salesname).toUpperCase()}`,
                 subtitle: `Sales Leader: ${ag.leader}  •  WO Today: ${todayLbl}  •  WO Besok: ${besokLbl}`,
-                columns: ['SALESNAME', 'TOTAL TODAY', 'SA (ACTIVE)', 'ON INSTALL', `BESOK (${besokLbl})`, 'BESOK OI', 'BESOK WAIT', 'WAITING WO'],
-                groupHeaders: [
-                    { label: `1. WO TODAY (${todayLbl})`, start: 1, end: 3, bg: '#002060' },
-                    { label: `2. WO BESOK (${besokLbl})`, start: 4, end: 6, bg: '#065f46' },
-                    { label: '3. WAITING WO', start: 7, end: 7, bg: '#92400e' },
-                ],
-                rows: [[
-                    ag.salesname,
-                    fmtInt(totI), fmtInt(saI), fmtInt(onI),
-                    fmtInt(bskI), fmtInt(bonI), fmtInt(bwtI), fmtInt(wwoI),
-                ]],
-                align: ['l', 'c', 'c', 'c', 'c', 'c', 'c', 'c'],
-                rowStyles: [{ bg: '#ffffff', bold: true }],
-                cellStyle: (_i, c) => {
-                    if (c === 1) return { bg: '#dbeafe', fg: '#1e3a8a', bold: true };
-                    if (c === 2) return { bg: '#bbf7d0', fg: '#14532d', bold: true };
-                    if (c === 4) return { bg: '#dcfce7', fg: '#065f46', bold: true };
-                    if (c === 7) return { bg: '#fef3c7', fg: '#92400e', bold: true };
-                    return null;
-                },
+                panelRows: [[{
+                    headBg: '#002060',
+                    columns: ['SALESNAME', 'TOTAL TODAY', 'SA (ACTIVE)', 'ON INSTALL', `BESOK (${besokLbl})`, 'BESOK OI', 'BESOK WAIT', 'WAITING WO'],
+                    groupHeaders: [
+                        { label: `1. WO TODAY (${todayLbl})`, start: 1, end: 3, bg: '#002060' },
+                        { label: `2. WO BESOK (${besokLbl})`, start: 4, end: 6, bg: '#065f46' },
+                        { label: '3. WAITING WO', start: 7, end: 7, bg: '#92400e' },
+                    ],
+                    rows: [[ag.salesname, fmtInt(totI), fmtInt(saI), fmtInt(onI), fmtInt(bskI), fmtInt(bonI), fmtInt(bwtI), fmtInt(wwoI)]],
+                    align: ['l', 'c', 'c', 'c', 'c', 'c', 'c', 'c'],
+                    rowStyles: [{ bg: '#ffffff', bold: true }],
+                    cellStyle: (_i, c) => ({ 1: { bg: '#dbeafe', fg: '#1e3a8a', bold: true }, 2: { bg: '#bbf7d0', fg: '#14532d', bold: true }, 4: { bg: '#dcfce7', fg: '#065f46', bold: true }, 7: { bg: '#fef3c7', fg: '#92400e', bold: true } }[c] || null),
+                }]],
                 notes: [`Kartu Monitoring WO Pribadi — ${ag.salesname} (${ag.leader})`],
             });
             const safeSn = String(ag.salesname).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'Agent';
@@ -3173,424 +3306,417 @@ $authUser = $_SESSION['auth_user'] ?? null;
             return {
                 fileName: `01E_WO_Agent_${safeSn}.png`,
                 caption: `👤 <b>Kartu WO — ${escSn}</b> (${escLd}) | Today: ${totI} (SA ${saI}) | Besok: ${bskI} | Waiting: ${wwoI}`,
-                blob: imgC.blob,
-                dataUrl: imgC.dataUrl,
+                blob: imgC.blob, dataUrl: imgC.dataUrl, width: imgC.width, height: imgC.height,
+            };
+        }
+
+        function specMtdSa(data) {
+            let totOct = 0, totNov = 0;
+            const rows = [], rowStyles = [];
+            let idxTot = -1;
+            for (const mr of data.mtd_rows) {
+                if (mr.is_total) { totOct = mr.sa_oct; totNov = mr.sa_nov; idxTot = rows.length; rowStyles.push({ bg: '#c9daf8', bold: true }); }
+                else rowStyles.push(null);
+                rows.push([mr.leader, fmtInt(mr.sa_oct), fmtInt(mr.sa_nov), fmtInt(mr.gap_sa)]);
+            }
+            const acv = totOct > 0 ? roundExcel(((totNov - totOct) / totOct) * 100) : 0;
+            const idxNote = rows.length;
+            rows.push(['Note Acv SA', '', acv < 0 ? '↓' : '↑', acv + '%']);
+            rowStyles.push({ bg: '#dbe5f1', bold: true });
+            return {
+                sectionTitle: `1. MTD SA PER LEADER (${data.bln_lalu} vs ${data.bln_ini} 1-${data.hari})`,
+                sectionBg: '#1f3864', headBg: '#1f3864',
+                columns: ['SALES LEADER', `SA ${data.bln_lalu}\n1-${data.hari}`, `SA ${data.bln_ini}\n1-${data.hari}`, 'GAP SA'],
+                rows, align: ['l', 'c', 'c', 'c'], rowStyles,
+                cellStyle: (i, c, txt) => {
+                    if (c === 0 && (i === idxTot || i === idxNote)) return { align: 'c' };
+                    if (c === 3) {
+                        const v = parseInt(String(txt).replace(/\./g, '').replace('%', ''), 10);
+                        if (!isNaN(v) && v < 0) return { bg: '#f4cccc', fg: '#990000', bold: true };
+                        if (!isNaN(v) && v > 0) return { fg: '#15803d', bold: true };
+                    }
+                    return null;
+                },
+            };
+        }
+
+        function specHarianBlmProduktif(data) {
+            const dRows = [], dStyles = [];
+            let idxGt = -1;
+            for (const dr of data.daily_rows) {
+                if (dr.is_gt) { idxGt = dRows.length; dStyles.push({ bg: '#dbe5f1', bold: true }); }
+                else dStyles.push(null);
+                dRows.push([dr.leader, fmtInt(dr.so), fmtInt(dr.paid), fmtInt(dr.sa), fmtInt(dr.blm_so), fmtInt(dr.blm_paid), fmtInt(dr.blm_sa)]);
+            }
+            return {
+                sectionTitle: `1B. REKAP HARIAN (${data.daily_label}) & AGENT BELUM PRODUKTIF`,
+                sectionBg: '#002060', headBg: '#002060',
+                columns: ['Sales Leader', 'SO / GP', 'PAID', 'SA', 'SO / GP', 'PAID', 'SA'],
+                groupHeaders: [
+                    { label: data.daily_label, start: 1, end: 3, bg: '#002060' },
+                    { label: 'Agent Blm Produktif', start: 4, end: 6, bg: '#dc0000' },
+                ],
+                rows: dRows, align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: dStyles,
+                cellStyle: (i, c) => (i === idxGt && c >= 4) ? { bg: '#fce4d6', fg: '#9a3412', bold: true } : null,
+            };
+        }
+
+        function specWoRingkasan(ws) {
+            const besokRng = ws.besok_label || '';
+            const wRows = [], wStyles = [];
+            let idxGtW = -1;
+            for (const wr of (ws.leader_summary || [])) {
+                if (wr.is_gt) { idxGtW = wRows.length; wStyles.push({ bg: '#dbeafe', bold: true }); }
+                else wStyles.push(null);
+                wRows.push([
+                    wr.leader, fmtInt(wr.today_total || 0), fmtInt(wr.today_sa || 0),
+                    fmtInt(wr.today_on_installation || 0),
+                    fmtInt(wr.wo_besok || 0), fmtInt(wr.besok_on_installation || 0), fmtInt(wr.besok_waiting_wo || 0),
+                    fmtInt(wr.waiting_wo || 0),
+                ]);
+            }
+            return {
+                sectionTitle: `1C. MONITORING WORK ORDER (${ws.today_label} | BESOK ${besokRng} | WAITING WO)`,
+                sectionBg: '#002060', headBg: '#002060',
+                columns: ['Sales Leader', 'TOTAL\nTODAY', 'SA\n(ACTIVE)', 'ON\nINSTALL', `TOTAL\n(${besokRng})`, 'ON\nINSTALL', 'WAIT\nWO', 'WAITING\nWO'],
+                groupHeaders: [
+                    { label: `1. WO TODAY (${ws.today_label})`, start: 1, end: 3, bg: '#002060' },
+                    { label: `2. WO BESOK (${besokRng})`, start: 4, end: 6, bg: '#065f46' },
+                    { label: '3. WAITING WO', start: 7, end: 7, bg: '#92400e' },
+                ],
+                rows: wRows, align: ['l', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: wStyles,
+                cellStyle: (i, c) => {
+                    if (i === idxGtW) return { 1: { bg: '#c9daf8', fg: '#1e3a8a', bold: true }, 2: { bg: '#bbf7d0', fg: '#14532d', bold: true }, 4: { bg: '#d1fae5', fg: '#065f46', bold: true }, 7: { bg: '#fde68a', fg: '#92400e', bold: true } }[c] || null;
+                    return { 1: { bg: '#eff6ff', bold: true }, 2: { bg: '#f0fdf4', fg: '#166534', bold: true }, 4: { bg: '#ecfdf5', bold: true }, 7: { bg: '#fffbeb', bold: true } }[c] || null;
+                },
+            };
+        }
+
+        function specWoPivotPanel(rowsSlice, rawCols, dispCols, sectionTitle, headBg, renameActive) {
+            const idxSaCol = (renameActive && dispCols.indexOf('Active (SA)') >= 0) ? (1 + dispCols.indexOf('Active (SA)')) : -1;
+            const cols = ['Salesname / Tim', ...dispCols, 'Total'];
+            const rows = [], rStyles = [];
+            let idxGtP = -1;
+            let curLdr = null;
+            for (const r of rowsSlice) {
+                const rt = r.row_type || 'agent';
+                let nmDisp = r.salesname || '';
+                if (rt === 'agent') {
+                    const ldrCur = String(r.leader || '');
+                    if (ldrCur !== curLdr) {
+                        curLdr = ldrCur;
+                        rows.push([`▸ ${ldrCur.toUpperCase()}`, ...rawCols.map(() => ''), '']);
+                        rStyles.push({ bg: '#e2e8f0', fg: '#0f172a', bold: true });
+                    }
+                    rStyles.push(null);
+                    nmDisp = '  ' + nmDisp;
+                } else if (rt === 'leader_total') {
+                    rStyles.push({ bg: '#dbeafe', bold: true });
+                } else {
+                    idxGtP = rows.length;
+                    rStyles.push({ bg: '#fef3c7', bold: true });
+                }
+                const stMap = r.statuses || {};
+                const stVals = rawCols.map(c => {
+                    const v = (stMap[c] !== undefined) ? Number(stMap[c]) : ((rawCols.length === 1 && c === 'Waiting WO') ? Number(r.total || 0) : 0);
+                    return (v > 0 || rt === 'grand_total') ? fmtInt(v) : '';
+                });
+                rows.push([nmDisp, ...stVals, fmtInt(r.total)]);
+            }
+            return {
+                sectionTitle, sectionBg: headBg, headBg, columns: cols, rows,
+                align: ['l', ...rawCols.map(() => 'c'), 'c'], rowStyles: rStyles,
+                cellStyle: (i, c) => {
+                    if (rStyles[i] && rStyles[i].bg === '#e2e8f0') return null;
+                    if (c === cols.length - 1) return { bold: true, bg: i === idxGtP ? '#fef3c7' : undefined };
+                    if (idxSaCol >= 0 && c === idxSaCol) return { bold: true, bg: i === idxGtP ? '#bbf7d0' : '#f0fdf4', fg: '#166534' };
+                    return null;
+                },
+            };
+        }
+
+        async function buildWoTodayImg(ws) {
+            const src = ws.wo_today_rows || [];
+            if (!src.length) return null;
+            const rawCols = Array.isArray(ws.wo_today_columns) ? ws.wo_today_columns : [];
+            const dispSt = rawCols.map(c => (String(c).toLowerCase() === 'active' ? 'Active (SA)' : c));
+            const nNonGt = src.filter(r => (r.row_type || 'agent') !== 'grand_total').length;
+            const nCols = nNonGt > 54 ? 3 : (nNonGt > 20 ? 2 : 1);
+            const slices = partitionWoBlocks(src, nCols);
+            const panels = slices.map((sl, idx) => specWoPivotPanel(sl, rawCols, dispSt, slices.length > 1 ? `BAGIAN ${idx + 1}/${slices.length}` : `1. WO TODAY (${ws.today_label})`, '#002060', true));
+            let totAll = 0, totSa = 0, totOi = 0;
+            for (const wr of (ws.leader_summary || [])) {
+                if (!wr.is_gt) { totAll += Number(wr.today_total || 0); totSa += Number(wr.today_sa || 0); totOi += Number(wr.today_on_installation || 0); }
+            }
+            const img = await renderCompositePng({
+                title: `1. WO TODAY (${ws.today_label}) — ON INSTALLATION & ACTIVE (SA)`,
+                subtitle: `Grand Total: ${fmtInt(totAll)} Customer  •  SA (Active): ${fmtInt(totSa)}  •  On Installation: ${fmtInt(totOi)}`,
+                panelRows: [panels],
+                notes: [`Total baris pivot: ${src.length} baris ditampilkan sejajar (${slices.length} kolom Super-HD anti-blur WhatsApp)`],
+            });
+            return { fileName: `02A_WO_TODAY_Detail_${ws.today_label}.png`, caption: `1️⃣ <b>WO TODAY (${ws.today_label}) — ${fmtInt(totAll)} (SA ${fmtInt(totSa)})</b>`, ...img };
+        }
+
+        async function buildWoBesokWaitingImg(ws, includeRingkasan) {
+            const besokRng = ws.besok_label || '';
+            const panelRows = [];
+            if (includeRingkasan && ws.leader_summary && ws.leader_summary.length) panelRows.push([specWoRingkasan(ws)]);
+            const botPanels = [];
+            const bSrc = ws.wo_besok_rows || [];
+            if (bSrc.length) {
+                const rawB = Array.isArray(ws.wo_besok_columns) ? ws.wo_besok_columns : [];
+                const nB = bSrc.filter(r => (r.row_type || 'agent') !== 'grand_total').length;
+                const nBKol = nB > 22 ? 2 : 1;
+                const bSlices = partitionWoBlocks(bSrc, nBKol);
+                bSlices.forEach((sl, idx) => botPanels.push(specWoPivotPanel(sl, rawB, rawB, bSlices.length > 1 ? `2. WO BESOK (${besokRng}) — BAG. ${idx + 1}/${bSlices.length}` : `2. WO BESOK (${besokRng})`, '#065f46', false)));
+            }
+            const wSrc = ws.waiting_wo_rows || [];
+            if (wSrc.length) {
+                const rawW = (Array.isArray(ws.waiting_wo_columns) && ws.waiting_wo_columns.length) ? ws.waiting_wo_columns : ['Waiting WO'];
+                botPanels.push(specWoPivotPanel(wSrc, rawW, rawW, '3. WAITING WO (INSTALASI BLANK)', '#92400e', false));
+            }
+            if (botPanels.length) panelRows.push(botPanels);
+            if (!panelRows.length) return null;
+            let bTot = 0, wTot = 0;
+            for (const wr of (ws.leader_summary || [])) {
+                if (!wr.is_gt) { bTot += Number(wr.wo_besok || 0); wTot += Number(wr.waiting_wo || 0); }
+            }
+            const img = await renderCompositePng({
+                title: includeRingkasan ? `MONITORING WO: RINGKASAN, BESOK (${besokRng}) & WAITING WO` : `2. WO BESOK (${besokRng}) & 3. WAITING WO (GABUNGAN)`,
+                subtitle: `WO Besok H+1 (${besokRng}): ${fmtInt(bTot)} Customer  •  Waiting WO (Instalasi Blank | Back To Sales, READY, Reschedule, Waiting WO bln aktif): ${fmtInt(wTot)} Customer`,
+                panelRows,
+                notes: ['Seluruh tabel Besok & Waiting WO digabung dalam 1 lembar Super-HD agar tetap tajam saat di-copy ke WhatsApp.'],
+            });
+            return {
+                fileName: includeRingkasan ? `01C_Monitoring_WO_Gabungan_${ws.today_label}.png` : `02B_WO_BESOK_dan_WAITING_${ws.today_label}.png`,
+                caption: includeRingkasan ? `🛠️ <b>Monitoring WO Gabungan (Ringkasan, Besok ${besokRng} &amp; Waiting WO)</b>` : `2️⃣3️⃣ <b>WO BESOK (${besokRng}: ${fmtInt(bTot)}) &amp; WAITING WO (${fmtInt(wTot)})</b>`,
+                ...img,
             };
         }
 
         async function buildAllReportPngs(data) {
             const out = [];
+            const hasSummary = (data.mtd_rows && data.mtd_rows.length) || (data.daily_rows && data.daily_rows.length) || (data.agent_rows && data.agent_rows.length);
 
-            // 1. MTD SA
-            if (data.mtd_rows && data.mtd_rows.length) {
-                let totOct = 0, totNov = 0;
-                const rows = [];
-                const rowStyles = [];
-                let idxTot = -1;
-                for (const mr of data.mtd_rows) {
-                    if (mr.is_total) {
-                        totOct = mr.sa_oct;
-                        totNov = mr.sa_nov;
-                        idxTot = rows.length;
-                        rowStyles.push({ bg: '#c9daf8', bold: true });
-                    } else {
-                        rowStyles.push(null);
+            if (!hasSummary) {
+                if (data.wo_summary && data.wo_summary.leader_summary && data.wo_summary.leader_summary.length) {
+                    const imgGab = await buildWoBesokWaitingImg(data.wo_summary, true);
+                    if (imgGab) out.push(imgGab);
+                    const imgToday = await buildWoTodayImg(data.wo_summary);
+                    if (imgToday) out.push(imgToday);
+                    if (data.wo_summary.include_cards && data.wo_summary.agent_summary) {
+                        for (const ag of data.wo_summary.agent_summary) out.push(await renderAgentWoCardPng(ag, data.wo_summary.today_label, data.wo_summary.besok_label));
                     }
-                    rows.push([mr.leader, fmtInt(mr.sa_oct), fmtInt(mr.sa_nov), fmtInt(mr.gap_sa)]);
                 }
-                const acv = totOct > 0 ? roundExcel(((totNov - totOct) / totOct) * 100) : 0;
-                const idxNote = rows.length;
-                rows.push(['Note Acv SA', '', acv < 0 ? '↓' : '↑', acv + '%']);
-                rowStyles.push({ bg: '#dbe5f1', bold: true });
+                return out;
+            }
 
-                const imgMtd = await renderTablePng({
-                    title: 'MTD SA — RINGKASAN PENCAPAIAN LEADER',
-                    subtitle: `Perbandingan tanggal 1-${data.hari} ${data.bln_lalu} vs ${data.bln_ini} ${data.tahun} (${data.scope})`,
-                    columns: ['SALES LEADER', `SA ${data.bln_lalu}\n1-${data.hari}`, `SA ${data.bln_ini}\n1-${data.hari}`, 'GAP SA'],
-                    rows: rows,
-                    align: ['l', 'c', 'c', 'c'],
-                    rowStyles: rowStyles,
-                    cellStyle: (i, c, txt) => {
-                        if (c === 0 && (i === idxTot || i === idxNote)) return { align: 'c' };
-                        if (c === 3) {
-                            const v = parseInt(String(txt).replace(/\./g, '').replace('%', ''), 10);
-                            if (!isNaN(v) && v < 0) return { bg: '#f4cccc', fg: '#990000', bold: true };
-                            if (!isNaN(v) && v > 0) return { fg: '#15803d', bold: true };
-                        }
-                        return null;
-                    },
-                    notes: [`GAP SA = SA ${data.bln_ini} - SA ${data.bln_lalu}. Note Acv SA = kenaikan/penurunan terhadap bulan lalu.`],
+            // 1. GABUNGAN RINGKASAN EKSEKUTIF (MTD SA + Rekap Harian + Ringkasan WO)
+            const topRow = [];
+            if (data.mtd_rows && data.mtd_rows.length) topRow.push(specMtdSa(data));
+            if (data.daily_rows && data.daily_rows.length) topRow.push(specHarianBlmProduktif(data));
+            const execRows = topRow.length ? [topRow] : [];
+            const execNotes = [`GAP SA = SA ${data.bln_ini} - SA ${data.bln_lalu}. SO/GP = Sales Order / Generate Payment pada ${data.daily_label}.`];
+            if (data.wo_summary && data.wo_summary.leader_summary && data.wo_summary.leader_summary.length) {
+                execRows.push([specWoRingkasan(data.wo_summary)]);
+                execNotes.push(`1. WO TODAY (${data.wo_summary.today_label}): On Install + SA | 2. WO BESOK (${data.wo_summary.besok_label}): H+1 | 3. WAITING WO: Instalasi Blank.`);
+            }
+            if (execRows.length) {
+                const imgExec = await renderCompositePng({
+                    title: `RINGKASAN EKSEKUTIF LAPORAN (${data.hari}-${data.bln_ini}-${data.tahun})`,
+                    subtitle: `Gabungan MTD SA (1-${data.hari} ${data.bln_lalu} vs ${data.bln_ini}) • Rekap Harian & Agent Blm Produktif` + (data.wo_summary ? ' • Monitoring Work Order' : ''),
+                    panelRows: execRows, notes: execNotes,
                 });
                 out.push({
-                    fileName: `01_MTD_SA_1-${data.hari}_${data.bln_ini}_${data.tahun}.png`,
-                    caption: `📈 <b>MTD SA 1-${data.hari} ${data.bln_lalu} vs ${data.bln_ini} ${data.tahun}</b>`,
-                    blob: imgMtd.blob,
-                    dataUrl: imgMtd.dataUrl,
+                    fileName: `01_Ringkasan_Eksekutif_1-${data.hari}_${data.bln_ini}_${data.tahun}.png`,
+                    caption: `📊 <b>Ringkasan Eksekutif (MTD 1-${data.hari} ${data.bln_ini}, Harian ${data.daily_label}` + (data.wo_summary ? ' &amp; Monitoring WO' : '') + `)</b>`,
+                    ...imgExec,
                 });
             }
 
-            // 1B. REKAP HARIAN & AGENT BELUM PRODUKTIF
-            if (data.daily_rows && data.daily_rows.length) {
-                const dRows = [];
-                const dStyles = [];
-                let idxGt = -1;
-                for (const dr of data.daily_rows) {
-                    if (dr.is_gt) {
-                        idxGt = dRows.length;
-                        dStyles.push({ bg: '#ffffff', bold: true });
-                    } else {
-                        dStyles.push(null);
-                    }
-                    dRows.push([dr.leader, fmtInt(dr.so), fmtInt(dr.paid), fmtInt(dr.sa), fmtInt(dr.blm_so), fmtInt(dr.blm_paid), fmtInt(dr.blm_sa)]);
-                }
-                const imgDp = await renderTablePng({
-                    title: `REKAP HARIAN (${data.daily_label}) & AGENT BELUM PRODUKTIF`,
-                    subtitle: `SO/GP (Sales Order = Generate Payment), PAID, SA tanggal ${data.daily_label} vs Jumlah Agent Belum Produktif`,
-                    columns: ['Sales Leader', 'SO / GP', 'PAID', 'SA', 'SO / GP', 'PAID', 'SA'],
-                    groupHeaders: [
-                        { label: data.daily_label, start: 1, end: 3, bg: '#002060' },
-                        { label: 'Jumlah Agent Blm Produktif', start: 4, end: 6, bg: '#dc0000' },
-                    ],
-                    headBg: '#002060',
-                    rows: dRows,
-                    align: ['l', 'c', 'c', 'c', 'c', 'c', 'c'],
-                    rowStyles: dStyles,
-                    cellStyle: (i, c) => (i === idxGt && c >= 4) ? { bg: '#fce4d6', fg: '#9a3412', bold: true } : null,
-                    notes: [`SO = GP (Sales Order / Generate Payment pada ${data.daily_label}) | Kolom Merah: Agen aktif non-Vacant dengan hasil 0.`],
-                });
-                out.push({
-                    fileName: `01B_Rekap_Harian_Blm_Produktif_${data.daily_label}.png`,
-                    caption: `📊 <b>Rekap Harian (${data.daily_label}) &amp; Jumlah Agent Belum Produktif</b>`,
-                    blob: imgDp.blob,
-                    dataUrl: imgDp.dataUrl,
-                });
-
-                for (const dr of data.daily_rows) {
-                    if (dr.is_gt || !Array.isArray(dr.agent_details) || !dr.agent_details.length) continue;
-                    const agRows = [];
-                    const agStyles = [];
-                    let sumSo = 0, sumPaid = 0, sumSa = 0, cPaid = 0, cGpBlm = 0, cTdk = 0;
-                    for (const ad of dr.agent_details) {
-                        const isVac = !!ad.is_vacant;
-                        sumSo += (ad.so || 0); sumPaid += (ad.paid || 0); sumSa += (ad.sa || 0);
-                        if (!isVac) {
-                            if ((ad.paid || 0) > 0) cPaid++;
-                            else {
-                                cTdk++;
-                                if ((ad.so || 0) > 0) cGpBlm++;
-                            }
-                        }
-                        agRows.push([ad.name, fmtInt(ad.so), fmtInt(ad.paid), fmtInt(ad.sa), ad.status_harian || '']);
-                        agStyles.push(isVac ? { bg: '#ffff00', bold: true } : null);
-                    }
-                    const idxTotAg = agRows.length;
-                    agRows.push([`TOTAL TIM (${dr.agent_details.length} slot)`, fmtInt(sumSo), fmtInt(sumPaid), fmtInt(sumSa), `PAID: ${cPaid} | GP(Blm PAID): ${cGpBlm} | Tdk PAID: ${cTdk}`]);
-                    agStyles.push({ bg: '#c9daf8', bold: true });
-                    const imgAgDp = await renderTablePng({
-                        title: `RINCIAN HARIAN PER AGENT — TIM ${String(dr.leader).toUpperCase()} (${data.daily_label})`,
-                        subtitle: `Sudah PAID: ${cPaid} | Sudah GP/SO (Blm PAID): ${cGpBlm} | Total Tidak PAID: ${cTdk}`,
-                        columns: ['Salesname', 'SO / GP', 'PAID', 'SA', 'Status Harian'],
-                        rows: agRows,
-                        align: ['l', 'c', 'c', 'c', 'l'],
-                        rowStyles: agStyles,
-                        cellStyle: (i, c, txt) => {
-                            if (i === idxTotAg || c !== 4) return null;
-                            if (String(txt).includes('Sudah PAID')) return { bg: '#d9ead3', fg: '#134f5c', bold: true };
-                            if (String(txt).includes('Sudah GP')) return { bg: '#fff2cc', fg: '#7f4f00', bold: true };
-                            if (String(txt).includes('Tidak PAID')) return { bg: '#f4cccc', fg: '#990000', bold: true };
-                            return null;
-                        },
-                        notes: ['Catatan: SO = GP (Sales Order / Generate Payment). Hijau = Sudah PAID | Kuning = Sudah GP/SO (Blm PAID) | Merah = Tidak PAID.'],
-                    });
-                    const safeD = String(dr.leader).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
-                    const escD = String(dr.leader).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    out.push({
-                        fileName: `01B2_Rincian_Agent_Harian_${safeD}_${data.daily_label}.png`,
-                        caption: `👥 <b>Rincian Harian Agent — Tim ${escD} (${data.daily_label})</b> | PAID: ${cPaid} | GP/SO (Blm PAID): ${cGpBlm} | Tdk PAID: ${cTdk}`,
-                        blob: imgAgDp.blob,
-                        dataUrl: imgAgDp.dataUrl,
-                    });
-                }
+            // 2. DETAIL WORK ORDER SUPER-HD (Today Multi-Kolom + Besok & Waiting Gabungan)
+            if (data.wo_summary && data.wo_summary.leader_summary && data.wo_summary.leader_summary.length) {
+                const imgToday = await buildWoTodayImg(data.wo_summary);
+                if (imgToday) out.push(imgToday);
+                const imgBW = await buildWoBesokWaitingImg(data.wo_summary, false);
+                if (imgBW) out.push(imgBW);
             }
 
-            // 1C. MONITORING WORK ORDER (RINGKASAN + PIVOT 1/2/3 + FOTO TIM PER LEADER + KARTU AGENT)
-            async function renderWoPivotPng(ws, mode) {
-                const isToday = mode === 'today';
-                const isBesok = mode === 'besok';
-                const src = isToday ? (ws.wo_today_rows || []) : (isBesok ? (ws.wo_besok_rows || []) : (ws.waiting_wo_rows || []));
-                if (!src.length) return null;
-                const besokRng = ws.besok_label || '';
-                const rawCols = isToday
-                    ? (Array.isArray(ws.wo_today_columns) ? ws.wo_today_columns : [])
-                    : (isBesok
-                        ? (Array.isArray(ws.wo_besok_columns) ? ws.wo_besok_columns : [])
-                        : (Array.isArray(ws.waiting_wo_columns) && ws.waiting_wo_columns.length ? ws.waiting_wo_columns : ['Waiting WO']));
-                const dispSt = rawCols.map(c => (isToday && String(c).toLowerCase() === 'active' ? 'Active (SA)' : c));
-                const idxSaCol = isToday && dispSt.indexOf('Active (SA)') >= 0 ? (2 + dispSt.indexOf('Active (SA)')) : -1;
-                const cols = ['Sales Leader', 'Salesname', ...dispSt, 'Grand Total'];
-
-                const rows = [];
-                const rStyles = [];
-                let idxGtP = -1;
-                for (const r of src) {
-                    const rt = r.row_type || 'agent';
-                    if (rt === 'grand_total') { idxGtP = rows.length; rStyles.push({ bg: '#fef3c7', bold: true }); }
-                    else if (rt === 'leader_total') { rStyles.push({ bg: '#dbeafe', bold: true }); }
-                    else { rStyles.push(null); }
-                    const ldrC = (rt === 'agent') ? r.leader : '';
-                    const stMap = r.statuses || {};
-                    const stVals = rawCols.map(c => {
-                        const v = (stMap[c] !== undefined) ? Number(stMap[c]) : ((rawCols.length === 1 && c === 'Waiting WO') ? Number(r.total || 0) : 0);
-                        return (v > 0 || rt === 'grand_total') ? fmtInt(v) : '';
-                    });
-                    rows.push([ldrC, r.salesname, ...stVals, fmtInt(r.total)]);
-                }
-                const title = isToday
-                    ? `1. WO TODAY (${ws.today_label}) — ON INSTALLATION & SA`
-                    : (isBesok ? `2. WO BESOK (${besokRng}) — JADWAL INSTALASI` : `3. WAITING WO — ANTREAN PENJADWALAN`);
-                const sub = isToday
-                    ? `Pivot Count of Customer Name pada Instalasi Date ${ws.today_label} (On Installation + Active/SA)`
-                    : (isBesok ? `Pivot Count of Customer Name pada Instalasi Date = ${ws.besok_label} (Hanya H+1, Status = ALL)` : `Pivot Count of Customer Name: Instalasi Date = (blank) | Status IN (Back To Sales, READY, Reschedule, Waiting WO)`);
-                const headBg = isToday ? '#002060' : (isBesok ? '#065f46' : '#92400e');
-                const alignArr = ['l', 'l', ...rawCols.map(() => 'c'), 'c'];
-                const imgP = await renderTablePng({
-                    title, subtitle: sub, columns: cols, headBg, rows,
-                    align: alignArr,
-                    rowStyles: rStyles,
-                    cellStyle: (i, c) => {
-                        if (c === cols.length - 1) return { bold: true, bg: i === idxGtP ? '#fef3c7' : undefined };
-                        if (idxSaCol >= 0 && c === idxSaCol) return { bold: true, bg: i === idxGtP ? '#bbf7d0' : '#f0fdf4', fg: '#166534' };
-                        return null;
-                    },
-                    notes: [`Total baris pivot: ${rows.length}`],
-                });
-                const fName = isToday ? `01C1_WO_TODAY_${ws.today_label}.png` : (isBesok ? `01C2_WO_BESOK_${ws.besok_label}.png` : `01C3_WAITING_WO_${ws.today_label}.png`);
-                const cap = isToday ? `1️⃣ <b>WO TODAY (${ws.today_label}) — Detail Agent &amp; SA</b>` : (isBesok ? `2️⃣ <b>WO BESOK (${besokRng}) — Detail Agent</b>` : `3️⃣ <b>WAITING WO — Detail Agent</b>`);
-                return { fileName: fName, caption: cap, blob: imgP.blob, dataUrl: imgP.dataUrl };
+            // 3. GABUNGAN PER TIM LEADER (Detail Agent MTD + Rincian Harian PAID/GP + Monitoring WO Tim)
+            const harianByLdr = new Map();
+            for (const dr of (data.daily_rows || [])) {
+                if (!dr.is_gt && Array.isArray(dr.agent_details) && dr.agent_details.length) harianByLdr.set(dr.leader, dr.agent_details);
+            }
+            const woByLdr = new Map();
+            for (const wag of ((data.wo_summary && data.wo_summary.agent_summary) || [])) {
+                if (!woByLdr.has(wag.leader)) woByLdr.set(wag.leader, []);
+                woByLdr.get(wag.leader).push(wag);
             }
 
-            async function renderWoTeamPngs(ws) {
-                const agList = ws.agent_summary || [];
-                if (!agList.length) return [];
-                const besokRng = ws.besok_label || '';
-                const byLdrW = new Map();
-                for (const a of agList) {
-                    if (!byLdrW.has(a.leader)) byLdrW.set(a.leader, []);
-                    byLdrW.get(a.leader).push(a);
-                }
-                const resList = [];
-                let seqW = 1;
-                for (const [ldrW, grpW] of byLdrW.entries()) {
-                    const rows = [], rStyles = [];
-                    let sTot = 0, sSa = 0, sOn = 0, sBsk = 0, sBon = 0, sBwt = 0, sWwo = 0;
-                    grpW.forEach((r, idx) => {
-                        const cTot = Number(r.today_total || 0), cSa = Number(r.today_sa || 0), cOn = Number(r.today_on_installation || 0);
-                        const cBsk = Number(r.wo_besok || 0), cBon = Number(r.besok_on_installation || 0), cBwt = Number(r.besok_waiting_wo || 0);
-                        const cWwo = Number(r.waiting_wo || 0);
-                        sTot += cTot; sSa += cSa; sOn += cOn; sBsk += cBsk; sBon += cBon; sBwt += cBwt; sWwo += cWwo;
-                        rows.push([
-                            String(idx + 1), r.salesname,
-                            fmtInt(cTot), cSa ? fmtInt(cSa) : '-', cOn ? fmtInt(cOn) : '-',
-                            fmtInt(cBsk), cBon ? fmtInt(cBon) : '-', cBwt ? fmtInt(cBwt) : '-',
-                            fmtInt(cWwo),
-                        ]);
-                        rStyles.push(null);
-                    });
-                    const idxTotW = rows.length;
-                    rows.push(['', `TOTAL ${ldrW}`, fmtInt(sTot), fmtInt(sSa), fmtInt(sOn), fmtInt(sBsk), fmtInt(sBon), fmtInt(sBwt), fmtInt(sWwo)]);
-                    rStyles.push({ bg: '#dbeafe', bold: true });
-                    const imgT = await renderTablePng({
-                        title: `WORK ORDER AGENT — TIM ${ldrW.toUpperCase()}`,
-                        subtitle: `1. WO Today (${ws.today_label})  •  2. WO Besok (${besokRng})  •  3. Waiting WO`,
-                        columns: ['NO', 'SALESNAME', 'TOTAL\nTODAY', 'SA\n(ACTIVE)', 'ON\nINSTALL', `TOTAL\n(${besokRng})`, 'ON\nINSTALL', 'WAIT\nWO', 'WAITING\nWO'],
-                        groupHeaders: [
-                            { label: `1. WO TODAY (${ws.today_label})`, start: 2, end: 4, bg: '#002060' },
-                            { label: `2. WO BESOK (${besokRng})`, start: 5, end: 7, bg: '#065f46' },
-                            { label: '3. WAITING WO', start: 8, end: 8, bg: '#92400e' },
-                        ],
-                        rows, align: ['c', 'l', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: rStyles,
-                        cellStyle: (i, c) => {
-                            if (c === 2) return i === idxTotW ? { bg: '#c9daf8', fg: '#1e3a8a', bold: true } : { bg: '#eff6ff', bold: true };
-                            if (c === 3) return i === idxTotW ? { bg: '#bbf7d0', fg: '#14532d', bold: true } : { bg: '#f0fdf4', fg: '#166534', bold: true };
-                            if (c === 5) return i === idxTotW ? { bg: '#d1fae5', fg: '#065f46', bold: true } : { bg: '#ecfdf5', bold: true };
-                            if (c === 8) return i === idxTotW ? { bg: '#fde68a', fg: '#92400e', bold: true } : { bg: '#fffbeb', bold: true };
-                            return null;
-                        },
-                        notes: [`Tim ${ldrW}: WO Today=${sTot} (SA=${sSa}) | WO Besok=${sBsk} | Waiting WO=${sWwo}`],
-                    });
-                    const safeLw = ldrW.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
-                    const escLw = ldrW.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    resList.push({
-                        fileName: `01D_${String(seqW).padStart(2, '0')}_WO_Tim_${safeLw}.png`,
-                        caption: `🛠️ <b>WO Detail Agent — Tim ${escLw}</b> | Today (${ws.today_label}): ${sTot} (SA ${sSa}) | Besok (${besokRng}): ${sBsk} | Waiting: ${sWwo}`,
-                        blob: imgT.blob,
-                        dataUrl: imgT.dataUrl,
-                    });
-                    seqW++;
-                }
-                return resList;
-            }
-
-            async function buildWoTableAndTeamPngs(ws, includeCards) {
-                const woOut = [];
-                const besokRng = ws.besok_label || '';
-                if (ws.leader_summary && ws.leader_summary.length) {
-                    const wRows = [], wStyles = [];
-                    let idxGtW = -1;
-                    for (const wr of ws.leader_summary) {
-                        if (wr.is_gt) { idxGtW = wRows.length; wStyles.push({ bg: '#dbeafe', bold: true }); }
-                        else { wStyles.push(null); }
-                        wRows.push([
-                            wr.leader, fmtInt(wr.today_total || 0), fmtInt(wr.today_sa || 0),
-                            fmtInt(wr.today_on_installation || 0),
-                            fmtInt(wr.wo_besok || 0), fmtInt(wr.besok_on_installation || 0), fmtInt(wr.besok_waiting_wo || 0),
-                            fmtInt(wr.waiting_wo || 0),
-                        ]);
-                    }
-                    const imgWo = await renderTablePng({
-                        title: `MONITORING WORK ORDER (${ws.today_label} | WO BESOK | WAITING WO)`,
-                        subtitle: `1. WO TODAY (${ws.today_label}: On Install + SA)  •  2. WO BESOK (${besokRng}, H+1)  •  3. WAITING WO (Instalasi Blank)`,
-                        columns: ['Sales Leader', 'TOTAL\nTODAY', 'SA\n(ACTIVE)', 'ON\nINSTALL', `TOTAL\n(${besokRng})`, 'ON\nINSTALL', 'WAIT\nWO', 'WAITING\nWO'],
-                        groupHeaders: [
-                            { label: `1. WO TODAY (${ws.today_label})`, start: 1, end: 3, bg: '#002060' },
-                            { label: `2. WO BESOK (${besokRng})`, start: 4, end: 6, bg: '#065f46' },
-                            { label: '3. WAITING WO', start: 7, end: 7, bg: '#92400e' },
-                        ],
-                        headBg: '#002060', rows: wRows, align: ['l', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: wStyles,
-                        cellStyle: (i, c) => {
-                            if (i === idxGtW && c === 1) return { bg: '#c9daf8', fg: '#1e3a8a', bold: true };
-                            if (i === idxGtW && c === 2) return { bg: '#bbf7d0', fg: '#14532d', bold: true };
-                            if (i === idxGtW && c === 4) return { bg: '#d1fae5', fg: '#065f46', bold: true };
-                            if (i === idxGtW && c === 7) return { bg: '#fde68a', fg: '#92400e', bold: true };
-                            if (c === 1) return { bg: '#eff6ff', bold: true };
-                            if (c === 2) return { bg: '#f0fdf4', fg: '#166534', bold: true };
-                            if (c === 4) return { bg: '#ecfdf5', bold: true };
-                            if (c === 7) return { bg: '#fffbeb', bold: true };
-                            return null;
-                        },
-                        notes: [`1. WO TODAY: On Installation + Active(SA) pd ${ws.today_label}. 2. WO BESOK: Hanya Instalasi Date = ${ws.besok_label}. 3. WAITING WO: Instalasi Blank & Status IN (Back To Sales, READY, Reschedule, Waiting WO) pd bulan aktif.`],
-                    });
-                    woOut.push({
-                        fileName: `01C_Monitoring_WO_${ws.today_label}.png`,
-                        caption: `🛠️ <b>Monitoring Work Order</b> | 1. Today (${ws.today_label}) | 2. Besok (${besokRng}) | 3. Waiting WO`,
-                        blob: imgWo.blob,
-                        dataUrl: imgWo.dataUrl,
-                    });
-                }
-                for (const md of ['today', 'besok', 'waiting']) {
-                    const pImg = await renderWoPivotPng(ws, md);
-                    if (pImg) woOut.push(pImg);
-                }
-                const tImgs = await renderWoTeamPngs(ws);
-                for (const ti of tImgs) woOut.push(ti);
-                if (includeCards && ws.agent_summary && ws.agent_summary.length) {
-                    for (const ag of ws.agent_summary) {
-                        woOut.push(await renderAgentWoCardPng(ag, ws.today_label, ws.besok_label));
-                    }
-                }
-                return woOut;
-            }
-
-            if (data.wo_summary) {
-                const wsItems = await buildWoTableAndTeamPngs(data.wo_summary, !!data.wo_summary.include_cards);
-                for (const wi of wsItems) out.push(wi);
-            }
-
-            // 2. DETAIL AGENT PER LEADER (TANPA Reguler/Yearly terpisah!)
             if (data.agent_rows && data.agent_rows.length) {
                 const byLdr = new Map();
                 for (const ag of data.agent_rows) {
                     if (!byLdr.has(ag.leader)) byLdr.set(ag.leader, []);
                     byLdr.get(ag.leader).push(ag);
                 }
-                let seq = 2;
+                let seq = 1;
                 for (const [ldrName, grp] of byLdr.entries()) {
-                    const rows = [];
-                    const styles = [];
-                    const vacantSet = new Set();
-                    const kurangSet = new Set();
-                    let nKurang = 0;
-                    let sT = 0, sSa = 0, sPaid = 0, sM = 0, s3m = 0, sSem = 0, sYr = 0, sPHr = 0, sSHr = 0;
-
+                    const rows = [], styles = [], vacantSet = new Set(), kurangSet = new Set();
+                    let nKurang = 0, sT = 0, sSa = 0, sPaid = 0, sM = 0, s3m = 0, sSem = 0, sYr = 0, sPHr = 0, sSHr = 0;
                     grp.forEach((r, idx) => {
                         const isVac = String(r.name).toUpperCase() === 'VACANT';
                         let stTxt = 'AMAN';
-                        if (isVac) {
-                            stTxt = 'VACANT';
-                            vacantSet.add(rows.length);
-                        } else if (r.persen < data.target_mtd) {
-                            stTxt = `KURANG -${data.target_mtd - r.persen}%`;
-                            nKurang++;
-                            kurangSet.add(rows.length);
-                        }
+                        if (isVac) { stTxt = 'VACANT'; vacantSet.add(rows.length); }
+                        else if (r.persen < data.target_mtd) { stTxt = `KURANG -${data.target_mtd - r.persen}%`; nKurang++; kurangSet.add(rows.length); }
                         sT += r.target_all; sSa += r.sa_nov; sPaid += r.paid_nov;
                         sM += r.p_m; s3m += r.p_3m; sSem += r.p_sem; sYr += r.p_yr;
                         sPHr += r.harus_paid_hr; sSHr += r.harus_sa_hr;
-                        rows.push([
-                            String(idx + 1), r.name, r.level, fmtInt(r.target_all),
-                            fmtInt(r.sa_nov), fmtInt(r.paid_nov), fmtInt(r.gap_sa), r.persen + '%',
-                            fmtInt(r.runrate_30), fmtInt(r.p_m), fmtInt(r.p_3m), fmtInt(r.p_sem), fmtInt(r.p_yr),
-                            stTxt, fmtInt(r.harus_paid_hr), fmtInt(r.harus_sa_hr),
-                        ]);
+                        rows.push([String(idx + 1), r.name, r.level, fmtInt(r.target_all), fmtInt(r.sa_nov), fmtInt(r.paid_nov), fmtInt(r.gap_sa), r.persen + '%', fmtInt(r.runrate_30), fmtInt(r.p_m), fmtInt(r.p_3m), fmtInt(r.p_sem), fmtInt(r.p_yr), stTxt, fmtInt(r.harus_paid_hr), fmtInt(r.harus_sa_hr)]);
                         styles.push(null);
                     });
-
                     const idxTotL = rows.length;
                     const pctL = sT > 0 ? roundExcel((sSa / sT) * 100) : 0;
                     const rrL = roundExcel((sSa * data.total_hari) / Math.max(1, data.hari));
-                    rows.push([
-                        '', `TOTAL ${ldrName}`, '', fmtInt(sT), fmtInt(sSa), fmtInt(sPaid), fmtInt(sSa - sT),
-                        pctL + '%', fmtInt(rrL), fmtInt(sM), fmtInt(s3m), fmtInt(sSem), fmtInt(sYr),
-                        `${nKurang} agen kurang`, fmtInt(sPHr), fmtInt(sSHr),
-                    ]);
+                    rows.push(['', `TOTAL ${ldrName}`, '', fmtInt(sT), fmtInt(sSa), fmtInt(sPaid), fmtInt(sSa - sT), pctL + '%', fmtInt(rrL), fmtInt(sM), fmtInt(s3m), fmtInt(sSem), fmtInt(sYr), `${nKurang} agen kurang`, fmtInt(sPHr), fmtInt(sSHr)]);
                     styles.push({ bg: '#b4a7d6', bold: true });
 
-                    const imgLdr = await renderTablePng({
-                        title: `DETAIL AGENT — TIM ${ldrName.toUpperCase()}`,
-                        subtitle: `Realisasi MTD 1-${data.hari} ${data.bln_ini} ${data.tahun}  •  Sisa ${data.sisa_hari} hari  •  Target MTD ${data.target_mtd}%`,
+                    const teamRows = [[{
+                        sectionTitle: `1. DETAIL AGENT MTD, PAKET & KUOTA WAJIB (${ldrName.toUpperCase()})`,
+                        sectionBg: '#1f3864', headBg: '#1f3864',
                         columns: ['NO', 'SALES NAME', 'LEVEL', 'TARGET\nTOTAL', `SA\n${data.bln_ini}`, `PAID\n${data.bln_ini}`, 'GAP\nSA', 'PERSEN-\nTASE', `RUNRATE\n${data.total_hari}H`, 'M', '3M', 'SEM', 'Y', `STATUS vs\nTARGET ${data.target_mtd}%`, 'PAID\n/ HARI', 'SA\n/ HARI'],
-                        groupHeaders: [
-                            { label: 'BREAKDOWN PAKET', start: 9, end: 12, bg: '#1f3864' },
-                            { label: 'KUOTA WAJIB / HARI', start: 14, end: 15, bg: '#1f3864' },
-                        ],
-                        banner: { top: 'TARGET', left: data.periode, right: data.target_mtd + '%' },
-                        rows: rows,
-                        align: ['c', 'l', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'],
-                        rowStyles: styles,
+                        groupHeaders: [{ label: 'BREAKDOWN PAKET', start: 9, end: 12, bg: '#1f3864' }, { label: 'KUOTA WAJIB / HARI', start: 14, end: 15, bg: '#1f3864' }],
+                        rows, align: ['c', 'l', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: styles,
                         cellStyle: (i, c, txt) => {
                             const isTot = i === idxTotL;
                             if (c === 1 && vacantSet.has(i)) return { bg: '#ffff00', bold: true };
                             if (c === 4 && !isTot) return { bg: '#c9daf8', bold: true };
                             if (c === 6 && !isTot && Number(String(txt).replace(/\./g, '')) < 0) return { fg: '#990000' };
-                            if (c === 7) {
-                                const v = parseInt(String(txt), 10);
-                                return (!isNaN(v) && v < data.target_mtd)
-                                    ? { bg: '#f4cccc', fg: '#990000', bold: true }
-                                    : { bg: '#d9ead3', fg: '#134f5c', bold: true };
-                            }
-                            if (c === 13 && !isTot) {
-                                if (String(txt).startsWith('KURANG')) return { bg: '#f4cccc', fg: '#990000', bold: true };
-                                if (txt === 'AMAN') return { bg: '#d9ead3', fg: '#134f5c', bold: true };
-                            }
+                            if (c === 7) { const v = parseInt(String(txt), 10); return (!isNaN(v) && v < data.target_mtd) ? { bg: '#f4cccc', fg: '#990000', bold: true } : { bg: '#d9ead3', fg: '#134f5c', bold: true }; }
+                            if (c === 13 && !isTot) { if (String(txt).startsWith('KURANG')) return { bg: '#f4cccc', fg: '#990000', bold: true }; if (txt === 'AMAN') return { bg: '#d9ead3', fg: '#134f5c', bold: true }; }
                             if ((c === 14 || c === 15) && kurangSet.has(i)) return { bg: '#fff2cc', fg: '#7f4f00', bold: true };
                             if (c === 14 || c === 15) return { bold: true };
                             return null;
                         },
-                        notes: [`PERSENTASE = SA ÷ Target Total. Kuning = kuota harian Paid/SA bagi agen di bawah ${data.target_mtd}%.`],
+                    }]];
+
+                    const botRowT = [];
+                    const agDet = harianByLdr.get(ldrName);
+                    if (agDet && agDet.length) {
+                        const agRows = [], agStyles = [];
+                        let sumSo = 0, sumPaid = 0, sumSa = 0, cPaid = 0, cGpBlm = 0, cTdk = 0;
+                        for (const ad of agDet) {
+                            const isVac = !!ad.is_vacant;
+                            sumSo += (ad.so || 0); sumPaid += (ad.paid || 0); sumSa += (ad.sa || 0);
+                            if (!isVac) { if ((ad.paid || 0) > 0) cPaid++; else { cTdk++; if ((ad.so || 0) > 0) cGpBlm++; } }
+                            agRows.push([ad.name, fmtInt(ad.so), fmtInt(ad.paid), fmtInt(ad.sa), ad.status_harian || '']);
+                            agStyles.push(isVac ? { bg: '#ffff00', bold: true } : null);
+                        }
+                        const idxTotAg = agRows.length;
+                        agRows.push([`TOTAL (${agDet.length} slot)`, fmtInt(sumSo), fmtInt(sumPaid), fmtInt(sumSa), `PAID:${cPaid} | GP:${cGpBlm} | Tdk:${cTdk}`]);
+                        agStyles.push({ bg: '#c9daf8', bold: true });
+                        botRowT.push({
+                            sectionTitle: `2. RINCIAN HARIAN (${data.daily_label}) | PAID:${cPaid} GP:${cGpBlm} Tdk:${cTdk}`,
+                            sectionBg: '#002060', headBg: '#002060',
+                            columns: ['Salesname', 'SO/GP', 'PAID', 'SA', 'Status Harian'],
+                            rows: agRows, align: ['l', 'c', 'c', 'c', 'l'], rowStyles: agStyles,
+                            cellStyle: (i, c, txt) => {
+                                if (i === idxTotAg || c !== 4) return null;
+                                if (String(txt).includes('Sudah PAID')) return { bg: '#d9ead3', fg: '#134f5c', bold: true };
+                                if (String(txt).includes('Sudah GP')) return { bg: '#fff2cc', fg: '#7f4f00', bold: true };
+                                if (String(txt).includes('Tidak PAID')) return { bg: '#f4cccc', fg: '#990000', bold: true };
+                                return null;
+                            },
+                        });
+                    }
+                    const woGrp = woByLdr.get(ldrName);
+                    if (woGrp && woGrp.length) {
+                        const ws = data.wo_summary, besokRng = ws.besok_label || '';
+                        const wRows = [], wStyles = [];
+                        let sTot = 0, sSaW = 0, sOn = 0, sBsk = 0, sBon = 0, sBwt = 0, sWwo = 0;
+                        woGrp.forEach((r, idx) => {
+                            const cTot = Number(r.today_total || 0), cSa = Number(r.today_sa || 0), cOn = Number(r.today_on_installation || 0);
+                            const cBsk = Number(r.wo_besok || 0), cBon = Number(r.besok_on_installation || 0), cBwt = Number(r.besok_waiting_wo || 0), cWwo = Number(r.waiting_wo || 0);
+                            sTot += cTot; sSaW += cSa; sOn += cOn; sBsk += cBsk; sBon += cBon; sBwt += cBwt; sWwo += cWwo;
+                            wRows.push([String(idx + 1), r.salesname, fmtInt(cTot), cSa ? fmtInt(cSa) : '-', cOn ? fmtInt(cOn) : '-', fmtInt(cBsk), cBon ? fmtInt(cBon) : '-', cBwt ? fmtInt(cBwt) : '-', fmtInt(cWwo)]);
+                            wStyles.push(null);
+                        });
+                        const idxTotW = wRows.length;
+                        wRows.push(['', `TOTAL ${ldrName}`, fmtInt(sTot), fmtInt(sSaW), fmtInt(sOn), fmtInt(sBsk), fmtInt(sBon), fmtInt(sBwt), fmtInt(sWwo)]);
+                        wStyles.push({ bg: '#dbeafe', bold: true });
+                        botRowT.push({
+                            sectionTitle: `3. MONITORING WO TIM (Today:${sTot} SA:${sSaW} | Besok:${sBsk} | Wait:${sWwo})`,
+                            sectionBg: '#065f46', headBg: '#065f46',
+                            columns: ['NO', 'SALESNAME', 'TOT', 'SA', 'OI', `${besokRng}`, 'OI', 'WT', 'WAIT'],
+                            groupHeaders: [
+                                { label: `TODAY (${ws.today_label})`, start: 2, end: 4, bg: '#002060' },
+                                { label: `BESOK (${besokRng})`, start: 5, end: 7, bg: '#065f46' },
+                                { label: 'WAIT', start: 8, end: 8, bg: '#92400e' },
+                            ],
+                            rows: wRows, align: ['c', 'l', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], rowStyles: wStyles,
+                            cellStyle: (i, c) => {
+                                if (c === 2) return i === idxTotW ? { bg: '#c9daf8', fg: '#1e3a8a', bold: true } : { bg: '#eff6ff', bold: true };
+                                if (c === 3) return i === idxTotW ? { bg: '#bbf7d0', fg: '#14532d', bold: true } : { bg: '#f0fdf4', fg: '#166534', bold: true };
+                                if (c === 5) return i === idxTotW ? { bg: '#d1fae5', fg: '#065f46', bold: true } : { bg: '#ecfdf5', bold: true };
+                                if (c === 8) return i === idxTotW ? { bg: '#fde68a', fg: '#92400e', bold: true } : { bg: '#fffbeb', bold: true };
+                                return null;
+                            },
+                        });
+                    }
+                    if (botRowT.length) teamRows.push(botRowT);
+
+                    const imgLdr = await renderCompositePng({
+                        title: `LAPORAN LENGKAP TIM ${ldrName.toUpperCase()}`,
+                        subtitle: `MTD 1-${data.hari} ${data.bln_ini} ${data.tahun}  •  Sisa ${data.sisa_hari} hari  •  Target MTD ${data.target_mtd}%  •  Detail MTD + Harian + WO`,
+                        banner: { top: 'TARGET', left: data.periode, right: data.target_mtd + '%' },
+                        panelRows: teamRows,
+                        notes: [`PERSENTASE = SA ÷ Target Total. Gabungan Detail Agent MTD, Rincian Harian (SO=GP) & Monitoring WO Tim ${ldrName}.`],
                     });
                     const safeL = ldrName.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
                     const escCapL = ldrName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     out.push({
-                        fileName: `${String(seq).padStart(2, '0')}_Detail_Agent_${safeL}.png`,
-                        caption: `📋 <b>Detail Agent — Tim ${escCapL}</b> | ${data.periode} | Target MTD ${data.target_mtd}%`,
-                        blob: imgLdr.blob,
-                        dataUrl: imgLdr.dataUrl,
+                        fileName: `03_${String(seq).padStart(2, '0')}_Laporan_Tim_${safeL}.png`,
+                        caption: `📋 <b>Laporan Lengkap Tim ${escCapL}</b> | ${data.periode} | Target MTD ${data.target_mtd}%`,
+                        ...imgLdr,
                     });
                     seq++;
                 }
             }
+            if (data.wo_summary && data.wo_summary.include_cards && data.wo_summary.agent_summary) {
+                for (const ag of data.wo_summary.agent_summary) out.push(await renderAgentWoCardPng(ag, data.wo_summary.today_label, data.wo_summary.besok_label));
+            }
             return out;
         }
+
+        function openHdLightbox(im) {
+            const lb = document.getElementById('hd-img-lightbox');
+            if (!lb) return;
+            const imgEl = document.getElementById('hd-lb-img');
+            const capEl = document.getElementById('hd-lb-cap');
+            const dlEl  = document.getElementById('hd-lb-dl');
+            const cpEl  = document.getElementById('hd-lb-copy');
+            if (imgEl) imgEl.src = im.dataUrl;
+            if (capEl) capEl.textContent = `${im.fileName} (${im.width || '?'}×${im.height || '?'} Super-HD)`;
+            if (dlEl) { dlEl.href = im.dataUrl; dlEl.download = im.fileName; }
+            if (cpEl) cpEl.onclick = () => window.copyImgForWa(im, cpEl);
+            lb.classList.add('open');
+        }
+
+        window.copyImgForWa = async function(im, btnEl) {
+            const orig = btnEl ? btnEl.textContent : '';
+            try {
+                if (navigator.clipboard && window.ClipboardItem && im.blob) {
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': im.blob })]);
+                    if (btnEl) {
+                        btnEl.textContent = '✅ Tersalin! Paste di WA';
+                        setTimeout(() => { btnEl.textContent = orig; }, 2200);
+                    }
+                    return;
+                }
+            } catch (err) {
+                // fallback info below
+            }
+            alert('Browser belum mengizinkan Clipboard API langsung. Gunakan tombol Download HD (.png) lalu kirim sebagai Foto/Dokumen di WhatsApp.');
+        };
 
         function appendImageGrid(container, imgs, gridClass) {
             const grid = document.createElement('div');
@@ -3599,23 +3725,34 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 const card = document.createElement('div');
                 card.className = 'wo-img-card';
                 const bar = document.createElement('div');
-                bar.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;';
+                bar.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;';
                 const ttl = document.createElement('b');
                 ttl.style.fontSize = '0.82rem';
-                ttl.textContent = im.fileName;
+                ttl.textContent = `${im.fileName}` + (im.width ? ` (${im.width}×${im.height} HD)` : '');
+                const acts = document.createElement('div');
+                acts.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
+                const cp = document.createElement('button');
+                cp.type = 'button'; cp.className = 'btn';
+                cp.style.cssText = 'padding:5px 10px; font-size:0.78rem; background:#059669;';
+                cp.textContent = '📋 Copy (WA)';
+                cp.onclick = () => window.copyImgForWa(im, cp);
+                const zm = document.createElement('button');
+                zm.type = 'button'; zm.className = 'btn btn-amber';
+                zm.style.cssText = 'padding:5px 10px; font-size:0.78rem;';
+                zm.textContent = '🔍 Zoom';
+                zm.onclick = () => openHdLightbox(im);
                 const dl = document.createElement('a');
-                dl.href = im.dataUrl;
-                dl.download = im.fileName;
+                dl.href = im.dataUrl; dl.download = im.fileName;
                 dl.className = 'btn btn-green';
                 dl.style.cssText = 'padding:5px 10px; font-size:0.78rem;';
                 dl.textContent = '📥 Download .png';
-                bar.appendChild(ttl);
-                bar.appendChild(dl);
+                acts.appendChild(cp); acts.appendChild(zm); acts.appendChild(dl);
+                bar.appendChild(ttl); bar.appendChild(acts);
                 const imgEl = document.createElement('img');
-                imgEl.src = im.dataUrl;
-                imgEl.alt = im.fileName;
-                card.appendChild(bar);
-                card.appendChild(imgEl);
+                imgEl.src = im.dataUrl; imgEl.alt = im.fileName;
+                imgEl.title = 'Klik untuk Zoom Super-HD';
+                imgEl.onclick = () => openHdLightbox(im);
+                card.appendChild(bar); card.appendChild(imgEl);
                 grid.appendChild(card);
             }
             container.appendChild(grid);
@@ -3729,13 +3866,12 @@ $authUser = $_SESSION['auth_user'] ?? null;
             const box = document.getElementById('wo-gal-tables');
             const ws = (PREVIEW_DATA && PREVIEW_DATA.wo_summary) ? PREVIEW_DATA.wo_summary : null;
             if (!box || !ws) return;
-            box.innerHTML = '<div style="padding:10px; color:#1e3a8a; font-weight:700;">⏳ Merender foto Ringkasan, Pivot 1/2/3 &amp; Tim per Leader...</div>';
+            box.innerHTML = '<div style="padding:10px; color:#1e3a8a; font-weight:700;">⏳ Merender foto gabungan Super-HD...</div>';
             try {
-                // Gunakan buildAllReportPngs-style WO subset (Ringkasan + Pivot + Tim)
                 const prevClone = Object.assign({}, PREVIEW_DATA, { mtd_rows: [], daily_rows: [], agent_rows: [] });
                 if (prevClone.wo_summary) prevClone.wo_summary = Object.assign({}, prevClone.wo_summary, { include_cards: false });
                 const imgs = await buildAllReportPngs(prevClone);
-                box.innerHTML = '<b>📸 Foto Ringkasan, Detail Pivot &amp; Setiap Tim Leader (' + imgs.length + ' Foto PNG):</b>';
+                box.innerHTML = '<b>📸 Foto Gabungan Super-HD — Ringkasan, Besok &amp; Waiting WO + WO Today Multi-Kolom (' + imgs.length + ' Foto PNG):</b>';
                 appendImageGrid(box, imgs, 'wo-img-grid');
                 box.dataset.rendered = '1';
             } catch (err) {
@@ -3777,7 +3913,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                 const prevClone = Object.assign({}, PREVIEW_DATA, { mtd_rows: [], daily_rows: [], agent_rows: [] });
                 if (prevClone.wo_summary) prevClone.wo_summary = Object.assign({}, prevClone.wo_summary, { include_cards: false });
                 imgs = await buildAllReportPngs(prevClone);
-                zipName = `Foto_WO_Ringkasan_Pivot_Tim_${ws.today_label}.zip`;
+                zipName = `Foto_WO_Gabungan_SuperHD_${ws.today_label}.zip`;
             } else {
                 const list = getWoFilteredAgents();
                 imgs = await renderAgentCardsBatch(list, ws.today_label, ws.besok_label);
@@ -3812,7 +3948,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
             const gal = document.getElementById('tg-preview-gallery');
             if (!gal) return;
             gal.style.display = 'block';
-            gal.innerHTML = '<div style="padding:10px; color:#1e3a8a; font-weight:700;">⏳ Merender seluruh gambar tabel presentasi &amp; WO (.png)...</div>';
+            gal.innerHTML = '<div style="padding:10px; color:#1e3a8a; font-weight:700;">⏳ Merender foto laporan gabungan Super-HD (.png)...</div>';
             try {
                 const prevCopy = Object.assign({}, PREVIEW_DATA);
                 const incCardEl = document.querySelector('input[name="include_wo_cards"]');
@@ -3823,7 +3959,7 @@ $authUser = $_SESSION['auth_user'] ?? null;
                     prevCopy.wo_summary = Object.assign({}, prevCopy.wo_summary, { include_cards: !!(incCardEl && incCardEl.checked) });
                 }
                 const imgs = await buildAllReportPngs(prevCopy);
-                gal.innerHTML = '<h4 style="margin:0 0 10px 0;">🖼️ Pratinjau Semua Gambar Presentasi &amp; WO (' + imgs.length + ' Gambar PNG)</h4>';
+                gal.innerHTML = '<h4 style="margin:0 0 10px 0;">🖼️ Pratinjau Foto Gabungan Super-HD &amp; Laporan Tim (' + imgs.length + ' Foto PNG — Siap Copy ke WhatsApp)</h4>';
                 appendImageGrid(gal, imgs, 'wo-img-grid');
             } catch (err) {
                 gal.innerHTML = '<div class="alert-err">❌ Gagal membuat pratinjau gambar: ' + err.message + '</div>';
@@ -3939,6 +4075,15 @@ $authUser = $_SESSION['auth_user'] ?? null;
     })();
     </script>
 <?php endif; ?>
+<div id="hd-img-lightbox" class="hd-lightbox" onclick="if(event.target===this)this.classList.remove('open')">
+    <div id="hd-lb-cap" style="color:#f8fafc; font-weight:700; font-size:0.95rem;"></div>
+    <img id="hd-lb-img" src="" alt="Zoom Super-HD">
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="hd-lb-copy" type="button" class="btn" style="background:#059669;">📋 Copy ke WhatsApp</button>
+        <a id="hd-lb-dl" href="#" download="" class="btn btn-green">📥 Download HD (.png)</a>
+        <button type="button" class="btn" style="background:#475569;" onclick="document.getElementById('hd-img-lightbox').classList.remove('open')">✖️ Tutup</button>
+    </div>
+</div>
 </div>
 </body>
 </html>

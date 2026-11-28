@@ -22,7 +22,6 @@ from security_firewall import (
     cek_status_lockout,
     decrypt_vault,
     muat_config_roles,
-    muat_config_superadmin,
     periksa_input_waf,
     reset_gagal_login,
     username_super_admin,
@@ -3103,9 +3102,9 @@ with tab_utama:
                 else:
                     st.info("Tidak ada antrean Waiting WO (Instalasi Blank) pada bulan aktif.")
             with tab_wogal:
-                wo_imgs = buat_semua_gambar_wo(wo_summary, include_pivot=True, include_tim=True, include_kartu_agent=False)
+                wo_imgs = buat_semua_gambar_wo(wo_summary, include_detail=True, include_kartu_agent=False)
                 if wo_imgs:
-                    st.markdown("#### 🖼️ Foto Ringkasan, Pivot Lengkap & Per Tim Agent")
+                    st.markdown("#### 🖼️ Foto Gabungan Super-HD (Ringkasan, WO Today Multi-Kolom, Besok & Waiting)")
                     for fn_w, bytes_w, cap_w in wo_imgs:
                         st.image(bytes_w, caption=re.sub(r"<[^>]+>", "", cap_w))
                         st.download_button(label=f"📥 Download {fn_w}", data=bytes_w, file_name=fn_w, mime="image/png", key=f"dl_wo_{fn_w}")

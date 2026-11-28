@@ -22,7 +22,6 @@ import hmac
 import json
 import os
 import re
-import secrets
 import struct
 import time
 
@@ -88,16 +87,6 @@ def sha256_hex(teks: str) -> str:
     return hashlib.sha256(teks.encode("utf-8")).hexdigest()
 
 
-def bandingkan_hash_aman(input_plain: str, daftar_hash_valid: set[str]) -> bool:
-    """Membandingkan input terhadap daftar hash SHA-256 menggunakan hmac.compare_digest."""
-    h_input = sha256_hex(input_plain.strip())
-    cocok = False
-    for h_valid in daftar_hash_valid:
-        if hmac.compare_digest(h_input, h_valid):
-            cocok = True
-    return cocok
-
-
 # =============================================================================
 # ENKRIPSI BRANKAS VAULT (PBKDF2 + SHA256-CTR + HMAC-SHA256) — KOMPATIBEL PHP
 # =============================================================================
@@ -120,17 +109,6 @@ def _keystream_sha256(enc_key: bytes, nonce: bytes, panjang: int) -> bytes:
         hasil.extend(blok)
         counter += 1
     return bytes(hasil[:panjang])
-
-
-def encrypt_vault(payload: dict, password_master: str, salt_hex: str) -> str:
-    """Mengenkripsi data Brankas Role (JSON) menggunakan Super Admin Password sebagai Master Key."""
-    plain = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    enc_key, mac_key = _turunkan_kunci_vault(password_master, salt_hex)
-    nonce = secrets.token_bytes(16)
-    ks = _keystream_sha256(enc_key, nonce, len(plain))
-    ct = bytes(a ^ b for a, b in zip(plain, ks))
-    tag = hmac.new(mac_key, nonce + ct, hashlib.sha256).digest()
-    return base64.b64encode(nonce + tag + ct).decode("ascii")
 
 
 def decrypt_vault(vault_b64: str, password_master: str, salt_hex: str) -> dict | None:
@@ -210,97 +188,6 @@ def muat_config_roles() -> dict | None:
     except Exception:
         pass
     return None
-
-
-def buat_id_agen_unik(daftar_agen_raw: list[dict]) -> dict[str, dict]:
-    """Membuat ID unik `agt_<nama>` tanpa tabrakan untuk setiap agen aktif."""
-    kandidat: list[tuple[str, str, str, str]] = []
-    hitung_depan: dict[str, int] = {}
-
-    for item in daftar_agen_raw:
-        agent_key = str(item.get("Agent_Key", "")).strip()
-        nama_tampil = str(item.get("Nama_Tampil", "")).strip()
-        leader_def = str(item.get("Leader_Default", "")).strip()
-        if not agent_key or agent_key.startswith("VACANT__") or nama_tampil.upper() == "VACANT":
-            continue
-        depan_raw = nama_tampil.split()[0] if nama_tampil else agent_key.split()[0]
-        depan_slug = re.sub(r"[^a-z0-9]", "", depan_raw.lower()) or "agen"
-        hitung_depan[depan_slug] = hitung_depan.get(depan_slug, 0) + 1
-        kandidat.append((depan_slug, agent_key, nama_tampil, leader_def))
-
-    terpakai: set[str] = set()
-    hasil: dict[str, dict] = {}
-    for depan_slug, agent_key, nama_tampil, leader_def in kandidat:
-        full_slug = re.sub(r"[^a-z0-9]", "", nama_tampil.lower()) or depan_slug
-        uid = f"agt_{depan_slug}" if hitung_depan.get(depan_slug, 0) == 1 else f"agt_{full_slug[:22]}"
-        asli = uid
-        idx = 2
-        while uid in terpakai:
-            uid = f"{asli}{idx}"
-            idx += 1
-        terpakai.add(uid)
-        hasil[uid] = {
-            "name": nama_tampil,
-            "agent_key": agent_key,
-            "leader": leader_def,
-        }
-    return hasil
-
-
-def bangun_roles_config(
-    sa_password: str,
-    finance_user: str,
-    finance_pass: str,
-    leader_map: dict[str, str],
-    leader_pass: str,
-    agen_accounts: dict[str, dict],
-    agen_pass: str,
-) -> dict:
-    """Menyusun dictionary konfigurasi role (hanya hash untuk auth + vault terenkripsi)."""
-    salt_vault = secrets.token_hex(16)
-    h_fin = sha256_hex(finance_pass.strip())
-    h_ldr = sha256_hex(leader_pass.strip())
-    h_agt = sha256_hex(agen_pass.strip())
-
-    leaders_cfg = {
-        uid.lower(): {"leader": nama_ldr, "hash": h_ldr}
-        for uid, nama_ldr in leader_map.items()
-    }
-    agen_cfg = {}
-    for uid, meta in agen_accounts.items():
-        agen_cfg[uid.lower()] = {
-            "name": meta["name"],
-            "agent_key": meta["agent_key"],
-            "leader": meta["leader"],
-            "hash": h_agt,
-        }
-
-    vault_plain = {
-        "super_admin_id": username_super_admin(),
-        "finance": {"id": finance_user.lower(), "pass": finance_pass},
-        "leaders": {
-            "pass_default": leader_pass,
-            "ids": {uid.lower(): nama_ldr for uid, nama_ldr in leader_map.items()},
-        },
-        "agen": {
-            "pass_default": agen_pass,
-            "total": len(agen_accounts),
-            "sample_ids": list(agen_accounts.keys())[:15],
-            "accounts": {uid.lower(): meta for uid, meta in agen_accounts.items()},
-        },
-        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    }
-
-    return {
-        "version": 2,
-        "finance": {"username": finance_user.lower(), "hash": h_fin},
-        "leaders": leaders_cfg,
-        "leader_default_hash": h_ldr,
-        "agen_default_hash": h_agt,
-        "agen_accounts": agen_cfg,
-        "vault_salt": salt_vault,
-        "vault_enc": encrypt_vault(vault_plain, sa_password, salt_vault),
-    }
 
 
 def verifikasi_peran_non_admin(
